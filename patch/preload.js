@@ -596,6 +596,16 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
     { search: 'Provides a comprehensive guide, quick reference, and sitemap for Google Antigravity (AGY)', replace: '提供 Google Antigravity (AGY) 的全面指南、快速参考和网站地图' },
     { search: 'including the Antigravity CLI (agy), Antigravity 2.0, Antigravity IDE, Python SDK, slash commands, and customizations (skills, rules, MCP, sidecars).', replace: '包括 Antigravity 命令行界面 (agy)、Antigravity 2.0、Antigravity IDE、Python SDK、斜杠命令以及自定义项（技能、规则、MCP、挂载服务）。' },
     { search: 'Activate this skill when the user asks questions about how to use, configure, or customize Antigravity, AGY, the agy CLI, the Antigravity IDE, or Antigravity 2.0.', replace: '当用户询问如何使用、配置或自定义 Antigravity、AGY、agy 命令行、Antigravity IDE 或 Antigravity 2.0 时，激活此技能。' },
+    { search: 'Search MCP servers by name', replace: '按名称搜索 MCP 服务端' },
+    { search: 'Investigate and fix software issues using AI-powered root cause analysis. This MCP server connects to your Antimetal account to search issues, read', replace: '使用 AI 驱动的根因分析调查和修复软件问题。该 MCP 服务端连接到您的 Antimetal 账户以搜索问题、读取' },
+    { search: 'Query and act on your marketing, analytics, CRM, e-commerce, and warehouse data', replace: '查询并处理您的营销、分析、CRM、电子商务和仓库数据' },
+    { search: 'across 325+ connectors (Meta Ads, Google Ads, TikTok Ads, GA4, HubSpot,', replace: '支持 325+ 个连接器（Meta 广告、Google 广告、TikTok 广告、GA4、HubSpot' },
+    { search: 'Query your GitLab SDLC as a knowledge graph.', replace: '将您的 GitLab SDLC 作为知识图谱进行查询。' },
+    { search: 'Orbit indexes groups, projects, source code, merge requests, pipelines, work items, and security findings into a', replace: 'Orbit 将群组、项目、源代码、合并请求、流水线、工作项和安全发现索引到一个' },
+    { search: 'Enable Antigravity to deploy apps to Google Cloud Run.', replace: '允许 Antigravity 将应用部署到 Google Cloud Run。' },
+    { search: 'Interact directly with the PostHog product analytics platform using natural language.', replace: '使用自然语言直接与 PostHog 产品分析平台进行交互。' },
+    { search: 'Run queries, manage feature flags, track errors, and manage projects.', replace: '运行查询、管理特性标志、跟踪错误并管理项目。' },
+    { search: 'Allows interacting with Google Kubernetes Engine (GKE) clusters on Google Cloud Platform (GCP).', replace: '允许在 Google Cloud Platform (GCP) 上与 Google Kubernetes Engine (GKE) 集群进行交互。' },
     { search: 'Minimize', replace: '最小化' },
     { search: 'Maximize', replace: '最大化' },
     { search: 'Toggle Developer Tools', replace: '切换开发者工具' },
@@ -652,6 +662,15 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
 
   function translateString(text) {
     if (!text) return text;
+    
+    let replacedText = text;
+    for (const rule of substringReplacements) {
+      if (replacedText.includes(rule.search)) {
+        replacedText = replacedText.replaceAll(rule.search, rule.replace);
+      }
+    }
+    
+    text = replacedText;
     const trimmed = text.trim();
     if (!trimmed) return text;
 
