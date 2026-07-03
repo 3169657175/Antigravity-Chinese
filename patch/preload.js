@@ -292,6 +292,10 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
     "No MCP Servers": "无已安装的 MCP 服务器",
     "You currently don't have any MCP Servers installed.": "您当前未安装任何 MCP 服务器。",
     "Add an MCP server above": "在上方添加一个 MCP 服务器",
+    "Search MCP servers...": "搜索 MCP 服务器...",
+    "Available MCP Servers": "可用的 MCP 服务器",
+    "Enable": "启用",
+    "Disable": "禁用",
     "Build With Google Plugins": "使用 Google 插件构建",
     
     // Account
@@ -681,6 +685,88 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
     }
     if (/^Canceled/.test(trimmed)) {
       dynamicMatch = dynamicMatch.replace(/^Canceled (.*)/, '已取消 $1');
+      isDynamic = true;
+    }
+
+    // MCP Server Description dynamic translation
+    if (/^(Allows running|Allows interacting with|Allows querying|Allows accessing|Provides tools to|Provides tools for|Provides tools) (.*?)\.? This tool runs on the host system outside of any sandboxes\.?$/i.test(trimmed)) {
+      const action = RegExp.$1.toLowerCase();
+      const target = RegExp.$2.trim();
+      let actionZh = '';
+      if (action.includes('running')) {
+        actionZh = '允许运行';
+      } else if (action.includes('interacting')) {
+        actionZh = '允许与';
+      } else if (action.includes('querying')) {
+        actionZh = '允许查询';
+      } else if (action.includes('accessing')) {
+        actionZh = '允许访问';
+      } else if (action.includes('tools for') || action.includes('tools to') || action.includes('provides tools')) {
+        actionZh = '提供用于';
+      }
+      
+      let targetZh = target;
+      const targetLower = target.toLowerCase();
+      if (targetLower === 'cmd.exe commands on windows') targetZh = 'Windows 上的 cmd.exe 命令';
+      else if (targetLower === 'ipconfig to inspect network settings on the host machine') targetZh = 'ipconfig 以检查宿主机的网络设置';
+      else if (targetLower === 'querying active directory domain services on windows') targetZh = '在 Windows 上查询活动目录 (Active Directory) 域服务';
+      else if (targetLower === 'bash shell commands') targetZh = 'bash Shell 命令';
+      else if (targetLower === 'cmd shell commands') targetZh = 'cmd Shell 命令';
+      else if (targetLower === 'the docker daemon') targetZh = 'Docker 守护进程';
+      else if (targetLower === 'git repositories') targetZh = 'Git 仓库';
+      else if (targetLower === 'search files using grep') targetZh = '使用 grep 搜索文件';
+      else if (targetLower === 'managing homebrew packages') targetZh = '管理 Homebrew 软件包';
+      else if (targetLower === 'interacting with a kubernetes cluster' || targetLower === 'a kubernetes cluster') targetZh = 'Kubernetes 集群';
+      else if (targetLower === 'the npm package manager') targetZh = 'npm 包管理器';
+      else if (targetLower === 'the pip package manager') targetZh = 'pip 包管理器';
+      else if (targetLower === 'running python scripts and modules' || targetLower === 'python scripts and modules') targetZh = '运行 Python 脚本和模块';
+      else if (targetLower === 'searching files using ripgrep') targetZh = '使用 ripgrep 搜索文件';
+      else if (targetLower === 'a sqlite database') targetZh = 'SQLite 数据库';
+      else if (targetLower === 'the command line tool curl') targetZh = '命令行工具 curl';
+      else if (targetLower === 'the google cloud cli') targetZh = 'Google Cloud CLI';
+      else if (targetLower === 'google cloud pub/sub') targetZh = 'Google Cloud Pub/Sub';
+      else if (targetLower === 'google cloud storage') targetZh = 'Google Cloud Storage';
+      else if (targetLower === 'google cloud spanner') targetZh = 'Google Cloud Spanner';
+      else if (targetLower === 'google cloud secret manager') targetZh = 'Google Cloud Secret Manager';
+      else if (targetLower === 'google cloud kms') targetZh = 'Google Cloud KMS';
+      else if (targetLower === 'github repositories') targetZh = 'GitHub 仓库';
+      else if (targetLower === 'gitlab repositories') targetZh = 'GitLab 仓库';
+      else if (targetLower === 'gmail messages and drafts') targetZh = 'Gmail 邮件与草稿';
+      else if (targetLower === 'google calendar events') targetZh = 'Google 日历事件';
+      else if (targetLower === 'google docs documents') targetZh = 'Google 文档';
+      else if (targetLower === 'google drive files and folders') targetZh = 'Google 云端硬盘文件与文件夹';
+      else if (targetLower === 'google sheets spreadsheets') targetZh = 'Google 表格';
+      else if (targetLower === 'jira issues') targetZh = 'Jira 事务';
+      else if (targetLower === 'confluence pages') targetZh = 'Confluence 页面';
+      else if (targetLower === 'slack channels and messages') targetZh = 'Slack 频道与消息';
+      else if (targetLower === 'linear issues') targetZh = 'Linear 事务';
+      else if (targetLower === 'notion pages and databases') targetZh = 'Notion 页面与数据库';
+      else if (targetLower === 'a postgresql database') targetZh = 'PostgreSQL 数据库';
+      else if (targetLower === 'a mysql database') targetZh = 'MySQL 数据库';
+      else if (targetLower === 'a redis cache') targetZh = 'Redis 缓存';
+      else if (targetLower === 'an elasticsearch cluster') targetZh = 'Elasticsearch 集群';
+      else if (targetLower === 'a mongodb database') targetZh = 'MongoDB 数据库';
+      else if (targetLower === 'sentry projects and issues') targetZh = 'Sentry 项目与问题';
+      else if (targetLower === 'datadog services') targetZh = 'Datadog 服务';
+      else if (targetLower === 'aws services') targetZh = 'AWS 服务';
+      else if (targetLower === 'azure services') targetZh = 'Azure 服务';
+      else if (targetLower === 'cloudflare services') targetZh = 'Cloudflare 服务';
+      else if (targetLower === 'vercel services') targetZh = 'Vercel 服务';
+      else if (targetLower === 'heroku services') targetZh = 'Heroku 服务';
+      else if (targetLower === 'netlify services') targetZh = 'Netlify 服务';
+      else if (targetLower === 'github copilot services') targetZh = 'GitHub Copilot 服务';
+      else if (targetLower === 'openai services') targetZh = 'OpenAI 服务';
+      else if (targetLower === 'anthropic services') targetZh = 'Anthropic 服务';
+      else if (targetLower === 'google gemini services') targetZh = 'Google Gemini 服务';
+      else if (targetLower === 'google vertex ai services') targetZh = 'Google Vertex AI 服务';
+
+      if (action.includes('tools for') || action.includes('tools to') || action.includes('provides tools')) {
+        dynamicMatch = `${actionZh}${targetZh}的工具。该工具运行在沙盒外的宿主系统上。`;
+      } else if (action.includes('interacting')) {
+        dynamicMatch = `${actionZh}${targetZh}进行交互。该工具运行在沙盒外的宿主系统上。`;
+      } else {
+        dynamicMatch = `${actionZh}${targetZh}。该工具运行在沙盒外的宿主系统上。`;
+      }
       isDynamic = true;
     }
 
