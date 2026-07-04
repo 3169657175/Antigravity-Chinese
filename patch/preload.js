@@ -1705,15 +1705,15 @@ try {
             if (!info || !info.port || !info.csrf) return;
 
             const endpoints = [
-              '/exa.language_server_pb.LanguageServerService/GetUserStatus',
-              '/exa.language_server_pb.LanguageServerService/GetModelLimits',
-              '/exa.language_server_pb.LanguageServerService/GetMembership',
-              '/exa.language_server_pb.LanguageServerService/GetQuota'
+              '/v1internal:fetchAvailableModels',
+              '/v1internal:loadCodeAssist',
+              '/v1internal:retrieveUserQuotaSummary'
             ];
 
             for (const ep of endpoints) {
               try {
-                const res = await fetch('https://127.0.0.1:' + info.port + ep, {
+                // Using relative path for same-origin request, bypassing CORS and SSL issues
+                const res = await fetch(ep, {
                   method: 'POST',
                   headers: {
                     'x-csrf-token': info.csrf,
@@ -1723,7 +1723,9 @@ try {
                 });
                 const text = await res.text();
                 
-                // If it contains the keys we want, parse and store!
+                // Write debug log to local mcp_spy.txt
+                logUrl('AUTO_POLL_' + ep.replace(':', '_'), 'POST', text);
+                
                 if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota') || text.includes('weekly')) {
                   try {
                     const json = JSON.parse(text);
