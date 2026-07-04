@@ -1437,10 +1437,10 @@ try {
         settingsBtn.parentNode.insertBefore(widget, settingsBtn);
       }
       
-      const gWeekly = localStorage.getItem('quota_gemini_weekly') || '100%';
-      const g5h = localStorage.getItem('quota_gemini_5h') || '100%';
-      const cWeekly = localStorage.getItem('quota_claude_weekly') || '100%';
-      const c5h = localStorage.getItem('quota_claude_5h') || '100%';
+      const gWeekly = localStorage.getItem('quota_gemini_weekly') || '--';
+      const g5h = localStorage.getItem('quota_gemini_5h') || '--';
+      const cWeekly = localStorage.getItem('quota_claude_weekly') || '--';
+      const c5h = localStorage.getItem('quota_claude_5h') || '--';
       
       function getCurrentModel() {
         try {
@@ -1618,6 +1618,11 @@ try {
         XMLHttpRequest.prototype.open = function(method, url, ...args) {
           this._url = url;
           this._method = method;
+          try {
+            if (window.mcpLogger && window.mcpLogger.writeLog) {
+              window.mcpLogger.writeLog('[XHR_REQ] url=' + url + ' method=' + method + '\n');
+            }
+          } catch(e) {}
           return origOpen.apply(this, [method, url, ...args]);
         };
         XMLHttpRequest.prototype.send = function(...args) {
@@ -1640,6 +1645,11 @@ try {
         // WebSocket Spy
         const OrigWebSocket = window.WebSocket;
         window.WebSocket = function(url, protocols) {
+          try {
+            if (window.mcpLogger && window.mcpLogger.writeLog) {
+              window.mcpLogger.writeLog('[WS_OPEN] url=' + url + '\n');
+            }
+          } catch(e) {}
           const ws = new OrigWebSocket(url, protocols);
           
           function logWs(direction, data) {
@@ -1683,6 +1693,11 @@ try {
         // EventSource Spy
         const OrigEventSource = window.EventSource;
         window.EventSource = function(url, configuration) {
+          try {
+            if (window.mcpLogger && window.mcpLogger.writeLog) {
+              window.mcpLogger.writeLog('[SSE_OPEN] url=' + url + '\n');
+            }
+          } catch(e) {}
           const es = new OrigEventSource(url, configuration);
           es.addEventListener('message', function(event) {
             logUrl(url, 'SSE_RECV', event.data);
@@ -1696,24 +1711,69 @@ try {
           return es;
         };
         window.EventSource.prototype = OrigEventSource.prototype;
+
+        // Fetch Spy
+        const origFetch = window.fetch;
+        window.fetch = async function(...args) {
+          const url = args[0];
+          const options = args[1] || {};
+          const method = options.method || 'GET';
+          try {
+            if (window.mcpLogger && window.mcpLogger.writeLog) {
+              window.mcpLogger.writeLog('[FETCH_REQ] url=' + url + ' method=' + method + '\n');
+            }
+          } catch(e) {}
+          const res = await origFetch.apply(this, args);
+          try {
+            if (typeof url === 'string') {
+              const clone = res.clone();
+              const text = await clone.text();
+              logUrl(url, method, text);
+              
+              if (text.includes('limit') || text.includes('quota') || text.includes('percentUsed')) {
+                try {
+                  const json = JSON.parse(text);
+                  parseAndStoreQuotaJson(json);
+                } catch(e) {}
+              }
+            }
+          } catch (e) {}
+          return res;
+        };
       })();
     `;
 
-    const script = document.createElement('script');
-    script.textContent = spyCode;
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
+    electron_1.webFrame.executeJavaScript(spyCode);
   } catch (e) {
     console.error('Network telemetry spy injection failed:', e);
   }
 
+  const setupActivityListeners = () => {
+    let lastNotify = 0;
+    const notifyActive = () => {
+      const now = Date.now();
+      // Throttling: only send IPC message once every 3 seconds to avoid IPC flooding
+      if (now - lastNotify > 3000) {
+        lastNotify = now;
+        electron_1.ipcRenderer.send('user-active');
+      }
+    };
+
+    // User is active if they move mouse, type, or click anywhere in the window
+    window.addEventListener('mousemove', notifyActive, true);
+    window.addEventListener('keydown', notifyActive, true);
+    window.addEventListener('mousedown', notifyActive, true);
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       startObserver();
+      setupActivityListeners();
       setInterval(injectQuotaWidget, 2000);
     });
   } else {
     startObserver();
+    setupActivityListeners();
     setInterval(injectQuotaWidget, 2000);
   }
 })();

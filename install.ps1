@@ -73,6 +73,7 @@ Copy-Item -Path "$patchDir\tray.js" -Destination "$tempDir\dist\tray.js" -Force
 Copy-Item -Path "$patchDir\main.js" -Destination "$tempDir\dist\main.js" -Force
 Copy-Item -Path "$patchDir\utils.js" -Destination "$tempDir\dist\utils.js" -Force
 Copy-Item -Path "$patchDir\languageServer.js" -Destination "$tempDir\dist\languageServer.js" -Force
+Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandlers.js" -Force
 
 # 7. Repack asar
 Write-Host "[+] 正在重包 app.asar..." -ForegroundColor Cyan
