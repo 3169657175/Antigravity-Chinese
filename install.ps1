@@ -1,4 +1,4 @@
-﻿# Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
+# Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
 # Cross-version safe local asar patching mechanism
 
 $Host.UI.RawUI.WindowTitle = "Antigravity 2.0 汉化与优化工具"
@@ -82,9 +82,19 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "[X] 打包失败，还原备份中..." -ForegroundColor Red
     Copy-Item -Path $backupPath -Destination $asarPath -Force
     exit 1
-}
+# 8. Register Auto-Healer in Startup Folder
+Write-Host "[+] 正在配置自动防更新覆盖自愈服务..." -ForegroundColor Cyan
+$cachedPatchedAsar = "C:\Users\niu\.gemini\antigravity\scratch\app.asar"
+Copy-Item -Path $asarPath -Destination $cachedPatchedAsar -Force
 
-# 8. Clean up
+$startupFile = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\AntigravityPatchAutoHealer.vbs"
+$vbsContent = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -File ""$scriptDir\auto_heal.ps1""", 0, False
+"@
+[System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::UTF8)
+
+# 9. Clean up
 Write-Host "[+] 正在清理临时工作文件..." -ForegroundColor Cyan
 Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -97,5 +107,6 @@ Write-Host "  1. 100% 完整汉化（支持云端热更新字典，支持标题�
 Write-Host "  2. 高精度代码防护（Monaco 代码区/终端日志绝不误翻译）" -ForegroundColor Green
 Write-Host "  3. 0ms 瞬间还原（托盘双击/左键立即还原，无 loading 重新加载）" -ForegroundColor Green
 Write-Host "  4. 免 TUN 代理优化（自动解析系统代理传递给智能体）" -ForegroundColor Green
+Write-Host "  5. 自动更新保护（官方升级覆盖补丁时，开机/登录后自动秒级恢复）" -ForegroundColor Green
 Write-Host ""
 Write-Host "  请手动重新运行您的 Antigravity 2.0 桌面客户端享受极速体验！" -ForegroundColor Cyan
