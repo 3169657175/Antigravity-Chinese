@@ -728,9 +728,10 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       isDynamic = true;
     }
     // Community MCP registry template rules
-    if (/^Enable Antigravity to (interact with|deploy apps to) (.*?)\.?$/i.test(trimmed)) {
-      const act = RegExp.$1;
-      const target = RegExp.$2;
+    const matchEnable = trimmed.match(/^Enable Antigravity to (interact with|deploy apps to) (.*?)\.?$/i);
+    if (matchEnable) {
+      const act = matchEnable[1];
+      const target = matchEnable[2];
       if (act === 'interact with') {
         dynamicMatch = `允许 Antigravity 与 ${target} 进行交互。`;
       } else {
@@ -738,33 +739,75 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       }
       isDynamic = true;
     }
-    else if (/^The (.*?) MCP server exposes (.*?) development tool actions to compatible AI-assistant clients\.?$/i.test(trimmed)) {
-      const name = RegExp.$1;
-      const target = RegExp.$2;
+    
+    const matchExposes = trimmed.match(/^The (.*?) MCP server exposes (.*?) development tool actions to compatible AI-assistant clients\.?$/i);
+    if (!isDynamic && matchExposes) {
+      const name = matchExposes[1];
+      const target = matchExposes[2];
       dynamicMatch = `${name} MCP 服务端，向兼容的 AI 助手客户端公开 ${target} 开发工具操作。`;
       isDynamic = true;
     }
-    else if (/^The (.*?) Model Context Protocol \(MCP\) Server gives AI-powered development tools the ability to (.*?)\.?$/i.test(trimmed)) {
-      const name = RegExp.$1;
-      let action = RegExp.$2;
+
+    const matchGives = trimmed.match(/^The (.*?) Model Context Protocol \(MCP\) (Server|server) gives AI-powered development tools the ability to (.*?)\.?$/i);
+    if (!isDynamic && matchGives) {
+      const name = matchGives[1];
+      let action = matchGives[3];
       action = action.replace(/work with your (.*?) projects and your app's codebase/i, '协同处理您的 $1 项目及应用代码库');
       action = action.replace(/build, debug and inspect your (.*?) app/i, '构建、调试与检查您的 $1 应用');
       action = action.replace(/build, debug and inspect your (.*)/i, '构建、调试与检查您的 $1');
       dynamicMatch = `针对 ${name} 的模型上下文协议 (MCP) 服务端，为 AI 辅助开发工具提供${action}的能力。`;
       isDynamic = true;
     }
-    else if (/^The (.*?) Model Context Protocol \(MCP\) server provides tools for (.*?)\.?$/i.test(trimmed)) {
-      const name = RegExp.$1;
-      let action = RegExp.$2;
+
+    const matchProvides = trimmed.match(/^The (.*?) Model Context Protocol \(MCP\) server provides tools for (.*?)\.?$/i);
+    if (!isDynamic && matchProvides) {
+      const name = matchProvides[1];
+      let action = matchProvides[2];
       action = action.replace(/semantic code analysis, live diagnostics, and transformation of your non-google3 Go codebase/i, '语义代码分析、实时诊断和非 google3 Go 代码库的转换');
       dynamicMatch = `${name} 模型上下文协议 (MCP) 服务端，提供用于 ${action} 的工具。`;
       isDynamic = true;
     }
 
+    // 5. Interact with your ... data...
+    const matchInteractData = trimmed.match(/^Interact with your (.*?) data using natural language\. This MCP server (.*?)\.?$/i);
+    if (!isDynamic && matchInteractData) {
+      const target = matchInteractData[1];
+      let action = matchInteractData[2];
+      action = action.replace(/allows you to securely connect to your datasets to search the datasets, inspect table.*/i, '允许您安全地连接到数据集以搜索数据集、检查数据表并获取结构信息。');
+      dynamicMatch = `使用自然语言与您的 ${target} 数据进行交互。该 MCP 服务端${action}`;
+      isDynamic = true;
+    }
+
+    // 6. Connect your AI assistant(s) to ...
+    const matchConnectAI = trimmed.match(/^Connect your AI assistant(?:s)? to (.*?)(?:\. This MCP server|,)(?:\s+)?(enables|enabling) (.*?)\.?$/i);
+    if (!isDynamic && matchConnectAI) {
+      const target = matchConnectAI[1];
+      let action = matchConnectAI[3];
+      action = action.replace(/data exploration and content management by allowing you to execute.*/i, '通过允许您执行自然语言查询，来实现数据探索与内容管理。');
+      action = action.replace(/data discovery and governance by allowing you to.*/i, '通过允许您执行数据探索和治理，来实现数据发现与数据治理。');
+      dynamicMatch = `将您的 AI 助手连接到 ${target}。该 MCP 服务端${action}`;
+      isDynamic = true;
+    }
+
+    // 7. The ... remote MCP server lets you ... (Bigtable Admin, Cloud SQL, Spanner)
+    const matchRemoteMCP = trimmed.match(/^The (.*?) (?:remote )?MCP server lets you (.*?)\.?$/i);
+    if (!isDynamic && matchRemoteMCP) {
+      const name = matchRemoteMCP[1];
+      let action = matchRemoteMCP[2];
+      action = action.replace(/manage (.*?) resources/i, '管理 $1 资源');
+      action = action.replace(/access and run (.*?) tools to (.*)/i, '访问和运行 $1 工具以：$2');
+      action = action.replace(/manage Cloud SQL instances, manage users, create and restore backups.*/i, '管理 Cloud SQL 实例、管理用户、创建和恢复备份等');
+      action = action.replace(/manage AlloyDB clusters and instances, manage users, create and restore.*/i, '管理 AlloyDB 集群和实例、管理用户、创建和恢复备份等');
+      action = action.replace(/create, manage, and query Spanner resources from your AI-enabled development.*/i, '从您的 AI 辅助开发环境中创建、管理和查询 Spanner 资源');
+      dynamicMatch = `${name} 远程 MCP 服务端，允许您${action}。`;
+      isDynamic = true;
+    }
+
     // MCP Server Description dynamic translation
-    else if (/^(Allows running|Allows interacting with|Allows querying|Allows accessing|Provides tools to|Provides tools for|Provides tools) (.*?)\.? This tool runs on the host system outside of any sandboxes\.?$/i.test(trimmed)) {
-      const action = RegExp.$1.toLowerCase();
-      const target = RegExp.$2.trim();
+    const matchAllows = trimmed.match(/^(Allows running|Allows interacting with|Allows querying|Allows accessing|Provides tools to|Provides tools for|Provides tools) (.*?)\.? This tool runs on the host system outside of any sandboxes\.?$/i);
+    if (!isDynamic && matchAllows) {
+      const action = matchAllows[1].toLowerCase();
+      const target = matchAllows[2].trim();
       let actionZh = '';
       if (action.includes('running')) {
         actionZh = '允许运行';
