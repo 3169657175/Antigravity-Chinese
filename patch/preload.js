@@ -1183,10 +1183,6 @@ try {
     const observer = new MutationObserver((mutations) => {
       observer.disconnect();
       try {
-        // Update quota and widget
-        updateStoredQuota();
-        injectQuotaWidget();
-
         for (const mutation of mutations) {
           if (mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
@@ -1319,7 +1315,10 @@ try {
   
   function updateStoredQuota() {
     try {
-      const allDivs = document.getElementsByTagName('*');
+      const dialog = document.querySelector('[role="dialog"], .settings-modal, .onboarding-modal');
+      if (!dialog) return;
+      
+      const allDivs = dialog.querySelectorAll('*');
       for (let i = 0; i < allDivs.length; i++) {
         const el = allDivs[i];
         if (!el || el.children.length > 0) continue;
@@ -1382,11 +1381,12 @@ try {
 
   function injectQuotaWidget() {
     try {
-      const allElements = document.getElementsByTagName('*');
+      const buttons = document.querySelectorAll('button, .sidebar-item, nav [role="button"], a');
       let settingsBtn = null;
-      for (let i = 0; i < allElements.length; i++) {
-        const el = allElements[i];
-        if (el.children.length === 0 && (el.textContent === '设置' || el.textContent === 'Settings' || el.textContent === 'Global Settings' || el.textContent === '全局设置')) {
+      for (let i = 0; i < buttons.length; i++) {
+        const el = buttons[i];
+        const text = el.textContent ? el.textContent.trim() : '';
+        if (text === '设置' || text === 'Settings' || text === 'Global Settings' || text === '全局设置') {
           let cur = el;
           while (cur && cur.parentElement && cur.parentElement.tagName !== 'BODY') {
             if (cur.tagName === 'BUTTON' || cur.getAttribute('role') === 'button' || cur.classList.contains('sidebar-item') || cur.parentElement.tagName === 'NAV') {
@@ -1444,40 +1444,13 @@ try {
       
       function getCurrentModel() {
         try {
-          const allElements = document.getElementsByTagName('*');
-          for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i];
-            if (el.children.length === 0) {
-              const text = el.textContent ? el.textContent.trim() : '';
-              if (/^(Gemini|Claude|GPT-OSS|GPT)/i.test(text)) {
-                let cur = el;
-                let isInteractive = false;
-                while (cur && cur.tagName !== 'BODY') {
-                  const tag = cur.tagName;
-                  const role = cur.getAttribute('role');
-                  const cls = cur.className || '';
-                  if (tag === 'BUTTON' || role === 'button' || cls.includes('select') || cls.includes('trigger') || cls.includes('dropdown')) {
-                    isInteractive = true;
-                    break;
-                  }
-                  cur = cur.parentElement;
-                }
-                if (isInteractive) {
-                  return text;
-                }
-              }
-            }
-          }
-        } catch (e) {}
-        try {
-          const allElements = document.getElementsByTagName('*');
-          for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i];
-            if (el.children.length === 0) {
-              const text = el.textContent ? el.textContent.trim() : '';
-              if (/^(Gemini\s+3\.|Claude\s+(Sonnet|Opus)|GPT-OSS)/i.test(text)) {
-                return text;
-              }
+          const interactives = document.querySelectorAll('button, [role="button"], .select, .trigger, .dropdown, a');
+          for (let i = 0; i < interactives.length; i++) {
+            const el = interactives[i];
+            const text = el.textContent ? el.textContent.trim() : '';
+            const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
+            if (m) {
+              return m[1];
             }
           }
         } catch (e) {}
