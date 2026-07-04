@@ -40,6 +40,7 @@ exports.LS_BINARY = void 0;
 exports.getLsCL = getLsCL;
 exports.getLsProcess = getLsProcess;
 exports.getLsPort = getLsPort;
+exports.getLsCsrf = getLsCsrf;
 exports.clearLsProcess = clearLsProcess;
 exports.extractCrashStackTrace = extractCrashStackTrace;
 exports.startLanguageServer = startLanguageServer;
@@ -111,6 +112,7 @@ const AUTH_URL_PATTERN = /https:\/\/accounts\.google\.com\/o\/oauth2\/auth\S+/;
 // ---------------------------------------------------------------------------
 let _lsProcess = null;
 let _lsPort = 0;
+let _lsCsrf = '';
 let _intentionalTermination = false;
 let _restartCount = 0;
 let _lastRestartTime = 0;
@@ -121,6 +123,9 @@ function getLsProcess() {
 /** Returns the active language server port, or 0 if not running. */
 function getLsPort() {
     return _lsPort;
+}
+function getLsCsrf() {
+    return _lsCsrf;
 }
 /** Clears the language server process reference (call after killing it). */
 function clearLsProcess() {
@@ -349,6 +354,7 @@ function setIntentionalTermination(value) {
  */
 async function startAndMonitorLanguageServer(port, csrf, options = {}) {
     setIntentionalTermination(false); // Reset
+    _lsCsrf = csrf;
     const handle = await startLanguageServer(port, csrf, options.headless);
     _lsPort = handle.port;
     if (options.onPortChanged) {

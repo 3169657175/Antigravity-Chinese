@@ -1733,20 +1733,27 @@ try {
     };
 
     // User is active if they move mouse, type, or click anywhere in the window
-    window.addEventListener('mousemove', notifyActive, true);
     window.addEventListener('keydown', notifyActive, true);
     window.addEventListener('mousedown', notifyActive, true);
+  };
+
+  const setupInstantWidgetRefresh = () => {
+    window.addEventListener('click', () => {
+      setTimeout(injectQuotaWidget, 100);
+    }, true);
   };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       startObserver();
       setupActivityListeners();
+      setupInstantWidgetRefresh();
       setInterval(injectQuotaWidget, 2000);
     });
   } else {
     startObserver();
     setupActivityListeners();
+    setupInstantWidgetRefresh();
     setInterval(injectQuotaWidget, 2000);
   }
 })();
