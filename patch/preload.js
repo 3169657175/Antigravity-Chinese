@@ -593,6 +593,32 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
   const combinedDict = Object.assign({}, coreWords, dictionary);
 
   const substringReplacements = [
+    { search: 'Search MCP servers by name', replace: '按名称搜索 MCP 服务端' },
+    { search: 'Interact with the Dux platform using natural language. This MCP server enables agentic capabilities for account clients.', replace: '使用自然语言与 Dux 平台进行交互。该 MCP 服务端为账户客户端启用了智能体功能。' },
+    { search: 'Connect your AI assistant to Firebase. Exposes tools for database, auth, and analytics to build and deploy app projects.', replace: '将您的 AI 助手连接到 Firebase。提供用于数据库、身份验证和分析的工具，以构建和部署应用项目。' },
+    { search: 'The go-pls (Go Language Server) MCP server provides tools for semantic code navigation, refactoring, and code completion in your Go projects.', replace: 'go-pls (Go 语言服务器) MCP 服务端提供用于 Go 项目中语义代码导航、重构和代码补全的工具。' },
+    { search: 'Interact with BigQuery data using natural language. This MCP server lists datasets, runs queries, and inspects database schemas.', replace: '使用自然语言与 BigQuery 数据进行交互。该 MCP 服务端可以列出数据集、运行查询并检查数据库 Schema。' },
+    { search: 'The AlloyDB for PostgreSQL server MCP exposes a schema and a set of tools to manage AlloyDB clusters and resources, manage users, create and restore backups', replace: 'AlloyDB for PostgreSQL MCP 服务端公开了 Schema 和一组工具，用于管理 AlloyDB 集群和资源、管理用户、创建和恢复备份' },
+    { search: 'The Google Cloud Bigtable Admin MCP server lets you manage Bigtable resources.', replace: 'Google Cloud Bigtable Admin MCP 服务端允许您管理 Bigtable 资源。' },
+    { search: 'The Cloud SQL template MCP server lets you create and run Cloud SQL tools to examine database performance, configure instances, view logs, and more.', replace: 'Cloud SQL 模板 MCP 服务端允许您创建和运行 Cloud SQL 工具，以检查数据库性能、配置实例、查看日志等。' },
+    { search: 'The Spanner template MCP server lets you create and run Spanner tools to create, querying, and query Spanner resources.', replace: 'Spanner 模板 MCP 服务端允许您创建和运行 Spanner 工具，以创建、查询和管理 Spanner 资源。' },
+    { search: 'Connect your AI assistant to Looker business intelligence. This MCP server enables data exploration and content management by allowing agents to execute runs', replace: '将您的 AI 助手连接到 Looker 商业智能。该 MCP 服务端允许智能体执行数据探索和内容管理' },
+    { search: 'Connect your AI assistant to the Knowledge Sharing (formerly known as Dataplex)', replace: '将您的 AI 助手连接到知识共享（前身为 Dataplex）' },
+    { search: 'The MCP Toolbox for Databases is an open-source MCP server designed to simplify and secure the development of tools for interacting with databases.', replace: 'MCP Toolbox for Databases 是一个开源的 MCP 服务端，旨在简化并保护与数据库交互的工具开发。' },
+    { search: 'Interact with your Oracle Database using natural language. The MCP server allows you to safely connect to your database for execution, sql querying,', replace: '使用自然语言与您的 Oracle 数据库进行交互。该 MCP 服务端允许您安全地连接到数据库以执行 SQL 查询等' },
+    { search: 'The Figma Dev Mode MCP Server helps developers understand design layouts by converting design layout information to structural layout annotations', replace: 'Figma Dev Mode MCP 服务端通过将设计布局信息转换为结构化布局注释，帮助开发人员理解设计布局' },
+    { search: 'The standard GitHub Server for interacting with GitHub API', replace: '用于与 GitHub API 交互的官方标准 GitHub 服务端' },
+    { search: 'Allows AI Agents to interact with the Glean API, searching for items, reading documents, and conducting search queries.', replace: '允许 AI 智能体与 Glean API 进行交互，以搜索项目、阅读文档并执行搜索查询。' },
+    { search: 'The official Model Context Protocol server allows you to integrate with Stripe APIs to perform user billing, files and support issues lookup, and transaction lookup.', replace: '官方模型上下文协议 (MCP) 服务端允许您与 Stripe API 集成，以执行用户计费、文件和支持问题查找以及交易查询。' },
+    { search: 'Interact with Sentry issues and events.', replace: '与 Sentry 的问题 (Issues) 和事件 (Events) 进行交互。' },
+    { search: 'Official Slack MCP Server for interacting with Slack channels, users, and sending messages.', replace: '官方 Slack MCP 服务端，用于与 Slack 频道、用户进行交互并发送消息。' },
+    { search: 'Official Linear MCP Server for interacting with Linear projects, issues, and teams.', replace: '官方 Linear MCP 服务端，用于与 Linear 项目、问题和团队进行交互。' },
+    { search: 'An MCP server implementation that integrates the Puppeteer library to provide agents with web research capabilities.', replace: '集成了 Puppeteer 库的 MCP 服务端实现，为智能体提供网页调研能力。' },
+    { search: 'Official Figma MCP Server allows integration with Figma APIs for file review, code generation, and assets assets search.', replace: '官方 Figma MCP 服务端，允许与 Figma API 集成以进行文件评审、代码生成和资源搜索。' },
+    { search: 'The Heroku Platform API server provides seamless access to Heroku resources including apps, config vars, deploy keys, manage application, add-ons', replace: 'Heroku 平台 API 服务端提供对 Heroku 资源（包括应用、配置变量、部署密钥、应用管理、插件等）的无缝访问' },
+    { search: 'The Pinecone MCP server enables AI assistants to perform vector search, database index creation, generate code context to coordinate configuration, and', replace: 'Pinecone MCP 服务端允许 AI 助手执行向量搜索、数据库索引创建、生成代码上下文以协调配置等' },
+    { search: 'Connect your Supabase projects to AI assistants. This MCP server handles managing tables, executing queries, database schema querying, checking connection logs, and', replace: '将您的 Supabase 项目连接 to AI 助手。该 MCP 服务端负责管理表、执行查询、数据库 Schema 查询、检查连接日志等' },
+    { search: 'The Prisma MCP Server exposes API endpoints for database schema querying and migration execution.', replace: 'Prisma MCP 服务端公开了用于数据库 Schema 查询和迁移执行的 API 端点。' },
     { search: 'Provides a comprehensive guide, quick reference, and sitemap for Google Antigravity (AGY)', replace: '提供 Google Antigravity (AGY) 的全面指南、快速参考和网站地图' },
     { search: 'including the Antigravity CLI (agy), Antigravity 2.0, Antigravity IDE, Python SDK, slash commands, and customizations (skills, rules, MCP, sidecars).', replace: '包括 Antigravity 命令行界面 (agy)、Antigravity 2.0、Antigravity IDE、Python SDK、斜杠命令以及自定义项（技能、规则、MCP、挂载服务）。' },
     { search: 'Activate this skill when the user asks questions about how to use, configure, or customize Antigravity, AGY, the agy CLI, the Antigravity IDE, or Antigravity 2.0.', replace: '当用户询问如何使用、配置或自定义 Antigravity、AGY、agy 命令行、Antigravity IDE 或 Antigravity 2.0 时，激活此技能。' },
@@ -858,12 +884,12 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       return text.replace(trimmed, coreTranslated + trailPunc);
     }
 
-    // 3. Fallback to word-by-word ONLY for short strings (<= 3 words)
+    // 3. Fallback to word-by-word ONLY for short strings (<= 1 word)
     if (/[\u4e00-\u9fa5]/.test(core)) {
       return text;
     }
     const wordsCount = core.split(/\s+/).filter(Boolean).length;
-    if (wordsCount > 3) {
+    if (wordsCount > 1) {
       return text;
     }
 
