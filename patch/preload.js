@@ -889,7 +889,7 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       matchPunc = match[0];
       core = core.slice(0, -matchPunc.length).trim();
       
-      if (matchPunc === '.') trailPunc = '。';
+      if (matchPunc === '.') trailPunc = '.';
       else if (matchPunc === '?') trailPunc = '？';
       else if (matchPunc === '!') trailPunc = '！';
       else if (matchPunc === ':') trailPunc = '：';
