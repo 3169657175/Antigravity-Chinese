@@ -627,7 +627,7 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
     { search: 'Query and act on your marketing, analytics, CRM, e-commerce, and warehouse data', replace: '查询并处理您的营销、分析、CRM、电子商务和仓库数据' },
     { search: 'across 325+ connectors (Meta Ads, Google Ads, TikTok Ads, GA4, HubSpot,', replace: '支持 325+ 个连接器（Meta 广告、Google 广告、TikTok 广告、GA4、HubSpot' },
     { search: 'Query your GitLab SDLC as a knowledge graph.', replace: '将您的 GitLab SDLC 作为知识图谱进行查询。' },
-    { search: 'Orbit indexes groups, projects, source code, merge requests, pipelines, work items, and security findings into a', replace: 'Orbit 将群组、项目、源代码、合并请求、流水线、工作项和安全发现索引到一个' },
+    { search: 'Orbit indexes groups, projects, source code, merge requests, pipelines, work items, and security findings into a single graph so agents can answer blast radius', replace: 'Orbit 将群组、项目、源代码、合并请求、流水线、工作项和安全发现索引到单个图谱中，以便智能体能够回答影响范围' },
     { search: 'Enable Antigravity to deploy apps to Google Cloud Run.', replace: '允许 Antigravity 将应用部署到 Google Cloud Run。' },
     { search: 'Interact directly with the PostHog product analytics platform using natural language.', replace: '使用自然语言直接与 PostHog 产品分析平台进行交互。' },
     { search: 'Run queries, manage feature flags, track errors, and manage projects.', replace: '运行查询、管理特性标志、跟踪错误并管理项目。' },
@@ -727,9 +727,42 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       dynamicMatch = dynamicMatch.replace(/^Canceled (.*)/, '已取消 $1');
       isDynamic = true;
     }
+    // Community MCP registry template rules
+    if (/^Enable Antigravity to (interact with|deploy apps to) (.*?)\.?$/i.test(trimmed)) {
+      const act = RegExp.$1;
+      const target = RegExp.$2;
+      if (act === 'interact with') {
+        dynamicMatch = `允许 Antigravity 与 ${target} 进行交互。`;
+      } else {
+        dynamicMatch = `允许 Antigravity 将应用部署到 ${target}。`;
+      }
+      isDynamic = true;
+    }
+    else if (/^The (.*?) MCP server exposes (.*?) development tool actions to compatible AI-assistant clients\.?$/i.test(trimmed)) {
+      const name = RegExp.$1;
+      const target = RegExp.$2;
+      dynamicMatch = `${name} MCP 服务端，向兼容的 AI 助手客户端公开 ${target} 开发工具操作。`;
+      isDynamic = true;
+    }
+    else if (/^The (.*?) Model Context Protocol \(MCP\) Server gives AI-powered development tools the ability to (.*?)\.?$/i.test(trimmed)) {
+      const name = RegExp.$1;
+      let action = RegExp.$2;
+      action = action.replace(/work with your (.*?) projects and your app's codebase/i, '协同处理您的 $1 项目及应用代码库');
+      action = action.replace(/build, debug and inspect your (.*?) app/i, '构建、调试与检查您的 $1 应用');
+      action = action.replace(/build, debug and inspect your (.*)/i, '构建、调试与检查您的 $1');
+      dynamicMatch = `针对 ${name} 的模型上下文协议 (MCP) 服务端，为 AI 辅助开发工具提供${action}的能力。`;
+      isDynamic = true;
+    }
+    else if (/^The (.*?) Model Context Protocol \(MCP\) server provides tools for (.*?)\.?$/i.test(trimmed)) {
+      const name = RegExp.$1;
+      let action = RegExp.$2;
+      action = action.replace(/semantic code analysis, live diagnostics, and transformation of your non-google3 Go codebase/i, '语义代码分析、实时诊断和非 google3 Go 代码库的转换');
+      dynamicMatch = `${name} 模型上下文协议 (MCP) 服务端，提供用于 ${action} 的工具。`;
+      isDynamic = true;
+    }
 
     // MCP Server Description dynamic translation
-    if (/^(Allows running|Allows interacting with|Allows querying|Allows accessing|Provides tools to|Provides tools for|Provides tools) (.*?)\.? This tool runs on the host system outside of any sandboxes\.?$/i.test(trimmed)) {
+    else if (/^(Allows running|Allows interacting with|Allows querying|Allows accessing|Provides tools to|Provides tools for|Provides tools) (.*?)\.? This tool runs on the host system outside of any sandboxes\.?$/i.test(trimmed)) {
       const action = RegExp.$1.toLowerCase();
       const target = RegExp.$2.trim();
       let actionZh = '';
