@@ -107,6 +107,9 @@ electron_1.contextBridge.exposeInMainWorld('deepLink', deepLinkAPI);
 electron_1.contextBridge.exposeInMainWorld('agent', agentAPI);
 electron_1.contextBridge.exposeInMainWorld('electronNative', electronNativeAPI);
 electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
+electron_1.contextBridge.exposeInMainWorld('mcpLogger', {
+    writeLog: (text) => electron_1.ipcRenderer.invoke('mcp:write-log', text)
+});
 
 // ==========================================
 // Antigravity 2.0 Chinese Localization Engine
@@ -1519,15 +1522,8 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
           cleanText = responseText.substring(0, 2000) + '... (truncated)';
         }
         const logContent = `[${new Date().toISOString()}] ${method || 'GET'} ${url}\nResponse: ${cleanText}\n\n`;
-        if (window.nativeStorage && window.nativeStorage.getItems) {
-          window.nativeStorage.getItems().then(items => {
-            let oldLogs = items.mcp_spy_logs || '';
-            let newLogs = oldLogs + logContent;
-            if (newLogs.length > 100000) {
-              newLogs = newLogs.substring(newLogs.length - 100000);
-            }
-            window.nativeStorage.updateItems({ mcp_spy_logs: newLogs });
-          });
+        if (window.mcpLogger && window.mcpLogger.writeLog) {
+          window.mcpLogger.writeLog(logContent);
         }
       } catch (e) {}
     }
