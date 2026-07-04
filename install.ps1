@@ -54,7 +54,7 @@ if (Test-Path $tempDir) {
 }
 
 Write-Host "[+] 正在解包 app.asar..." -ForegroundColor Cyan
-& npx.cmd -y @electron/asar extract $asarPath $tempDir
+& npx.cmd --registry=https://registry.npmmirror.com -y @electron/asar extract $asarPath $tempDir
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[X] 解包失败，请检查文件写入权限。" -ForegroundColor Red
     exit 1
@@ -77,7 +77,7 @@ Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandle
 
 # 7. Repack asar
 Write-Host "[+] 正在重包 app.asar..." -ForegroundColor Cyan
-& npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
+& npx.cmd --registry=https://registry.npmmirror.com -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[X] 打包失败，还原备份中..." -ForegroundColor Red
     Copy-Item -Path $backupPath -Destination $asarPath -Force
