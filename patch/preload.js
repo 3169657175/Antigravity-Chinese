@@ -1432,16 +1432,79 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
       const cWeekly = localStorage.getItem('quota_claude_weekly') || '100%';
       const c5h = localStorage.getItem('quota_claude_5h') || '100%';
       
-      widget.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-weight:bold; color:#3b82f6;">Gemini 周/5h:</span>
-          <span>${gWeekly} / ${g5h}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-weight:bold; color:#10b981;">Claude 周/5h:</span>
-          <span>${cWeekly} / ${c5h}</span>
-        </div>
-      `;
+      function getCurrentModel() {
+        try {
+          const allElements = document.getElementsByTagName('*');
+          for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (el.children.length === 0) {
+              const text = el.textContent ? el.textContent.trim() : '';
+              if (/^(Gemini|Claude|GPT-OSS|GPT)/i.test(text)) {
+                let cur = el;
+                let isInteractive = false;
+                while (cur && cur.tagName !== 'BODY') {
+                  const tag = cur.tagName;
+                  const role = cur.getAttribute('role');
+                  const cls = cur.className || '';
+                  if (tag === 'BUTTON' || role === 'button' || cls.includes('select') || cls.includes('trigger') || cls.includes('dropdown')) {
+                    isInteractive = true;
+                    break;
+                  }
+                  cur = cur.parentElement;
+                }
+                if (isInteractive) {
+                  return text;
+                }
+              }
+            }
+          }
+        } catch (e) {}
+        try {
+          const allElements = document.getElementsByTagName('*');
+          for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (el.children.length === 0) {
+              const text = el.textContent ? el.textContent.trim() : '';
+              if (/^(Gemini\s+3\.|Claude\s+(Sonnet|Opus)|GPT-OSS)/i.test(text)) {
+                return text;
+              }
+            }
+          }
+        } catch (e) {}
+        return 'Gemini';
+      }
+
+      const currentModel = getCurrentModel().toLowerCase();
+      const isGemini = currentModel.includes('gemini');
+
+      if (isGemini) {
+        widget.innerHTML = `
+          <div style="font-weight:bold; font-size:12px; color:#3b82f6; text-transform:lowercase; margin-bottom:4px; letter-spacing:0.5px;">gemini</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
+            <span>每周额度：</span>
+            <span style="font-weight:bold;">${gWeekly}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85;">
+            <span>5H额度：</span>
+            <span style="font-weight:bold;">${g5h}</span>
+          </div>
+        `;
+      } else {
+        const isGpt = currentModel.includes('gpt');
+        const titleText = isGpt ? 'gpt' : 'claude';
+        const color = isGpt ? '#f59e0b' : '#10b981';
+        widget.innerHTML = `
+          <div style="font-weight:bold; font-size:12px; color:${color}; text-transform:lowercase; margin-bottom:4px; letter-spacing:0.5px;">${titleText}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
+            <span>每周额度：</span>
+            <span style="font-weight:bold;">${cWeekly}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85;">
+            <span>5H额度：</span>
+            <span style="font-weight:bold;">${c5h}</span>
+          </div>
+        `;
+      }
     } catch (e) {
       console.error('Quota widget injection error:', e);
     }
