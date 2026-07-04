@@ -1510,25 +1510,187 @@ electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
     }
   }
 
-  // Network request spy to catch background limits json requests
+  // --- Sandbox-Safe Multi-Protocol Network Spy (Fetch + XHR + WebSocket + EventSource) ---
   try {
+    function logUrl(url, method, responseText) {
+      try {
+        let cleanText = responseText;
+        if (responseText && responseText.length > 2000) {
+          cleanText = responseText.substring(0, 2000) + '... (truncated)';
+        }
+        const logContent = `[${new Date().toISOString()}] ${method || 'GET'} ${url}\nResponse: ${cleanText}\n\n`;
+        if (window.nativeStorage && window.nativeStorage.getItems) {
+          window.nativeStorage.getItems().then(items => {
+            let oldLogs = items.mcp_spy_logs || '';
+            let newLogs = oldLogs + logContent;
+            if (newLogs.length > 100000) {
+              newLogs = newLogs.substring(newLogs.length - 100000);
+            }
+            window.nativeStorage.updateItems({ mcp_spy_logs: newLogs });
+          });
+        }
+      } catch (e) {}
+    }
+
     const origFetch = window.fetch;
     window.fetch = async function(...args) {
       const url = args[0];
+      const options = args[1] || {};
+      const method = options.method || 'GET';
       const res = await origFetch.apply(this, args);
       try {
         if (typeof url === 'string') {
-          if (url.includes('/quota') || url.includes('/limits') || url.includes('/credits') || url.includes('/user')) {
-            const clone = res.clone();
-            const json = await clone.json();
-            if (json && json.userSettings && json.userSettings.modelLimits) {
-              // Parse model limits directly
-            }
+          const clone = res.clone();
+          const text = await clone.text();
+          logUrl(url, method, text);
+          
+          if (text.includes('limit') || text.includes('quota') || text.includes('credits') || text.includes('percentUsed')) {
+            try {
+              const json = JSON.parse(text);
+              parseAndStoreQuotaJson(json);
+            } catch(e) {}
           }
         }
       } catch (e) {}
       return res;
     };
+
+    const origSend = XMLHttpRequest.prototype.send;
+    const origOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+      this._url = url;
+      this._method = method;
+      return origOpen.apply(this, [method, url, ...args]);
+    };
+    XMLHttpRequest.prototype.send = function(...args) {
+      const self = this;
+      this.addEventListener('load', function() {
+        try {
+          const text = self.responseText;
+          logUrl(self._url, self._method, text);
+          if (text.includes('limit') || text.includes('quota') || text.includes('credits') || text.includes('percentUsed')) {
+            try {
+              const json = JSON.parse(text);
+              parseAndStoreQuotaJson(json);
+            } catch(e) {}
+          }
+        } catch(e) {}
+      });
+      return origSend.apply(this, args);
+    };
+
+    // WebSocket Spy
+    const OrigWebSocket = window.WebSocket;
+    window.WebSocket = function(url, protocols) {
+      const ws = new OrigWebSocket(url, protocols);
+      
+      function logWs(direction, data) {
+        try {
+          let strData = '';
+          if (typeof data === 'string') {
+            strData = data;
+          } else if (data instanceof ArrayBuffer) {
+            strData = new TextDecoder('utf-8').decode(data);
+          } else if (data instanceof Blob) {
+            data.text().then(t => logWs(direction, t));
+            return;
+          }
+          
+          if (!strData) return;
+          logUrl(url, direction, strData);
+          
+          if (strData.includes('percentUsed') || strData.includes('Limit') || strData.includes('quota') || strData.includes('weekly')) {
+            try {
+              const json = JSON.parse(strData);
+              parseAndStoreQuotaJson(json);
+            } catch (e) {}
+          }
+        } catch(e) {}
+      }
+      
+      ws.addEventListener('message', function(event) {
+        logWs('WS_RECV', event.data);
+      });
+      
+      const origSend = ws.send;
+      ws.send = function(data) {
+        logWs('WS_SEND', data);
+        return origSend.apply(ws, arguments);
+      };
+      
+      return ws;
+    };
+    window.WebSocket.prototype = OrigWebSocket.prototype;
+
+    // EventSource (SSE) Spy
+    const OrigEventSource = window.EventSource;
+    window.EventSource = function(url, configuration) {
+      const es = new OrigEventSource(url, configuration);
+      
+      es.addEventListener('message', function(event) {
+        logUrl(url, 'SSE_RECV', event.data);
+        if (event.data && (event.data.includes('limit') || event.data.includes('quota') || event.data.includes('percentUsed'))) {
+          try {
+            const json = JSON.parse(event.data);
+            parseAndStoreQuotaJson(json);
+          } catch(e) {}
+        }
+      });
+      return es;
+    };
+    window.EventSource.prototype = OrigEventSource.prototype;
+
+    function parseAndStoreQuotaJson(json) {
+      try {
+        function deepSearch(obj) {
+          if (!obj || typeof obj !== 'object') return;
+          
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              const val = obj[key];
+              if (key === 'gemini' || key === 'geminiModels' || key.includes('gemini')) {
+                extractGroupQuota(val, 'gemini');
+              } else if (key === 'claude' || key === 'claudeGpt' || key.includes('claude') || key.includes('gpt')) {
+                extractGroupQuota(val, 'claude');
+              } else {
+                deepSearch(val);
+              }
+            }
+          }
+        }
+
+        function extractGroupQuota(groupObj, type) {
+          if (!groupObj || typeof groupObj !== 'object') return;
+          let weeklyUsed = null;
+          let fiveHourUsed = null;
+          
+          for (const k in groupObj) {
+            const sub = groupObj[k];
+            if (sub && typeof sub === 'object') {
+              const p = sub.percentUsed !== undefined ? sub.percentUsed : sub.percent_used;
+              if (p !== undefined) {
+                if (k.toLowerCase().includes('week')) {
+                  weeklyUsed = p;
+                } else if (k.toLowerCase().includes('five') || k.toLowerCase().includes('5h') || k.toLowerCase().includes('hour')) {
+                  fiveHourUsed = p;
+                }
+              }
+            }
+          }
+          
+          if (weeklyUsed !== null) {
+            const pct = Math.max(0, Math.min(100, Math.round((1 - weeklyUsed) * 100))) + '%';
+            localStorage.setItem(`quota_${type}_weekly`, pct);
+          }
+          if (fiveHourUsed !== null) {
+            const pct = Math.max(0, Math.min(100, Math.round((1 - fiveHourUsed) * 100))) + '%';
+            localStorage.setItem(`quota_${type}_5h`, pct);
+          }
+        }
+
+        deepSearch(json);
+      } catch (e) {}
+    }
   } catch (e) {}
 
   if (document.readyState === 'loading') {
