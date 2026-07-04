@@ -1696,51 +1696,6 @@ try {
           return es;
         };
         window.EventSource.prototype = OrigEventSource.prototype;
-
-        // Background Auto-Poller (No User Interactivity Required!)
-        async function runAutoPoll() {
-          try {
-            if (!window.mcpLogger || !window.mcpLogger.getLsInfo) return;
-            const info = await window.mcpLogger.getLsInfo();
-            if (!info || !info.port || !info.csrf) return;
-
-            const endpoints = [
-              '/v1internal:fetchAvailableModels',
-              '/v1internal:loadCodeAssist',
-              '/v1internal:retrieveUserQuotaSummary'
-            ];
-
-            for (const ep of endpoints) {
-              try {
-                // Using relative path for same-origin request, bypassing CORS and SSL issues
-                const res = await fetch(ep, {
-                  method: 'POST',
-                  headers: {
-                    'x-csrf-token': info.csrf,
-                    'content-type': 'application/json'
-                  },
-                  body: '{}'
-                });
-                const text = await res.text();
-                
-                // Write debug log to local mcp_spy.txt
-                logUrl('AUTO_POLL_' + ep.replace(':', '_'), 'POST', text);
-                
-                if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota') || text.includes('weekly')) {
-                  try {
-                    const json = JSON.parse(text);
-                    parseAndStoreQuotaJson(json);
-                  } catch (e) {}
-                }
-              } catch (e) {}
-            }
-          } catch(e) {}
-        }
-
-        // Run poll every 30 seconds
-        setInterval(runAutoPoll, 30000);
-        // Run first poll after 5 seconds to let app stabilize
-        setTimeout(runAutoPoll, 5000);
       })();
     `;
 
@@ -1753,8 +1708,12 @@ try {
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startObserver);
+    document.addEventListener('DOMContentLoaded', () => {
+      startObserver();
+      setInterval(injectQuotaWidget, 2000);
+    });
   } else {
     startObserver();
+    setInterval(injectQuotaWidget, 2000);
   }
 })();
