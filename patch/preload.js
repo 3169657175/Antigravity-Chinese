@@ -1704,39 +1704,34 @@ try {
             const info = await window.mcpLogger.getLsInfo();
             if (!info || !info.port || !info.csrf) return;
 
-            // 1. Poll fetchAvailableModels
-            try {
-              const res = await fetch('https://127.0.0.1:' + info.port + '/v1internal:fetchAvailableModels', {
-                method: 'POST',
-                headers: {
-                  'x-csrf-token': info.csrf,
-                  'content-type': 'application/json'
-                },
-                body: '{}'
-              });
-              const text = await res.text();
-              if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota')) {
-                const json = JSON.parse(text);
-                parseAndStoreQuotaJson(json);
-              }
-            } catch (e) {}
+            const endpoints = [
+              '/exa.language_server_pb.LanguageServerService/GetUserStatus',
+              '/exa.language_server_pb.LanguageServerService/GetModelLimits',
+              '/exa.language_server_pb.LanguageServerService/GetMembership',
+              '/exa.language_server_pb.LanguageServerService/GetQuota'
+            ];
 
-            // 2. Poll loadCodeAssist
-            try {
-              const res = await fetch('https://127.0.0.1:' + info.port + '/v1internal:loadCodeAssist', {
-                method: 'POST',
-                headers: {
-                  'x-csrf-token': info.csrf,
-                  'content-type': 'application/json'
-                },
-                body: '{}'
-              });
-              const text = await res.text();
-              if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota')) {
-                const json = JSON.parse(text);
-                parseAndStoreQuotaJson(json);
-              }
-            } catch (e) {}
+            for (const ep of endpoints) {
+              try {
+                const res = await fetch('https://127.0.0.1:' + info.port + ep, {
+                  method: 'POST',
+                  headers: {
+                    'x-csrf-token': info.csrf,
+                    'content-type': 'application/json'
+                  },
+                  body: '{}'
+                });
+                const text = await res.text();
+                
+                // If it contains the keys we want, parse and store!
+                if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota') || text.includes('weekly')) {
+                  try {
+                    const json = JSON.parse(text);
+                    parseAndStoreQuotaJson(json);
+                  } catch (e) {}
+                }
+              } catch (e) {}
+            }
           } catch(e) {}
         }
 
