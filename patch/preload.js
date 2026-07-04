@@ -111,6 +111,12 @@ electron_1.contextBridge.exposeInMainWorld('mcpLogger', {
     writeLog: (text) => electron_1.ipcRenderer.invoke('mcp:write-log', text)
 });
 
+try {
+  electron_1.ipcRenderer.invoke('mcp:write-log', '--- Preload Loaded at ' + new Date().toISOString() + ' ---\n');
+} catch (e) {
+  console.error('Preload boot log failed:', e);
+}
+
 // ==========================================
 // Antigravity 2.0 Chinese Localization Engine
 // ==========================================
