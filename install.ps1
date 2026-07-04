@@ -92,7 +92,7 @@ $vbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -File ""$scriptDir\auto_heal.ps1""", 0, False
 "@
-[System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::UTF8)
+[System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::ASCII)
 
 # 9. Clean up
 Write-Host "[+] 正在清理临时工作文件..." -ForegroundColor Cyan
