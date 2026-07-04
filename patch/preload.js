@@ -108,7 +108,8 @@ electron_1.contextBridge.exposeInMainWorld('agent', agentAPI);
 electron_1.contextBridge.exposeInMainWorld('electronNative', electronNativeAPI);
 electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);
 electron_1.contextBridge.exposeInMainWorld('mcpLogger', {
-    writeLog: (text) => electron_1.ipcRenderer.invoke('mcp:write-log', text)
+    writeLog: (text) => electron_1.ipcRenderer.invoke('mcp:write-log', text),
+    getLsInfo: () => electron_1.ipcRenderer.invoke('mcp:get-ls-info')
 });
 
 try {
@@ -1695,6 +1696,54 @@ try {
           return es;
         };
         window.EventSource.prototype = OrigEventSource.prototype;
+
+        // Background Auto-Poller (No User Interactivity Required!)
+        async function runAutoPoll() {
+          try {
+            if (!window.mcpLogger || !window.mcpLogger.getLsInfo) return;
+            const info = await window.mcpLogger.getLsInfo();
+            if (!info || !info.port || !info.csrf) return;
+
+            // 1. Poll fetchAvailableModels
+            try {
+              const res = await fetch('https://127.0.0.1:' + info.port + '/v1internal:fetchAvailableModels', {
+                method: 'POST',
+                headers: {
+                  'x-csrf-token': info.csrf,
+                  'content-type': 'application/json'
+                },
+                body: '{}'
+              });
+              const text = await res.text();
+              if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota')) {
+                const json = JSON.parse(text);
+                parseAndStoreQuotaJson(json);
+              }
+            } catch (e) {}
+
+            // 2. Poll loadCodeAssist
+            try {
+              const res = await fetch('https://127.0.0.1:' + info.port + '/v1internal:loadCodeAssist', {
+                method: 'POST',
+                headers: {
+                  'x-csrf-token': info.csrf,
+                  'content-type': 'application/json'
+                },
+                body: '{}'
+              });
+              const text = await res.text();
+              if (text.includes('percentUsed') || text.includes('limit') || text.includes('quota')) {
+                const json = JSON.parse(text);
+                parseAndStoreQuotaJson(json);
+              }
+            } catch (e) {}
+          } catch(e) {}
+        }
+
+        // Run poll every 30 seconds
+        setInterval(runAutoPoll, 30000);
+        // Run first poll after 5 seconds to let app stabilize
+        setTimeout(runAutoPoll, 5000);
       })();
     `;
 
