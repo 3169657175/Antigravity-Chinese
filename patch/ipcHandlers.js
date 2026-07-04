@@ -287,16 +287,17 @@ async function pollLocalQuota() {
         const port = languageServer.getLsPort();
         const csrf = languageServer.getLsCsrf();
         
+        // Diagnostic tick log
+        try {
+            const fs = require('fs');
+            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_TICK] port=${port} csrf=${csrf}\n`, 'utf-8');
+        } catch (e) {}
+
         if (!port || !csrf) return;
 
-        // Step 1: Force local language server to sync fresh data from Google Cloud (using force_refresh = true payload)
-        await requestGrpc(port, csrf, '/google.internal.cloud.code.v1internal.PredictionService/FetchAvailableModels', true);
-
-        // Step 2: Wait 1.5 seconds for the background sync to complete
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Step 3: Fetch the fresh quota summary
-        const data = await requestGrpc(port, csrf, '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary', false);
+        // Fetch the fresh quota summary with force_refresh = true (using Field 2 payload [0x10, 0x01])
+        const forceRefreshPayload = Buffer.from([0, 0, 0, 0, 2, 16, 1]);
+        const data = await requestGrpc(port, csrf, '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary', forceRefreshPayload);
         
         if (data && data.length > 0) {
             const quotas = parseProtoQuota(data);
@@ -319,18 +320,31 @@ async function pollLocalQuota() {
                         `).catch(()=>{});
                     }
                 }
+            } else {
+                try {
+                    const fs = require('fs');
+                    fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_EMPTY_QUOTAS] parsed 0 quotas\n`, 'utf-8');
+                } catch (e) {}
             }
+        } else {
+            try {
+                const fs = require('fs');
+                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_EMPTY_DATA] response length is 0\n`, 'utf-8');
+            } catch (e) {}
         }
     } catch (e) {
+        try {
+            const fs = require('fs');
+            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_ERR] execution error: ${e.message}\n`, 'utf-8');
+        } catch (err) {}
         console.error('pollLocalQuota execution error:', e);
     }
 }
 
-function requestGrpc(port, csrf, path, isForceRefresh) {
+function requestGrpc(port, csrf, path, payload) {
     return new Promise((resolve) => {
         const https = require('https');
-        // [0, 0, 0, 0, 2, 8, 1] is gRPC-web frame: data flag, length 2, payload: [0x08, 0x01] (field 1 = true)
-        const body = isForceRefresh ? Buffer.from([0, 0, 0, 0, 2, 8, 1]) : Buffer.from([0, 0, 0, 0, 0]);
+        const body = payload || Buffer.from([0, 0, 0, 0, 0]);
 
         const options = {
             hostname: '127.0.0.1',
@@ -343,7 +357,7 @@ function requestGrpc(port, csrf, path, isForceRefresh) {
                 'x-grpc-web': '1'
             },
             rejectUnauthorized: false,
-            timeout: 3000
+            timeout: 5000
         };
 
         const req = https.request(options, (res) => {
@@ -355,11 +369,19 @@ function requestGrpc(port, csrf, path, isForceRefresh) {
         });
 
         req.on('error', (e) => {
+            try {
+                const fs = require('fs');
+                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_REQ_ERR] path=${path} err=${e.message}\n`, 'utf-8');
+            } catch (err) {}
             console.error(`requestGrpc error on ${path}:`, e.message);
             resolve(Buffer.alloc(0));
         });
 
         req.on('timeout', () => {
+            try {
+                const fs = require('fs');
+                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_TIMEOUT] path=${path}\n`, 'utf-8');
+            } catch (err) {}
             req.destroy();
             resolve(Buffer.alloc(0));
         });
