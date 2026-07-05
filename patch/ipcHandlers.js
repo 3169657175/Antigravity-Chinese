@@ -542,43 +542,25 @@ function registerIpcHandlers(storageManager) {
                 log('Error reading accounts.json: ' + e.message);
             }
 
-            const existingAcc = (dataPool.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
-            log('Existing account found: ' + (existingAcc ? existingAcc.id : 'none'));
-            
-            if (existingAcc && dataPool.current_account_id === existingAcc.id) {
-                log('Account already current, returning success');
-                return { success: true, email, accountId: existingAcc.id, alreadySaved: true };
-            }
 
-            if (existingAcc) {
-                log('Account exists but not current, updating current_account_id');
-                dataPool.current_account_id = existingAcc.id;
-                await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
-                log('Updated current_account_id to ' + existingAcc.id);
-                return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
-            }
+            // 定义局部通用读取 Token 逻辑（包含 DB 读取和 Keyring 降级机制）
+            const getFreshToken = () => {
+                log('Reading fresh token...');
+                const { execSync } = require('child_process');
+                const appdata = process.env.APPDATA || '';
+                const dbCandidates = [
+                    path.join(appdata, 'Antigravity IDE', 'User', 'globalStorage', 'state.vscdb'),
+                    path.join(appdata, 'Antigravity', 'User', 'globalStorage', 'state.vscdb'),
+                ];
+                let dbPath = null;
+                for (const c of dbCandidates) {
+                    if (fs.existsSync(c)) { dbPath = c; break; }
+                }
+                log('state.vscdb path: ' + (dbPath || 'NOT FOUND'));
 
-            log('New email detected, reading token from state.vscdb...');
-
-            // 直接读 Antigravity 的 state.vscdb 数据库获取 Token（官方 Antigravity-Manager 同款方案）
-            // 数据库路径: %APPDATA%\Antigravity IDE\User\globalStorage\state.vscdb
-            const { execSync } = require('child_process');
-            const appdata = process.env.APPDATA || '';
-            const dbCandidates = [
-                path.join(appdata, 'Antigravity IDE', 'User', 'globalStorage', 'state.vscdb'),
-                path.join(appdata, 'Antigravity', 'User', 'globalStorage', 'state.vscdb'),
-            ];
-            let dbPath = null;
-            for (const c of dbCandidates) {
-                if (fs.existsSync(c)) { dbPath = c; break; }
-            }
-            log('state.vscdb path: ' + (dbPath || 'NOT FOUND'));
-            if (!dbPath) {
-                return { success: false, error: 'state.vscdb not found' };
-            }
-
-            // 用 Python sqlite3 读取 Token JSON
-            const pyScript = `
+                let currentKeyring = null;
+                if (dbPath) {
+                    const pyScript = `
 import sqlite3, json, sys
 db = sys.argv[1]
 conn = sqlite3.connect(db)
@@ -591,37 +573,165 @@ else:
     print("KEYRING:")
 conn.close()
 `.trim();
-            const tempPy = path.join(os.tmpdir(), 'agy_read_db_' + Date.now() + '.py');
-            fs.writeFileSync(tempPy, pyScript, 'utf-8');
+                    const tempPy = path.join(os.tmpdir(), 'agy_read_db_' + Date.now() + '.py');
+                    fs.writeFileSync(tempPy, pyScript, 'utf-8');
 
-            let currentKeyring = null;
-            try {
-                const out = execSync(`python "${tempPy}" "${dbPath}"`, { encoding: 'utf-8', timeout: 8000 });
-                if (fs.existsSync(tempPy)) fs.unlinkSync(tempPy);
-                log('DB read output: ' + out.substring(0, 200));
-                const match = /^KEYRING:(.+)$/m.exec(out);
-                if (match && match[1].trim()) {
                     try {
-                        currentKeyring = JSON.parse(match[1].trim());
-                    } catch(pe) {
-                        log('JSON parse error: ' + pe.message + ' raw: ' + match[1].trim().substring(0, 100));
+                        const out = execSync(`python "${tempPy}" "${dbPath}"`, { encoding: 'utf-8', timeout: 8000 });
+                        if (fs.existsSync(tempPy)) fs.unlinkSync(tempPy);
+                        log('DB read output: ' + out.substring(0, 200));
+                        const match = /^KEYRING:(.+)$/m.exec(out);
+                        if (match && match[1].trim()) {
+                            try {
+                                currentKeyring = JSON.parse(match[1].trim());
+                            } catch(pe) {
+                                log('JSON parse error: ' + pe.message);
+                            }
+                        }
+                    } catch(e) {
+                        if (fs.existsSync(tempPy)) try { fs.unlinkSync(tempPy); } catch(_) {}
+                        log('DB read error: ' + e.message);
                     }
                 }
-            } catch(e) {
-                if (fs.existsSync(tempPy)) try { fs.unlinkSync(tempPy); } catch(_) {}
-                log('DB read error: ' + e.message);
+
+                // 降级：如果 DB 读取失败，尝试从 Windows Keyring 读取
+                if (!currentKeyring || !currentKeyring.token || !currentKeyring.token.access_token) {
+                    log('No token found in DB, falling back to Keyring...');
+                    try {
+                        const tempPsFile = path.join(os.tmpdir(), `agy_read_cred_${Date.now()}.ps1`);
+                        const readScript = `
+                            try {
+                                $definition = @"
+                                using System;
+                                using System.Text;
+                                using System.Runtime.InteropServices;
+
+                                [StructLayout(LayoutKind.Sequential)]
+                                public struct CREDENTIAL {
+                                    public uint Flags;
+                                    public uint Type;
+                                    public IntPtr TargetName;
+                                    public IntPtr Comment;
+                                    public long LastWritten;
+                                    public int CredentialBlobSize;
+                                    public IntPtr CredentialBlob;
+                                    public uint Persist;
+                                    public uint AttributeCount;
+                                    public IntPtr Attributes;
+                                    public IntPtr TargetAlias;
+                                    public IntPtr UserName;
+                                }
+
+                                public class CredReader {
+                                    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+                                    public static extern bool CredEnumerate(string filter, int flag, out int count, out IntPtr pCredentials);
+
+                                    [DllImport("advapi32.dll", SetLastError = true)]
+                                    public static extern void CredFree(IntPtr pCredentials);
+
+                                    public static string ReadGenericCred(string targetName) {
+                                        int count;
+                                        IntPtr pCredentials;
+                                        if (CredEnumerate(null, 0, out count, out pCredentials)) {
+                                            IntPtr[] credentials = new IntPtr[count];
+                                            Marshal.Copy(pCredentials, credentials, 0, count);
+                                            try {
+                                                for (int i = 0; i < count; i++) {
+                                                    CREDENTIAL cred = (CREDENTIAL)Marshal.PtrToStructure(credentials[i], typeof(CREDENTIAL));
+                                                    string tName = Marshal.PtrToStringUni(cred.TargetName);
+                                                    if (tName != null && tName.ToLower() == targetName.ToLower()) {
+                                                        if (cred.CredentialBlob != IntPtr.Zero && cred.CredentialBlobSize > 0) {
+                                                            byte[] blob = new byte[cred.CredentialBlobSize];
+                                                            Marshal.Copy(cred.CredentialBlob, blob, 0, cred.CredentialBlobSize);
+                                                            return Encoding.UTF8.GetString(blob);
+                                                        }
+                                                    }
+                                                }
+                                            } finally {
+                                                CredFree(pCredentials);
+                                            }
+                                        }
+                                        return "";
+                                    }
+                                }
+"@
+                                Add-Type -TypeDefinition $definition -ErrorAction SilentlyContinue
+                                $res = [CredReader]::ReadGenericCred("gemini:antigravity")
+                                Write-Host "VALUE: $res"
+                            } catch {
+                                Write-Host "ERROR: $($_.Exception.Message)"
+                            }
+                        `;
+                        const bom = Buffer.from([0xFF, 0xFE]);
+                        const buf = Buffer.from(readScript, 'utf16le');
+                        fs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
+                        
+                        const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
+                        if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
+                        
+                        const lines = out.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('VALUE: ')) {
+                                const jsonStr = line.substring(7).trim();
+                                if (jsonStr) {
+                                    currentKeyring = JSON.parse(jsonStr);
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        log('Keyring fallback error: ' + e.message);
+                    }
+                }
+                return currentKeyring;
+            };
+
+            const existingAcc = (dataPool.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
+            log('Existing account found: ' + (existingAcc ? existingAcc.id : 'none'));
+            
+            if (existingAcc && dataPool.current_account_id === existingAcc.id) {
+                log('Account already current, returning success');
+                return { success: true, email, accountId: existingAcc.id, alreadySaved: true };
             }
 
+            if (existingAcc) {
+                log('Account exists but not current. Re-reading fresh token to update detail file...');
+                const currentKeyring = getFreshToken();
+                if (currentKeyring && currentKeyring.token && currentKeyring.token.access_token) {
+                    const detailPath = path.join(baseDir, 'accounts', `${existingAcc.id}.json`);
+                    try {
+                        const detailRaw = await fsPromises.readFile(detailPath, 'utf-8');
+                        const detail = JSON.parse(detailRaw);
+                        
+                        // 用新 Token 覆盖旧 Token
+                        const token = currentKeyring.token;
+                        detail.token.access_token = token.access_token;
+                        detail.token.refresh_token = token.refresh_token;
+                        detail.token.expires_in = token.expires_in || 3599;
+                        detail.token.expiry_timestamp = token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599;
+                        if (token.project_id) {
+                            detail.token.project_id = token.project_id;
+                        }
+                        
+                        await fsPromises.writeFile(detailPath, JSON.stringify(detail, null, 2), 'utf-8');
+                        log('Successfully updated token for existing account: ' + email);
+                    } catch(e) {
+                        log('Failed to update existing account detail file: ' + e.message);
+                    }
+                } else {
+                    log('Warning: could not retrieve fresh token for existing account.');
+                }
+
+                dataPool.current_account_id = existingAcc.id;
+                await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+                log('Updated current_account_id to ' + existingAcc.id);
+                return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
+            }
+
+            log('New email detected. Fetching fresh token for registration...');
+            const currentKeyring = getFreshToken();
             if (!currentKeyring || !currentKeyring.token || !currentKeyring.token.access_token) {
-                log('No token found in DB, falling back to keyring...');
-                // 降级：尝试读 Windows Keyring
-                try {
-                    const credOut = execSync('cmdkey /list:gemini:antigravity', { encoding: 'utf-8', timeout: 3000 });
-                    log('Keyring list: ' + credOut.substring(0, 100));
-                } catch(_) {}
-                return { success: false, error: 'No token found in state.vscdb' };
+                return { success: false, error: 'No token found in system database or keyring' };
             }
-
 
             const crypto = require('crypto');
             await fsPromises.mkdir(path.join(baseDir, 'accounts'), { recursive: true });
