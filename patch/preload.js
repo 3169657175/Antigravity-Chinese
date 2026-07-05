@@ -141,6 +141,9 @@ try {
     "Are you sure you want to quit?": "您确定要退出吗？",
     "There may be agents or background tasks running.": "可能还有智能体或后台任务正在运行。",
     "Welcome to the new Antigravity!": "欢迎使用全新 Antigravity！",
+    "Welcome to Antigravity": "欢迎使用 Antigravity",
+    "Continue with Google": "使用 Google 账号登录",
+    "Use Google Cloud project instead": "或使用 Google Cloud 项目凭据",
     "Antigravity has been redesigned to put agents first with new capabilities. If you'd still like a code editor, you can download it as a separate app named": "Antigravity 已经重构为以智能体为核心的全新平台。如果您仍需要代码编辑器，可以将其作为名为以下的独立应用下载：",
     "Antigravity IDE": "Antigravity IDE 编辑器",
     "Download the Antigravity IDE": "下载 Antigravity IDE",
@@ -1596,6 +1599,107 @@ try {
     });
   }
 
+  function injectQuickLogin() {
+    try {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      let googleBtn = null;
+      for (const btn of buttons) {
+        const txt = btn.textContent ? btn.textContent.trim() : '';
+        if (txt.includes('Continue with Google') || txt.includes('使用 Google 账号登录')) {
+          googleBtn = btn;
+          break;
+        }
+      }
+      
+      if (!googleBtn) return;
+      if (document.getElementById('antigravity-quick-login-container')) return;
+      
+      const container = googleBtn.parentElement;
+      if (!container) return;
+      
+      const qkContainer = document.createElement('div');
+      qkContainer.id = 'antigravity-quick-login-container';
+      qkContainer.style.marginTop = '28px';
+      qkContainer.style.width = '100%';
+      qkContainer.style.display = 'flex';
+      qkContainer.style.flexDirection = 'column';
+      qkContainer.style.alignItems = 'center';
+      qkContainer.style.gap = '10px';
+      qkContainer.style.opacity = '0';
+      qkContainer.style.transition = 'opacity 0.25s cubic-bezier(0.25, 1, 0.5, 1)';
+      
+      electron_1.ipcRenderer.invoke('accounts:list').then(res => {
+        const accounts = res.accounts || [];
+        if (accounts.length === 0) return;
+        
+        const title = document.createElement('div');
+        title.style.fontSize = '12px';
+        title.style.fontWeight = '600';
+        title.style.color = '#ffffff';
+        title.style.opacity = '0.55';
+        title.style.marginBottom = '6px';
+        title.style.letterSpacing = '1px';
+        title.style.textTransform = 'uppercase';
+        title.style.userSelect = 'none';
+        title.textContent = '— 快捷登录已存账号 —';
+        qkContainer.appendChild(title);
+        
+        accounts.forEach(acc => {
+          const btn = document.createElement('div');
+          btn.style.width = '260px';
+          btn.style.padding = '10px 16px';
+          btn.style.borderRadius = '8px';
+          btn.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+          btn.style.background = 'rgba(255, 255, 255, 0.03)';
+          btn.style.color = '#e2e8f0';
+          btn.style.fontSize = '12.5px';
+          btn.style.cursor = 'pointer';
+          btn.style.textAlign = 'center';
+          btn.style.boxSizing = 'border-box';
+          btn.style.backdropFilter = 'blur(10px)';
+          btn.style.webkitBackdropFilter = 'blur(10px)';
+          btn.style.transition = 'all 0.18s cubic-bezier(0.25, 1, 0.5, 1)';
+          btn.style.textOverflow = 'ellipsis';
+          btn.style.overflow = 'hidden';
+          btn.style.whiteSpace = 'nowrap';
+          btn.textContent = `${acc.name} (${acc.email})`;
+          
+          btn.onmouseenter = () => {
+            btn.style.background = 'rgba(59, 130, 246, 0.12)';
+            btn.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+            btn.style.color = '#ffffff';
+            btn.style.transform = 'translateY(-1px)';
+            btn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
+          };
+          btn.onmouseleave = () => {
+            btn.style.background = 'rgba(255, 255, 255, 0.03)';
+            btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            btn.style.color = '#e2e8f0';
+            btn.style.transform = 'translateY(0)';
+            btn.style.boxShadow = 'none';
+          };
+          
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            btn.style.opacity = '0.6';
+            btn.style.pointerEvents = 'none';
+            btn.textContent = '正在快捷登录并重启...';
+            electron_1.ipcRenderer.invoke('accounts:switch', acc.id);
+          };
+          
+          qkContainer.appendChild(btn);
+        });
+        
+        container.appendChild(qkContainer);
+        setTimeout(() => { qkContainer.style.opacity = '1'; }, 50);
+      }).catch(err => {
+        console.error('[preload] Failed to fetch accounts for quick login onboarding:', err);
+      });
+    } catch (e) {
+      console.error('[preload] Quick login UI injection failed:', e);
+    }
+  }
+
   function injectQuotaWidget() {
     try {
       // 1. 异步载入多账号列表并缓存于 window 对象中（增加即时重绘与凭据嗅探）
@@ -2230,11 +2334,13 @@ try {
       setupActivityListeners();
       setupInstantWidgetRefresh();
       setInterval(injectQuotaWidget, 2000);
+      setInterval(injectQuickLogin, 1000);
     });
   } else {
     startObserver();
     setupActivityListeners();
     setupInstantWidgetRefresh();
     setInterval(injectQuotaWidget, 2000);
+    setInterval(injectQuickLogin, 1000);
   }
 })();
