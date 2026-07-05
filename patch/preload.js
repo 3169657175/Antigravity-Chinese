@@ -673,7 +673,9 @@ try {
   const substringReplacements = [
     { search: 'Plugins are packaged collections of skills and MCPs to help the Agent in Antigravity work with Google developer products. You can always change your choices in Settings.', replace: '插件是包含技能和 MCP 服务封装的资源包，旨在协助 Antigravity 智能体调用 Google 开发者产品。您随时可以在设置中更改选择。' },
     { search: 'Plugins are packaged collections of skills and MCPs to help the Agent', replace: '插件是包含技能和 MCP 服务封装的资源包，旨在协助智能体' },
-    { search: 'in Antigravity work with Google developer products.', replace: '在 Antigravity 中调用 Google 开发者产品。' },
+    { search: 'in Antigravity work with Google', replace: '在 Antigravity 中调用 Google' },
+    { search: 'developer products.', replace: '开发者产品。' },
+    { search: 'Developer products.', replace: '开发者产品。' },
     { search: 'You can always change your choices in Settings.', replace: '您随时可以在设置中更改选择。' },
     { search: 'Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer', replace: '在 Chrome 浏览器中利用 DevTools 调试协议与 Puppeteer 实现高可靠性自动化、深度调试及性能剖析' },
     { search: 'Dart and Flutter', replace: 'Dart & Flutter' },
