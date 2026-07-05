@@ -38,6 +38,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerIpcHandlers = registerIpcHandlers;
 const electron_1 = require("electron");
+
+function getLogPath(filename) {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const dir = path.join(require('os').homedir(), '.gemini', 'antigravity', 'scratch');
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        return path.join(dir, filename);
+    } catch(e) {
+        return filename;
+    }
+}
 const electron_updater_1 = require("electron-updater");
 const updater_1 = require("./updater");
 const main_1 = __importDefault(require("electron-log/main"));
@@ -227,7 +241,7 @@ function registerIpcHandlers(storageManager) {
     electron_1.ipcMain.handle('mcp:write-log', async (_event, text) => {
         try {
             const nodeFs = require('fs');
-            nodeFs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', text, 'utf-8');
+            nodeFs.appendFileSync(getLogPath('mcp_spy.txt'), text, 'utf-8');
         } catch (e) {
             console.error('mcp:write-log error:', e);
         }
@@ -463,7 +477,7 @@ function registerIpcHandlers(storageManager) {
     electron_1.ipcMain.handle('debug:log', async (_event, msg) => {
         try {
             const fs = require('fs');
-            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/sniff_combined.log', '[' + new Date().toISOString() + '] ' + msg + '\n', 'utf-8');
+            fs.appendFileSync(getLogPath('sniff_combined.log'), '[' + new Date().toISOString() + '] ' + msg + '\n', 'utf-8');
         } catch(e) {}
     });
 
@@ -474,7 +488,7 @@ function registerIpcHandlers(storageManager) {
             const path = require('path');
             const log = (msg) => {
                 try {
-                    fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/sniff_combined.log', '[' + new Date().toISOString() + '] [ipc] ' + msg + '\n', 'utf-8');
+                    fs.appendFileSync(getLogPath('sniff_combined.log'), '[' + new Date().toISOString() + '] [ipc] ' + msg + '\n', 'utf-8');
                 } catch(e) {}
             };
 
@@ -946,7 +960,7 @@ async function pollLocalQuota() {
         // Diagnostic tick log
         try {
             const fs = require('fs');
-            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_TICK] port=${port} csrf=${csrf}\n`, 'utf-8');
+            fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_TICK] port=${port} csrf=${csrf}\n`, 'utf-8');
         } catch (e) {}
 
         if (!port || !csrf) return;
@@ -962,7 +976,7 @@ async function pollLocalQuota() {
                 // Diagnostic log
                 try {
                     const fs = require('fs');
-                    fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_SUCCESS] quotas=${JSON.stringify(quotas)}\n`, 'utf-8');
+                    fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_SUCCESS] quotas=${JSON.stringify(quotas)}\n`, 'utf-8');
                 } catch (e) {}
 
                 const windows = electron_1.BrowserWindow.getAllWindows();
@@ -979,19 +993,19 @@ async function pollLocalQuota() {
             } else {
                 try {
                     const fs = require('fs');
-                    fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_EMPTY_QUOTAS] parsed 0 quotas\n`, 'utf-8');
+                    fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_EMPTY_QUOTAS] parsed 0 quotas\n`, 'utf-8');
                 } catch (e) {}
             }
         } else {
             try {
                 const fs = require('fs');
-                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_EMPTY_DATA] response length is 0\n`, 'utf-8');
+                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_EMPTY_DATA] response length is 0\n`, 'utf-8');
             } catch (e) {}
         }
     } catch (e) {
         try {
             const fs = require('fs');
-            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_ERR] execution error: ${e.message}\n`, 'utf-8');
+            fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_ERR] execution error: ${e.message}\n`, 'utf-8');
         } catch (err) {}
         console.error('pollLocalQuota execution error:', e);
     }
@@ -1027,7 +1041,7 @@ function requestGrpc(port, csrf, path, payload) {
         req.on('error', (e) => {
             try {
                 const fs = require('fs');
-                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_REQ_ERR] path=${path} err=${e.message}\n`, 'utf-8');
+                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_REQ_ERR] path=${path} err=${e.message}\n`, 'utf-8');
             } catch (err) {}
             console.error(`requestGrpc error on ${path}:`, e.message);
             resolve(Buffer.alloc(0));
@@ -1036,7 +1050,7 @@ function requestGrpc(port, csrf, path, payload) {
         req.on('timeout', () => {
             try {
                 const fs = require('fs');
-                fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/mcp_spy.txt', `[MAIN_POLL_TIMEOUT] path=${path}\n`, 'utf-8');
+                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_TIMEOUT] path=${path}\n`, 'utf-8');
             } catch (err) {}
             req.destroy();
             resolve(Buffer.alloc(0));
