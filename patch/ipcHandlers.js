@@ -666,6 +666,70 @@ function registerIpcHandlers(storageManager) {
         }
     });
 
+    // Accounts clear keyring and trigger relaunch
+    electron_1.ipcMain.handle('accounts:clear-keyring', async () => {
+        try {
+            const { execSync } = require('child_process');
+            if (process.platform === 'win32') {
+                try {
+                    execSync('cmdkey /delete:gemini:antigravity');
+                    console.log('[ipcHandlers] Successfully cleared generic credential from system keyring');
+                } catch (e) {
+                    console.warn('[ipcHandlers] cmdkey delete failed (might not exist):', e.message);
+                }
+            }
+            // Sync current_account_id to empty in accounts.json
+            try {
+                const os = require('os');
+                const path = require('path');
+                const fs = require('fs/promises');
+                const userHome = os.homedir();
+                const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
+                const raw = await fs.readFile(accountsPath, 'utf-8');
+                const data = JSON.parse(raw);
+                data.current_account_id = '';
+                await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            } catch (e) {}
+
+            // Kill old language_server.exe immediately to free up gRPC ports before relaunch
+            if (process.platform === 'win32') {
+                try {
+                    execSync('taskkill /F /IM language_server.exe');
+                } catch (e) {}
+            }
+
+            // Relaunch the app
+            setTimeout(() => {
+                electron_1.app.relaunch();
+                electron_1.app.exit(0);
+            }, 50);
+            return { success: true };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:clear-keyring error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    // Accounts async native confirm box to prevent blocking the Chromium render thread
+    electron_1.ipcMain.handle('accounts:confirm-clear', async (event) => {
+        try {
+            const { dialog, BrowserWindow } = require('electron');
+            const win = BrowserWindow.fromWebContents(event.sender);
+            const result = await dialog.showMessageBox(win, {
+                type: 'question',
+                buttons: ['确定', '取消'],
+                defaultId: 1,
+                title: 'Antigravity',
+                message: '是否要清空当前登录状态并重启客户端以登录新账号？',
+                cancelId: 1
+            });
+            return result.response === 0;
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:confirm-clear error:', e);
+            return false;
+        }
+    });
+
     // Accounts confirm delete handler (async native dialog box)
     electron_1.ipcMain.handle('accounts:confirm-delete', async (event, { email, isCurrent }) => {
         try {
