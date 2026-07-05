@@ -459,20 +459,264 @@ function registerIpcHandlers(storageManager) {
         }
     });
 
-    // Accounts open manager handler
-    electron_1.ipcMain.handle('accounts:open-manager', async () => {
+    // Accounts get current keyring handler
+    electron_1.ipcMain.handle('accounts:get-current-keyring', async () => {
         try {
-            const { spawn } = require('child_process');
-            // Use spawn with detached to safely launch the manager and unref it
-            const child = spawn('D:\\Antigravity Tools\\antigravity_tools.exe', [], {
-                detached: true,
-                stdio: 'ignore'
-            });
-            child.unref();
-            console.log('[ipcHandlers] Successfully spawned Antigravity Tools manager');
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            
+            if (process.platform !== 'win32') return null;
+            
+            const tempPsFile = path.join(os.tmpdir(), `agy_read_cred_${Date.now()}.ps1`);
+            const readScript = `
+                try {
+                    ` + '$definition = @"' + `
+                    using System;
+                    using System.Text;
+                    using System.Runtime.InteropServices;
+
+                    [StructLayout(LayoutKind.Sequential)]
+                    public struct CREDENTIAL {
+                        public uint Flags;
+                        public uint Type;
+                        public IntPtr TargetName;
+                        public IntPtr Comment;
+                        public long LastWritten;
+                        public int CredentialBlobSize;
+                        public IntPtr CredentialBlob;
+                        public uint Persist;
+                        public uint AttributeCount;
+                        public IntPtr Attributes;
+                        public IntPtr TargetAlias;
+                        public IntPtr UserName;
+                    }
+
+                    public class CredReader {
+                        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+                        public static extern bool CredEnumerate(string filter, int flag, out int count, out IntPtr pCredentials);
+
+                        [DllImport("advapi32.dll", SetLastError = true)]
+                        public static extern void CredFree(IntPtr pCredentials);
+
+                        public static string ReadGenericCred(string targetName) {
+                            int count;
+                            IntPtr pCredentials;
+                            if (CredEnumerate(null, 0, out count, out pCredentials)) {
+                                IntPtr[] credentials = new IntPtr[count];
+                                Marshal.Copy(pCredentials, credentials, 0, count);
+                                try {
+                                    for (int i = 0; i < count; i++) {
+                                        CREDENTIAL cred = (CREDENTIAL)Marshal.PtrToStructure(credentials[i], typeof(CREDENTIAL));
+                                        string tName = Marshal.PtrToStringUni(cred.TargetName);
+                                        if (tName != null && tName.ToLower() == targetName.ToLower()) {
+                                            if (cred.CredentialBlob != IntPtr.Zero && cred.CredentialBlobSize > 0) {
+                                                byte[] blob = new byte[cred.CredentialBlobSize];
+                                                Marshal.Copy(cred.CredentialBlob, blob, 0, cred.CredentialBlobSize);
+                                                return Encoding.UTF8.GetString(blob);
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                    CredFree(pCredentials);
+                                }
+                            }
+                            return "";
+                        }
+                    }
+"@
+                    Add-Type -TypeDefinition $definition -ErrorAction SilentlyContinue
+                    $res = [CredReader]::ReadGenericCred("gemini:antigravity")
+                    Write-Host "VALUE: $res"
+                } catch {
+                    Write-Host "ERROR: $($_.Exception.Message)"
+                }
+            `;
+            
+            const bom = Buffer.from([0xFF, 0xFE]);
+            const buf = Buffer.from(readScript, 'utf16le');
+            fs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
+            
+            try {
+                const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
+                if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
+                
+                const lines = out.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('VALUE: ')) {
+                        const jsonStr = line.substring(7).trim();
+                        if (jsonStr) {
+                            return JSON.parse(jsonStr);
+                        }
+                    }
+                }
+            } catch (e) {
+                if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
+                console.error('[ipcHandlers] accounts:get-current-keyring run error:', e);
+            }
+            return null;
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:get-current-keyring error:', e);
+            return null;
+        }
+    });
+
+    // Accounts clear keyring and trigger relaunch
+    electron_1.ipcMain.handle('accounts:clear-keyring', async () => {
+        try {
+            const { execSync } = require('child_process');
+            if (process.platform === 'win32') {
+                try {
+                    execSync('cmdkey /delete:gemini:antigravity');
+                    console.log('[ipcHandlers] Successfully cleared generic credential from system keyring');
+                } catch (e) {
+                    console.warn('[ipcHandlers] cmdkey delete failed (might not exist):', e.message);
+                }
+            }
+            // Sync current_account_id to empty in accounts.json
+            try {
+                const os = require('os');
+                const path = require('path');
+                const fs = require('fs/promises');
+                const userHome = os.homedir();
+                const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
+                const raw = await fs.readFile(accountsPath, 'utf-8');
+                const data = JSON.parse(raw);
+                data.current_account_id = '';
+                await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            } catch (e) {}
+
+            // Kill old language_server.exe immediately to free up gRPC ports before relaunch
+            if (process.platform === 'win32') {
+                try {
+                    execSync('taskkill /F /IM language_server.exe');
+                } catch (e) {}
+            }
+
+            // Relaunch the app
+            setTimeout(() => {
+                electron_1.app.relaunch();
+                electron_1.app.exit(0);
+            }, 50);
             return { success: true };
         } catch (e) {
-            console.error('[ipcHandlers] accounts:open-manager error:', e);
+            console.error('[ipcHandlers] accounts:clear-keyring error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    // Accounts async native confirm box to prevent blocking the Chromium render thread
+    electron_1.ipcMain.handle('accounts:confirm-clear', async (event) => {
+        try {
+            const { dialog, BrowserWindow } = require('electron');
+            const win = BrowserWindow.fromWebContents(event.sender);
+            const result = await dialog.showMessageBox(win, {
+                type: 'question',
+                buttons: ['确定', '取消'],
+                defaultId: 1,
+                title: 'Antigravity',
+                message: '是否要清空当前登录状态并重启客户端以登录新账号？',
+                cancelId: 1
+            });
+            return result.response === 0;
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:confirm-clear error:', e);
+            return false;
+        }
+    });
+
+    // Accounts save new handler
+    electron_1.ipcMain.handle('accounts:save-new', async (_event, { email, name, token }) => {
+        try {
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs/promises');
+            const crypto = require('crypto');
+            const userHome = os.homedir();
+            
+            const baseDir = path.join(userHome, '.antigravity_tools');
+            await fs.mkdir(baseDir, { recursive: true });
+            await fs.mkdir(path.join(baseDir, 'accounts'), { recursive: true });
+            
+            const accountsPath = path.join(baseDir, 'accounts.json');
+            let data = { version: "2.0", accounts: [], current_account_id: "" };
+            
+            try {
+                const raw = await fs.readFile(accountsPath, 'utf-8');
+                data = JSON.parse(raw);
+            } catch (e) {
+                // If accounts.json doesn't exist, we use the default empty one
+            }
+            
+            // Check if email already exists
+            let acc = (data.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
+            const accountId = acc ? acc.id : crypto.randomUUID();
+            
+            if (!acc) {
+                acc = {
+                    id: accountId,
+                    email: email,
+                    name: name || email.split('@')[0],
+                    disabled: false
+                };
+                data.accounts.push(acc);
+            } else {
+                // Update name if changed
+                if (name) acc.name = name;
+            }
+            
+            data.current_account_id = accountId;
+            
+            // Save detailed JSON file (which holds access_token and refresh_token)
+            const detailPath = path.join(baseDir, 'accounts', `${accountId}.json`);
+            let existingDetail = {};
+            try {
+                const detailRaw = await fs.readFile(detailPath, 'utf-8');
+                existingDetail = JSON.parse(detailRaw);
+            } catch (e) {}
+            
+            const deviceProfile = existingDetail.device_profile || {
+                machine_id: "auth0|user_" + accountId.replace(/-/g, '').substring(0, 24),
+                mac_machine_id: crypto.randomUUID(),
+                dev_device_id: crypto.randomUUID(),
+                sqm_id: "{" + crypto.randomUUID().toUpperCase() + "}"
+            };
+            
+            const newDetail = {
+                id: accountId,
+                email: email,
+                name: name || email.split('@')[0],
+                token: {
+                    access_token: token.access_token,
+                    refresh_token: token.refresh_token,
+                    expires_in: token.expires_in || 3599,
+                    expiry_timestamp: token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599,
+                    token_type: token.token_type || 'Bearer',
+                    email: email,
+                    project_id: token.project_id || ('disco-acre-' + crypto.randomBytes(3).toString('hex')),
+                    oauth_client_key: token.oauth_client_key || 'antigravity_enterprise',
+                    is_gcp_tos: false
+                },
+                device_profile: deviceProfile,
+                device_history: [
+                    {
+                        id: crypto.randomUUID(),
+                        created_at: Math.floor(Date.now() / 1000),
+                        label: "auto_generated",
+                        profile: deviceProfile,
+                        is_current: true
+                    }
+                ]
+            };
+            
+            await fs.writeFile(detailPath, JSON.stringify(newDetail, null, 2), 'utf-8');
+            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            
+            console.log('[ipcHandlers] Successfully saved/updated account in pool:', email);
+            return { success: true, id: accountId };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:save-new error:', e);
             return { success: false, error: e.message };
         }
     });

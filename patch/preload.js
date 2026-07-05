@@ -1430,7 +1430,7 @@ try {
 
   function injectQuotaWidget() {
     try {
-      // 1. 异步载入多账号列表并缓存于 window 对象中（增加即时重绘）
+      // 1. 异步载入多账号列表并缓存于 window 对象中（增加即时重绘与凭据嗅探）
       if (window.antigravityAccounts === undefined) {
         window.antigravityAccounts = null;
         try {
@@ -1439,6 +1439,52 @@ try {
             window.antigravityCurrentAccount = res.currentAccountId || '';
             // 异步数据一落地，立即强行重绘挂件，彻底消灭 2 秒的显示等待延迟
             injectQuotaWidget();
+
+            // 自动嗅探：启动时比对当前系统内的有效凭证
+            electron_1.ipcRenderer.invoke('accounts:get-current-keyring').then(currentKeyring => {
+              if (currentKeyring && currentKeyring.token && currentKeyring.token.access_token) {
+                const accessToken = currentKeyring.token.access_token;
+                // 使用浏览器自带的 fetch 请求 Google UserInfo API，自动继承并使用系统代理
+                fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                })
+                .then(resp => {
+                  if (!resp.ok) throw new Error('UserInfo API status: ' + resp.status);
+                  return resp.json();
+                })
+                .then(userInfo => {
+                  if (userInfo && userInfo.email) {
+                    const email = userInfo.email;
+                    const name = userInfo.name || email.split('@')[0];
+                    
+                    // 比对是否为新登录账号
+                    const exists = window.antigravityAccounts.some(acc => acc.email.toLowerCase() === email.toLowerCase());
+                    if (!exists) {
+                      console.log('[preload] New Google account detected, registering:', email);
+                      electron_1.ipcRenderer.invoke('accounts:save-new', {
+                        email: email,
+                        name: name,
+                        token: currentKeyring.token
+                      }).then(saveRes => {
+                        if (saveRes.success) {
+                          // 注册成功后重新加载池数据并更新界面
+                          electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
+                            window.antigravityAccounts = newList.accounts || [];
+                            window.antigravityCurrentAccount = newList.currentAccountId || '';
+                            injectQuotaWidget();
+                          });
+                        }
+                      });
+                    }
+                  }
+                })
+                .catch(err => {
+                  console.warn('[preload] Failed to fetch Google userinfo for auto-register:', err.message);
+                });
+              }
+            }).catch(err => {
+              console.warn('[preload] Failed to read current system keyring:', err);
+            });
           }).catch(err => {
             console.error('[preload] accounts:list invoke failed:', err);
             window.antigravityAccounts = [];
@@ -1581,6 +1627,7 @@ try {
                 const isSelected = acc.id === window.antigravityCurrentAccount ? 'selected' : '';
                 return `<option value="${acc.id}" ${isSelected} style="background: var(--background, #191919); color: var(--foreground, #fff);">${acc.name} (${acc.email})</option>`;
               }).join('')}
+              <option value="__add_new_account__" style="background: var(--background, #191919); color: #3b82f6; font-weight: bold;">+ 登录新账号...</option>
             </select>
           </div>
         `;
@@ -1589,6 +1636,24 @@ try {
         if (select) {
           select.onchange = (e) => {
             const targetId = e.target.value;
+            if (targetId === '__add_new_account__') {
+              select.disabled = true;
+              select.style.opacity = '0.5';
+              electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
+                if (confirmed) {
+                  electron_1.ipcRenderer.invoke('accounts:clear-keyring');
+                } else {
+                  select.disabled = false;
+                  select.style.opacity = '1';
+                  select.value = window.antigravityCurrentAccount;
+                }
+              }).catch(err => {
+                select.disabled = false;
+                select.style.opacity = '1';
+                select.value = window.antigravityCurrentAccount;
+              });
+              return;
+            }
             if (targetId && targetId !== window.antigravityCurrentAccount) {
               select.disabled = true;
               select.style.opacity = '0.5';
@@ -1618,12 +1683,18 @@ try {
           addBtn.onmouseleave = () => { addBtn.style.color = '#3b82f6'; };
           addBtn.onclick = (e) => {
             e.stopPropagation();
-            electron_1.ipcRenderer.invoke('accounts:open-manager').then(res => {
-              if (!res.success) {
-                alert('打开管理器失败: ' + res.error);
+            addBtn.style.pointerEvents = 'none';
+            addBtn.style.opacity = '0.5';
+            electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
+              if (confirmed) {
+                electron_1.ipcRenderer.invoke('accounts:clear-keyring');
+              } else {
+                addBtn.style.pointerEvents = 'auto';
+                addBtn.style.opacity = '1';
               }
             }).catch(err => {
-              alert('打开管理器发生错误: ' + err.message);
+              addBtn.style.pointerEvents = 'auto';
+              addBtn.style.opacity = '1';
             });
           };
           addBtn.onmousedown = (e) => e.stopPropagation();
