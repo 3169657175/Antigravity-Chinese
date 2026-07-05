@@ -1689,6 +1689,20 @@ try {
         `;
         
         settingsBtn.parentNode.insertBefore(widget, settingsBtn);
+
+        // 动态向上遍历父级链，彻底禁用侧边栏容器的横向溢出滚动条，规避 Chromium 残留滚动条的渲染 Bug
+        try {
+          let p = widget.parentElement;
+          while (p && p.tagName !== 'BODY') {
+            const comp = window.getComputedStyle(p);
+            if (comp.overflowX === 'auto' || comp.overflowX === 'scroll' || comp.overflow === 'auto' || comp.overflow === 'scroll') {
+              p.style.setProperty('overflow-x', 'hidden', 'important');
+            }
+            p = p.parentElement;
+          }
+        } catch (e) {
+          console.error('[preload] Failed to set parent overflow-x to hidden:', e);
+        }
       }
       
       const gWeekly = localStorage.getItem('quota_gemini_weekly') || '--';
