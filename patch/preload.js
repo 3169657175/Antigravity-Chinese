@@ -1432,17 +1432,51 @@ try {
     return null;
   }
 
+  function getNativeThemeColors() {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body);
+    const pick = (...names) => {
+      for (const name of names) {
+        const val = rootStyle.getPropertyValue(name).trim() || bodyStyle.getPropertyValue(name).trim();
+        if (val) return val;
+      }
+      return '';
+    };
+    const parseRgb = (value) => {
+      const match = String(value || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+    };
+    const pageBg = pick('--background', '--color-background', '--vscode-editor-background') || bodyStyle.backgroundColor || '#f3f3f3';
+    const pageFg = pick('--foreground', '--color-foreground', '--vscode-foreground') || bodyStyle.color || '#202020';
+    const rgb = parseRgb(pageBg);
+    const isDark = rgb ? ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000) < 128 : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const accent = pick('--accent', '--primary', '--vscode-focusBorder') || '#3b82f6';
+    return {
+      isDark,
+      accent,
+      surface: pick('--panel-background', '--sidebar-background', '--vscode-sideBar-background') || pageBg || (isDark ? '#1f1f1f' : '#f7f7f7'),
+      foreground: pageFg || (isDark ? '#f2f2f2' : '#1f1f1f'),
+      muted: isDark ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.58)',
+      border: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+      subtle: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+      subtleHover: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)',
+      overlay: isDark ? 'rgba(0,0,0,0.50)' : 'rgba(0,0,0,0.26)',
+      shadow: isDark ? '0 18px 48px rgba(0,0,0,0.45)' : '0 18px 42px rgba(0,0,0,0.16)'
+    };
+  }
+
   function showBeautifulConfirm(title, message, confirmText = '确定', cancelText = '取消') {
     return new Promise((resolve) => {
+      const theme = getNativeThemeColors();
       const overlay = document.createElement('div');
       overlay.style.position = 'fixed';
       overlay.style.top = '0';
       overlay.style.left = '0';
       overlay.style.width = '100vw';
       overlay.style.height = '100vh';
-      overlay.style.background = 'rgba(0, 0, 0, 0.45)';
-      overlay.style.backdropFilter = 'blur(16px) saturate(140%)';
-      overlay.style.webkitBackdropFilter = 'blur(16px) saturate(140%)';
+      overlay.style.background = theme.overlay;
+      overlay.style.backdropFilter = 'blur(6px)';
+      overlay.style.webkitBackdropFilter = 'blur(6px)';
       overlay.style.zIndex = '999999';
       overlay.style.display = 'flex';
       overlay.style.alignItems = 'center';
@@ -1451,30 +1485,30 @@ try {
       overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
 
       const card = document.createElement('div');
-      card.style.background = 'rgba(23, 23, 23, 0.82)';
-      card.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-      card.style.borderRadius = '14px';
+      card.style.background = theme.surface;
+      card.style.border = '1px solid ' + theme.border;
+      card.style.borderRadius = '10px';
       card.style.padding = '24px 28px';
       card.style.width = '380px';
-      card.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.65)';
+      card.style.boxShadow = theme.shadow;
       card.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       card.style.transform = 'scale(0.92) translateY(10px)';
       card.style.transition = 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease';
       card.style.opacity = '0';
-      card.style.color = '#e5e5e5';
+      card.style.color = theme.foreground;
 
       const titleEl = document.createElement('div');
       titleEl.style.fontSize = '16px';
       titleEl.style.fontWeight = '600';
-      titleEl.style.color = '#ffffff';
+      titleEl.style.color = theme.foreground;
       titleEl.style.marginBottom = '12px';
-      titleEl.style.letterSpacing = '0.5px';
+      titleEl.style.letterSpacing = '0';
       titleEl.textContent = title;
 
       const descEl = document.createElement('div');
       descEl.style.fontSize = '13.5px';
       descEl.style.lineHeight = '1.6';
-      descEl.style.color = '#a3a3a3';
+      descEl.style.color = theme.muted;
       descEl.style.marginBottom = '24px';
       descEl.style.whiteSpace = 'pre-wrap';
       descEl.textContent = message;
@@ -1485,49 +1519,45 @@ try {
       btnArea.style.gap = '12px';
 
       const cancelBtn = document.createElement('button');
-      cancelBtn.style.background = 'transparent';
-      cancelBtn.style.border = '1px solid rgba(255, 255, 255, 0.15)';
-      cancelBtn.style.borderRadius = '8px';
+      cancelBtn.style.background = theme.subtle;
+      cancelBtn.style.border = '1px solid ' + theme.border;
+      cancelBtn.style.borderRadius = '6px';
       cancelBtn.style.padding = '8px 16px';
       cancelBtn.style.fontSize = '12.5px';
       cancelBtn.style.fontWeight = '500';
-      cancelBtn.style.color = '#d4d4d4';
+      cancelBtn.style.color = theme.foreground;
       cancelBtn.style.cursor = 'pointer';
       cancelBtn.style.transition = 'all 0.15s ease';
       cancelBtn.textContent = cancelText;
 
       cancelBtn.onmouseenter = () => {
-        cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
-        cancelBtn.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-        cancelBtn.style.color = '#ffffff';
+        cancelBtn.style.background = theme.subtleHover;
+        cancelBtn.style.borderColor = theme.border;
       };
       cancelBtn.onmouseleave = () => {
-        cancelBtn.style.background = 'transparent';
-        cancelBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-        cancelBtn.style.color = '#d4d4d4';
+        cancelBtn.style.background = theme.subtle;
+        cancelBtn.style.borderColor = theme.border;
       };
 
       const confirmBtn = document.createElement('button');
-      confirmBtn.style.background = 'linear-gradient(135deg, #3b82f6, #1d4ed8)';
+      confirmBtn.style.background = theme.accent;
       confirmBtn.style.border = 'none';
-      confirmBtn.style.borderRadius = '8px';
+      confirmBtn.style.borderRadius = '6px';
       confirmBtn.style.padding = '8px 20px';
       confirmBtn.style.fontSize = '12.5px';
       confirmBtn.style.fontWeight = '600';
       confirmBtn.style.color = '#ffffff';
       confirmBtn.style.cursor = 'pointer';
-      confirmBtn.style.boxShadow = '0 2px 8px rgba(29, 78, 216, 0.3)';
+      confirmBtn.style.boxShadow = 'none';
       confirmBtn.style.transition = 'all 0.15s ease';
       confirmBtn.textContent = confirmText;
 
       confirmBtn.onmouseenter = () => {
         confirmBtn.style.transform = 'translateY(-1px)';
-        confirmBtn.style.boxShadow = '0 4px 12px rgba(29, 78, 216, 0.45)';
-        confirmBtn.style.filter = 'brightness(1.1)';
+        confirmBtn.style.filter = theme.isDark ? 'brightness(1.12)' : 'brightness(0.96)';
       };
       confirmBtn.onmouseleave = () => {
         confirmBtn.style.transform = 'translateY(0)';
-        confirmBtn.style.boxShadow = '0 2px 8px rgba(29, 78, 216, 0.3)';
         confirmBtn.style.filter = 'brightness(1)';
       };
 
@@ -1762,16 +1792,25 @@ try {
         
         const style = document.createElement('style');
         style.textContent = `
+          :host {
+            color-scheme: light dark;
+            --ag-accent: var(--accent, var(--primary, #3b82f6));
+            --ag-border: color-mix(in srgb, CanvasText 14%, transparent);
+            --ag-subtle: color-mix(in srgb, CanvasText 5%, transparent);
+            --ag-hover: color-mix(in srgb, CanvasText 8%, transparent);
+            --ag-active: color-mix(in srgb, var(--ag-accent) 14%, transparent);
+            --ag-danger: #d84848;
+          }
           .widget-card {
             box-sizing: border-box !important;
             padding: 8px 12px !important;
             border-radius: 6px !important;
             font-size: 11px !important;
             font-family: var(--font-family, sans-serif) !important;
-            border: 1px solid rgba(128,128,128,0.15) !important;
-            background: rgba(128,128,128,0.05) !important;
-            color: var(--foreground, inherit) !important;
-            opacity: 0.75 !important;
+            border: 1px solid var(--ag-border) !important;
+            background: var(--ag-subtle) !important;
+            color: CanvasText !important;
+            opacity: 0.82 !important;
             display: flex !important;
             flex-direction: column !important;
             gap: 4px !important;
@@ -1782,7 +1821,7 @@ try {
           }
           .widget-card:hover {
             opacity: 1 !important;
-            background: rgba(128,128,128,0.08) !important;
+            background: var(--ag-hover) !important;
           }
           .quota-title {
             font-weight: bold;
@@ -1803,7 +1842,7 @@ try {
           }
           .accounts-container {
             margin-top: 6px;
-            border-top: 1px solid rgba(128,128,128,0.15);
+            border-top: 1px solid var(--ag-border);
             padding-top: 6px;
             display: flex;
             flex-direction: column;
@@ -1826,7 +1865,7 @@ try {
             user-select: none;
           }
           .add-link {
-            color: #3b82f6;
+            color: var(--ag-accent);
             cursor: pointer;
             font-weight: bold;
             text-decoration: none;
@@ -1834,14 +1873,14 @@ try {
             user-select: none;
           }
           .add-link:hover {
-            color: #60a5fa !important;
+            filter: brightness(1.05);
           }
           .select-trigger {
             width: 100%;
             padding: 4px 8px;
             border-radius: 4px;
-            border: 1px solid rgba(128,128,128,0.25);
-            background: rgba(128,128,128,0.06);
+            border: 1px solid var(--ag-border);
+            background: var(--ag-subtle);
             color: inherit;
             font-size: 10px;
             cursor: pointer;
@@ -1855,8 +1894,8 @@ try {
             overflow: hidden !important;
           }
           .select-trigger:hover {
-            background: rgba(128,128,128,0.12) !important;
-            border-color: rgba(128,128,128,0.4) !important;
+            background: var(--ag-hover) !important;
+            border-color: var(--ag-border) !important;
           }
           .trigger-label {
             display: inline-block !important;
@@ -1879,13 +1918,13 @@ try {
             bottom: 26px;
             left: 0;
             right: 0;
-            background: var(--background, #191919);
-            border: 1px solid rgba(128,128,128,0.25);
+            background: Canvas;
+            color: CanvasText;
+            border: 1px solid var(--ag-border);
             border-radius: 6px;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.16);
             z-index: 99999;
             padding: 4px;
-            display: flex;
             flex-direction: column;
             gap: 2px;
             box-sizing: border-box;
@@ -1903,22 +1942,22 @@ try {
             cursor: pointer;
             border-radius: 4px;
             transition: background 0.1s;
-            color: var(--foreground, #fff);
+            color: CanvasText;
           }
           .account-item:hover {
-            background: rgba(128, 128, 128, 0.12) !important;
+            background: var(--ag-hover) !important;
           }
           .account-item.active {
-            background: rgba(59, 130, 246, 0.15) !important;
-            color: #3b82f6 !important;
+            background: var(--ag-active) !important;
+            color: var(--ag-accent) !important;
             font-weight: bold !important;
           }
           .account-item.active:hover {
-            background: rgba(59, 130, 246, 0.22) !important;
+            background: color-mix(in srgb, var(--ag-accent) 18%, transparent) !important;
           }
           .delete-btn {
             font-size: 14px;
-            color: rgba(239, 68, 68, 0.6);
+            color: color-mix(in srgb, var(--ag-danger) 70%, transparent);
             padding: 0 6px;
             cursor: pointer;
             border-radius: 3px;
@@ -1927,8 +1966,8 @@ try {
             user-select: none;
           }
           .delete-btn:hover {
-            color: rgba(239, 68, 68, 1) !important;
-            background: rgba(239, 68, 68, 0.15) !important;
+            color: var(--ag-danger) !important;
+            background: color-mix(in srgb, var(--ag-danger) 12%, transparent) !important;
           }
           .add-new-item {
             padding: 6px 8px;
@@ -1938,11 +1977,11 @@ try {
             cursor: pointer;
             border-radius: 4px;
             transition: background 0.1s;
-            color: #3b82f6;
+            color: var(--ag-accent);
             font-weight: bold;
           }
           .add-new-item:hover {
-            background: rgba(59, 130, 246, 0.1) !important;
+            background: var(--ag-active) !important;
           }
         `;
         root.appendChild(style);
@@ -2036,7 +2075,7 @@ try {
               <span class="arrow-icon">▼</span>
             </div>
 
-            <div id="antigravity-account-dropdown" class="dropdown-list">
+            <div id="antigravity-account-dropdown" class="dropdown-list" style="display: none;">
               <!-- Dropdown items will be dynamically generated -->
             </div>
           </div>
