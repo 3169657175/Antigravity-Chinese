@@ -354,6 +354,8 @@ try {
     "Browser Actuation Rules": "浏览器操作控制规则",
     "Configure allowed and denied URLs for browser actuation.": "配置允许或禁止浏览器执行动作的 URL 列表。",
     "App Settings": "应用设置",
+    "Automatic Check for Updates": "自动检查更新",
+    "When enabled, you will be automatically prompted to restart the app when there is a new update available. When disabled, you can check for updates manually from the app menu.": "开启后，当有新版本可用时，系统会自动提示您重启应用以应用更新。关闭后，您可以通过应用菜单手动检查更新。",
     "Prevent Sleep": "防止计算机休眠",
     "Prevent the computer from sleeping while the app is running.": "在应用运行时防止计算机进入休眠状态。",
     "Keep In Menu Bar": "常驻系统托盘",
