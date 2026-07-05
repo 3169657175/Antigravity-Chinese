@@ -139,6 +139,66 @@ electron_1.app.on('open-url', (event, url) => {
 electron_1.app
     .whenReady()
     .then(async () => {
+    // ---------------------------------------------------------------------------
+    // Auto-Proxy Injection for Electron Main Session (Codex / Webview)
+    // ---------------------------------------------------------------------------
+    try {
+        const net = require('net');
+        const checkPort = (host, port) => {
+            return new Promise((resolve) => {
+                const socket = new net.Socket();
+                socket.setTimeout(300);
+                socket.once('connect', () => { socket.destroy(); resolve(true); });
+                socket.once('timeout', () => { socket.destroy(); resolve(false); });
+                socket.once('error', () => { socket.destroy(); resolve(false); });
+                socket.connect(port, host);
+            });
+        };
+        const getSystemProxyAsync = async () => {
+            try {
+                // Electron native resolveProxy is non-blocking and handles system settings, PAC, env vars automatically!
+                const proxyString = await electron_1.session.defaultSession.resolveProxy('https://generativelanguage.googleapis.com');
+                if (proxyString && typeof proxyString === 'string') {
+                    const parts = proxyString.split(';');
+                    const proxyPart = parts.find(p => p.trim().startsWith('PROXY'));
+                    if (proxyPart) {
+                        return proxyPart.replace('PROXY', '').trim();
+                    }
+                }
+            } catch (e) {
+                console.error('[Auto-Proxy] Failed to resolve system proxy via resolveProxy:', e);
+            }
+            // Fallback to environment variables
+            return process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.ALL_PROXY || null;
+        };
+        const sysProxy = await getSystemProxyAsync();
+        if (sysProxy) {
+            let host = '127.0.0.1';
+            let port = 10808;
+            let cleanProxy = sysProxy;
+            if (cleanProxy.includes('://')) {
+                cleanProxy = cleanProxy.split('://')[1];
+            }
+            const parts = cleanProxy.split(':');
+            if (parts.length === 2) {
+                host = parts[0];
+                port = parseInt(parts[1], 10);
+            }
+            const isProxyAlive = await checkPort(host, port);
+            if (isProxyAlive) {
+                const proxyRules = `http://${host}:${port}`;
+                console.log('[Auto-Proxy] Main Electron Session configured to use proxy:', proxyRules);
+                await electron_1.session.defaultSession.setProxy({
+                    proxyRules: proxyRules,
+                    proxyBypassRules: 'localhost,127.0.0.1,::1,*.local,*.netease.com,*.163.com,*.netease.co,*.gdl.netease.com'
+                });
+            } else {
+                console.log('[Auto-Proxy] Detected proxy port is closed. Running direct.');
+            }
+        }
+    } catch (proxyErr) {
+        console.error('[Auto-Proxy] Failed to configure main session proxy:', proxyErr);
+    }
     // Initialize electron-log and override console
     main_1.default.initialize();
     Object.assign(console, main_1.default.functions);

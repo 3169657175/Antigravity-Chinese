@@ -1288,27 +1288,38 @@ try {
     console.error('Failed to load cached cloud dictionary:', e);
   }
 
-  // Fetch the latest dictionary in the background
-  fetch('https://raw.githubusercontent.com/good9527/Antigravity-Chinese-Patch/main/dist/dictionary.json')
-    .then(res => {
-      if (res.ok) return res.json();
-      throw new Error('Network response was not ok');
-    })
-    .then(data => {
-      if (data && typeof data === 'object') {
-        localStorage.setItem('antigravity_chinese_patch_dict', JSON.stringify(data));
-        Object.assign(dictionary, data);
-        console.log('Antigravity Chinese Patch: Cloud dictionary updated successfully! Total keys: ' + Object.keys(data).length);
-        
-        // Force refresh current body translation
-        if (document.body) {
-          translateNode(document.body);
+  // Fetch the latest dictionary in the background (CDN fast lane with GitHub fallback)
+  const dictUrls = [
+    'https://fastly.jsdelivr.net/gh/good9527/Antigravity-Chinese-Patch@main/dist/dictionary.json',
+    'https://raw.githubusercontent.com/good9527/Antigravity-Chinese-Patch/main/dist/dictionary.json'
+  ];
+
+  async function fetchCloudDict() {
+    for (const url of dictUrls) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && typeof data === 'object') {
+            localStorage.setItem('antigravity_chinese_patch_dict', JSON.stringify(data));
+            Object.assign(dictionary, data);
+            console.log('Antigravity Chinese Patch: Cloud dictionary updated successfully from ' + new URL(url).hostname + '! Total keys: ' + Object.keys(data).length);
+            
+            // Force refresh current body translation
+            if (document.body) {
+              translateNode(document.body);
+            }
+            return;
+          }
         }
+      } catch (err) {
+        console.warn('Antigravity Chinese Patch: Failed to fetch cloud dict from ' + url, err);
       }
-    })
-    .catch(err => {
-      console.warn('Antigravity Chinese Patch: Cloud update failed or offline. Using local dictionary. Details:', err);
-    });
+    }
+    console.warn('Antigravity Chinese Patch: All cloud update routes failed or offline. Using cached/local dictionary.');
+  }
+
+  fetchCloudDict();
 
   // --- Sidebar Minimalist Quota Monitor (Minimalist / Severe style) ---
   // DFII Score: 18 (Memorable, clean DOM injection, inherits theme styles automatically)
