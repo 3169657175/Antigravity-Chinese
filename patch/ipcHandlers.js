@@ -459,15 +459,59 @@ function registerIpcHandlers(storageManager) {
         }
     });
 
-    // Accounts get current keyring handler
-    electron_1.ipcMain.handle('accounts:get-current-keyring', async () => {
+    // Accounts sniff handler - highly optimized local gRPC check (2ms)
+    electron_1.ipcMain.handle('accounts:sniff', async () => {
         try {
+            const languageServer = require("./languageServer");
+            const port = languageServer.getLsPort();
+            const csrf = languageServer.getLsCsrf();
+            if (!port || !csrf) return { success: false, error: 'No LS port/csrf' };
+
+            // Query GetUserStatus locally (takes ~2ms, no CPU overhead)
+            const data = await requestGrpc(port, csrf, '/exa.language_server_pb.LanguageServerService/GetUserStatus', Buffer.from([0, 0, 0, 0, 0]));
+            if (!data || data.length === 0) return { success: false, error: 'Empty LS response' };
+
+            const text = data.toString('utf-8');
+            const emailMatch = /[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}/.exec(text);
+            if (!emailMatch) return { success: false, error: 'No email found in response' };
+
+            const email = emailMatch[0].trim();
+
             const os = require('os');
-            const path = require('path');
-            const fs = require('fs');
+            const fsPromises = require('fs/promises');
+            const userHome = os.homedir();
+            
+            const baseDir = path.join(userHome, '.antigravity_tools');
+            await fsPromises.mkdir(baseDir, { recursive: true });
+            
+            const accountsPath = path.join(baseDir, 'accounts.json');
+            let dataPool = { version: "2.0", accounts: [], current_account_id: "" };
+            
+            try {
+                const rawPool = await fsPromises.readFile(accountsPath, 'utf-8');
+                dataPool = JSON.parse(rawPool);
+            } catch (e) {}
+
+            const existingAcc = (dataPool.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
+            
+            // Optimization: If the account is already saved and it is set as current, return immediately (no PowerShell run!)
+            if (existingAcc && dataPool.current_account_id === existingAcc.id) {
+                return { success: true, email, accountId: existingAcc.id, alreadySaved: true };
+            }
+
+            // If account exists but is not set as current in accounts.json
+            if (existingAcc) {
+                dataPool.current_account_id = existingAcc.id;
+                await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+                return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
+            }
+
+            // ONLY IF the account does NOT exist in the pool, we run PowerShell to read the keyring and save it
+            console.log('[ipcHandlers] New email detected from LS:', email, '. Extracting token from keyring...');
+            
             const { execSync } = require('child_process');
             
-            if (process.platform !== 'win32') return null;
+            if (process.platform !== 'win32') return { success: false, error: 'Unsupported platform' };
             
             const tempPsFile = path.join(os.tmpdir(), `agy_read_cred_${Date.now()}.ps1`);
             const readScript = `
@@ -536,8 +580,10 @@ function registerIpcHandlers(storageManager) {
             
             const bom = Buffer.from([0xFF, 0xFE]);
             const buf = Buffer.from(readScript, 'utf16le');
+            const fs = require('fs');
             fs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
             
+            let currentKeyring = null;
             try {
                 const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
                 if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
@@ -547,146 +593,45 @@ function registerIpcHandlers(storageManager) {
                     if (line.startsWith('VALUE: ')) {
                         const jsonStr = line.substring(7).trim();
                         if (jsonStr) {
-                            return JSON.parse(jsonStr);
+                            currentKeyring = JSON.parse(jsonStr);
                         }
                     }
                 }
             } catch (e) {
                 if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
-                console.error('[ipcHandlers] accounts:get-current-keyring run error:', e);
-            }
-            return null;
-        } catch (e) {
-            console.error('[ipcHandlers] accounts:get-current-keyring error:', e);
-            return null;
-        }
-    });
-
-    // Accounts clear keyring and trigger relaunch
-    electron_1.ipcMain.handle('accounts:clear-keyring', async () => {
-        try {
-            const { execSync } = require('child_process');
-            if (process.platform === 'win32') {
-                try {
-                    execSync('cmdkey /delete:gemini:antigravity');
-                    console.log('[ipcHandlers] Successfully cleared generic credential from system keyring');
-                } catch (e) {
-                    console.warn('[ipcHandlers] cmdkey delete failed (might not exist):', e.message);
-                }
-            }
-            // Sync current_account_id to empty in accounts.json
-            try {
-                const os = require('os');
-                const path = require('path');
-                const fs = require('fs/promises');
-                const userHome = os.homedir();
-                const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
-                const raw = await fs.readFile(accountsPath, 'utf-8');
-                const data = JSON.parse(raw);
-                data.current_account_id = '';
-                await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
-            } catch (e) {}
-
-            // Kill old language_server.exe immediately to free up gRPC ports before relaunch
-            if (process.platform === 'win32') {
-                try {
-                    execSync('taskkill /F /IM language_server.exe');
-                } catch (e) {}
+                console.error('[ipcHandlers] Read keyring error inside sniff:', e);
             }
 
-            // Relaunch the app
-            setTimeout(() => {
-                electron_1.app.relaunch();
-                electron_1.app.exit(0);
-            }, 50);
-            return { success: true };
-        } catch (e) {
-            console.error('[ipcHandlers] accounts:clear-keyring error:', e);
-            return { success: false, error: e.message };
-        }
-    });
+            if (!currentKeyring || !currentKeyring.token || !currentKeyring.token.access_token) {
+                return { success: false, error: 'No token found in keyring' };
+            }
 
-    // Accounts async native confirm box to prevent blocking the Chromium render thread
-    electron_1.ipcMain.handle('accounts:confirm-clear', async (event) => {
-        try {
-            const { dialog, BrowserWindow } = require('electron');
-            const win = BrowserWindow.fromWebContents(event.sender);
-            const result = await dialog.showMessageBox(win, {
-                type: 'question',
-                buttons: ['确定', '取消'],
-                defaultId: 1,
-                title: 'Antigravity',
-                message: '是否要清空当前登录状态并重启客户端以登录新账号？',
-                cancelId: 1
-            });
-            return result.response === 0;
-        } catch (e) {
-            console.error('[ipcHandlers] accounts:confirm-clear error:', e);
-            return false;
-        }
-    });
-
-    // Accounts save new handler
-    electron_1.ipcMain.handle('accounts:save-new', async (_event, { email, name, token }) => {
-        try {
-            const os = require('os');
-            const path = require('path');
-            const fs = require('fs/promises');
             const crypto = require('crypto');
-            const userHome = os.homedir();
+            await fsPromises.mkdir(path.join(baseDir, 'accounts'), { recursive: true });
             
-            const baseDir = path.join(userHome, '.antigravity_tools');
-            await fs.mkdir(baseDir, { recursive: true });
-            await fs.mkdir(path.join(baseDir, 'accounts'), { recursive: true });
+            const accountId = crypto.randomUUID();
+            const newAcc = {
+                id: accountId,
+                email: email,
+                name: email.split('@')[0],
+                disabled: false
+            };
+            dataPool.accounts.push(newAcc);
+            dataPool.current_account_id = accountId;
             
-            const accountsPath = path.join(baseDir, 'accounts.json');
-            let data = { version: "2.0", accounts: [], current_account_id: "" };
-            
-            try {
-                const raw = await fs.readFile(accountsPath, 'utf-8');
-                data = JSON.parse(raw);
-            } catch (e) {
-                // If accounts.json doesn't exist, we use the default empty one
-            }
-            
-            // Check if email already exists
-            let acc = (data.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
-            const accountId = acc ? acc.id : crypto.randomUUID();
-            
-            if (!acc) {
-                acc = {
-                    id: accountId,
-                    email: email,
-                    name: name || email.split('@')[0],
-                    disabled: false
-                };
-                data.accounts.push(acc);
-            } else {
-                // Update name if changed
-                if (name) acc.name = name;
-            }
-            
-            data.current_account_id = accountId;
-            
-            // Save detailed JSON file (which holds access_token and refresh_token)
             const detailPath = path.join(baseDir, 'accounts', `${accountId}.json`);
-            let existingDetail = {};
-            try {
-                const detailRaw = await fs.readFile(detailPath, 'utf-8');
-                existingDetail = JSON.parse(detailRaw);
-            } catch (e) {}
-            
-            const deviceProfile = existingDetail.device_profile || {
+            const deviceProfile = {
                 machine_id: "auth0|user_" + accountId.replace(/-/g, '').substring(0, 24),
                 mac_machine_id: crypto.randomUUID(),
                 dev_device_id: crypto.randomUUID(),
                 sqm_id: "{" + crypto.randomUUID().toUpperCase() + "}"
             };
-            
+
+            const token = currentKeyring.token;
             const newDetail = {
                 id: accountId,
                 email: email,
-                name: name || email.split('@')[0],
+                name: email.split('@')[0],
                 token: {
                     access_token: token.access_token,
                     refresh_token: token.refresh_token,
@@ -709,14 +654,14 @@ function registerIpcHandlers(storageManager) {
                     }
                 ]
             };
-            
-            await fs.writeFile(detailPath, JSON.stringify(newDetail, null, 2), 'utf-8');
-            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
-            
-            console.log('[ipcHandlers] Successfully saved/updated account in pool:', email);
-            return { success: true, id: accountId };
+
+            await fsPromises.writeFile(detailPath, JSON.stringify(newDetail, null, 2), 'utf-8');
+            await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+
+            console.log('[ipcHandlers] Sniff registered brand new account to pool:', email);
+            return { success: true, email, accountId, newlySaved: true };
         } catch (e) {
-            console.error('[ipcHandlers] accounts:save-new error:', e);
+            console.error('[ipcHandlers] accounts:sniff error:', e);
             return { success: false, error: e.message };
         }
     });

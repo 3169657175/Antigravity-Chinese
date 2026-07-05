@@ -1428,6 +1428,24 @@ try {
     return null;
   }
 
+  function runGrpcSniff() {
+    if (window.antigravitySniffingInProgress) return;
+    window.antigravitySniffingInProgress = true;
+    electron_1.ipcRenderer.invoke('accounts:sniff').then(sniffRes => {
+      window.antigravitySniffingInProgress = false;
+      if (sniffRes && sniffRes.success && (sniffRes.newlySaved || sniffRes.updatedCurrent)) {
+        electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
+          window.antigravityAccounts = newList.accounts || [];
+          window.antigravityCurrentAccount = newList.currentAccountId || '';
+          injectQuotaWidget();
+        });
+      }
+    }).catch(err => {
+      window.antigravitySniffingInProgress = false;
+      console.warn('[preload] Sniff failed:', err);
+    });
+  }
+
   function injectQuotaWidget() {
     try {
       // 1. 异步载入多账号列表并缓存于 window 对象中（增加即时重绘与凭据嗅探）
@@ -1439,52 +1457,7 @@ try {
             window.antigravityCurrentAccount = res.currentAccountId || '';
             // 异步数据一落地，立即强行重绘挂件，彻底消灭 2 秒的显示等待延迟
             injectQuotaWidget();
-
-            // 自动嗅探：启动时比对当前系统内的有效凭证
-            electron_1.ipcRenderer.invoke('accounts:get-current-keyring').then(currentKeyring => {
-              if (currentKeyring && currentKeyring.token && currentKeyring.token.access_token) {
-                const accessToken = currentKeyring.token.access_token;
-                // 使用浏览器自带的 fetch 请求 Google UserInfo API，自动继承并使用系统代理
-                fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { 'Authorization': `Bearer ${accessToken}` }
-                })
-                .then(resp => {
-                  if (!resp.ok) throw new Error('UserInfo API status: ' + resp.status);
-                  return resp.json();
-                })
-                .then(userInfo => {
-                  if (userInfo && userInfo.email) {
-                    const email = userInfo.email;
-                    const name = userInfo.name || email.split('@')[0];
-                    
-                    // 比对是否为新登录账号
-                    const exists = window.antigravityAccounts.some(acc => acc.email.toLowerCase() === email.toLowerCase());
-                    if (!exists) {
-                      console.log('[preload] New Google account detected, registering:', email);
-                      electron_1.ipcRenderer.invoke('accounts:save-new', {
-                        email: email,
-                        name: name,
-                        token: currentKeyring.token
-                      }).then(saveRes => {
-                        if (saveRes.success) {
-                          // 注册成功后重新加载池数据并更新界面
-                          electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
-                            window.antigravityAccounts = newList.accounts || [];
-                            window.antigravityCurrentAccount = newList.currentAccountId || '';
-                            injectQuotaWidget();
-                          });
-                        }
-                      });
-                    }
-                  }
-                })
-                .catch(err => {
-                  console.warn('[preload] Failed to fetch Google userinfo for auto-register:', err.message);
-                });
-              }
-            }).catch(err => {
-              console.warn('[preload] Failed to read current system keyring:', err);
-            });
+            runGrpcSniff();
           }).catch(err => {
             console.error('[preload] accounts:list invoke failed:', err);
             window.antigravityAccounts = [];
@@ -1493,6 +1466,8 @@ try {
         } catch (e) {
           window.antigravityAccounts = [];
         }
+      } else {
+        runGrpcSniff();
       }
 
       const buttons = document.querySelectorAll('button, .sidebar-item, nav [role="button"], a');
