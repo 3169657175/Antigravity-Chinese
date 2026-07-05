@@ -1429,19 +1429,34 @@ try {
   }
 
   function runGrpcSniff() {
-    if (window.antigravitySniffingInProgress) return;
+    const log = (msg) => {
+        try {
+            electron_1.ipcRenderer.invoke('debug:log', '[preload] ' + msg);
+        } catch(e) {}
+    };
+
+    log('runGrpcSniff called');
+    if (window.antigravitySniffingInProgress) {
+        log('Sniff already in progress, skipping');
+        return;
+    }
     window.antigravitySniffingInProgress = true;
+    log('Invoking accounts:sniff...');
     electron_1.ipcRenderer.invoke('accounts:sniff').then(sniffRes => {
       window.antigravitySniffingInProgress = false;
+      log('accounts:sniff result: ' + JSON.stringify(sniffRes));
       if (sniffRes && sniffRes.success && (sniffRes.newlySaved || sniffRes.updatedCurrent)) {
+        log('Sniff registered change, reloading accounts...');
         electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
           window.antigravityAccounts = newList.accounts || [];
           window.antigravityCurrentAccount = newList.currentAccountId || '';
+          log('Accounts reloaded, current=' + window.antigravityCurrentAccount);
           injectQuotaWidget();
         });
       }
     }).catch(err => {
       window.antigravitySniffingInProgress = false;
+      log('Sniff invoke error: ' + err.message);
       console.warn('[preload] Sniff failed:', err);
     });
   }

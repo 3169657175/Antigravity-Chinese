@@ -459,23 +459,71 @@ function registerIpcHandlers(storageManager) {
         }
     });
 
+    // Debug logging helper
+    electron_1.ipcMain.handle('debug:log', async (_event, msg) => {
+        try {
+            const fs = require('fs');
+            fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/sniff_combined.log', '[' + new Date().toISOString() + '] ' + msg + '\n', 'utf-8');
+        } catch(e) {}
+    });
+
     // Accounts sniff handler - highly optimized local gRPC check (2ms)
     electron_1.ipcMain.handle('accounts:sniff', async () => {
         try {
+            const fs = require('fs');
+            const path = require('path');
+            const log = (msg) => {
+                try {
+                    fs.appendFileSync('C:/Users/niu/.gemini/antigravity/scratch/sniff_combined.log', '[' + new Date().toISOString() + '] [ipc] ' + msg + '\n', 'utf-8');
+                } catch(e) {}
+            };
+
+            log('accounts:sniff called');
             const languageServer = require("./languageServer");
             const port = languageServer.getLsPort();
             const csrf = languageServer.getLsCsrf();
-            if (!port || !csrf) return { success: false, error: 'No LS port/csrf' };
+            log('LS port=' + port + ', csrf=' + csrf);
+            if (!port || !csrf) {
+                log('No LS port or CSRF');
+                return { success: false, error: 'No LS port/csrf' };
+            }
 
-            // Query GetUserStatus locally (takes ~2ms, no CPU overhead)
             const data = await requestGrpc(port, csrf, '/exa.language_server_pb.LanguageServerService/GetUserStatus', Buffer.from([0, 0, 0, 0, 0]));
-            if (!data || data.length === 0) return { success: false, error: 'Empty LS response' };
+            log('LS GetUserStatus response length: ' + (data ? data.length : 0));
+            if (!data || data.length === 0) {
+                log('Empty LS response');
+                return { success: false, error: 'Empty LS response' };
+            }
 
-            const text = data.toString('utf-8');
-            const emailMatch = /[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}/.exec(text);
-            if (!emailMatch) return { success: false, error: 'No email found in response' };
-
-            const email = emailMatch[0].trim();
+            // 直接扫描 Buffer 字节寻找邮箱，绕过 Protobuf 二进制乱码干扰 UTF-8 解码
+            let email = null;
+            const AT = 0x40; // '@'
+            const VALID_CHARS = new Set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_+'.split('').map(c => c.charCodeAt(0)));
+            const DOT = 0x2E; // '.'
+            for (let i = 0; i < data.length; i++) {
+                if (data[i] === AT) {
+                    // 向前找用户名
+                    let start = i - 1;
+                    while (start >= 0 && VALID_CHARS.has(data[start])) start--;
+                    start++;
+                    if (start >= i) continue; // 没有用户名
+                    // 向后找域名（只到下一个非 ASCII 字母/数字/点为止）
+                    let end = i + 1;
+                    while (end < data.length && (VALID_CHARS.has(data[end]) || data[end] === DOT)) end++;
+                    const rawCandidate = data.slice(start, end).toString('ascii');
+                    // 用正则提取首个合法邮箱（截断末尾多余字节如 jm 等 Protobuf 残留）
+                    const m = /^([\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/.exec(rawCandidate);
+                    if (m) {
+                        email = m[1];
+                        break;
+                    }
+                }
+            }
+            if (!email) {
+                log('No email found in response. Raw hex preview: ' + data.slice(0, 80).toString('hex'));
+                return { success: false, error: 'No email found in response' };
+            }
+            log('Sniffed email from LS: ' + email);
 
             const os = require('os');
             const fsPromises = require('fs/promises');
@@ -490,28 +538,31 @@ function registerIpcHandlers(storageManager) {
             try {
                 const rawPool = await fsPromises.readFile(accountsPath, 'utf-8');
                 dataPool = JSON.parse(rawPool);
-            } catch (e) {}
+            } catch (e) {
+                log('Error reading accounts.json: ' + e.message);
+            }
 
             const existingAcc = (dataPool.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
+            log('Existing account found: ' + (existingAcc ? existingAcc.id : 'none'));
             
-            // Optimization: If the account is already saved and it is set as current, return immediately (no PowerShell run!)
             if (existingAcc && dataPool.current_account_id === existingAcc.id) {
+                log('Account already current, returning success');
                 return { success: true, email, accountId: existingAcc.id, alreadySaved: true };
             }
 
-            // If account exists but is not set as current in accounts.json
             if (existingAcc) {
+                log('Account exists but not current, updating current_account_id');
                 dataPool.current_account_id = existingAcc.id;
                 await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+                log('Updated current_account_id to ' + existingAcc.id);
                 return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
             }
 
-            // ONLY IF the account does NOT exist in the pool, we run PowerShell to read the keyring and save it
-            console.log('[ipcHandlers] New email detected from LS:', email, '. Extracting token from keyring...');
-            
-            const { execSync } = require('child_process');
-            
-            if (process.platform !== 'win32') return { success: false, error: 'Unsupported platform' };
+            log('New email detected, reading keyring token...');
+            if (process.platform !== 'win32') {
+                log('Unsupported platform');
+                return { success: false, error: 'Unsupported platform' };
+            }
             
             const tempPsFile = path.join(os.tmpdir(), `agy_read_cred_${Date.now()}.ps1`);
             const readScript = `
@@ -580,12 +631,13 @@ function registerIpcHandlers(storageManager) {
             
             const bom = Buffer.from([0xFF, 0xFE]);
             const buf = Buffer.from(readScript, 'utf16le');
-            const fs = require('fs');
             fs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
             
             let currentKeyring = null;
             try {
+                const { execSync } = require('child_process');
                 const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
+                log('Powershell keyring output: ' + out.trim());
                 if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
                 
                 const lines = out.split('\n');
@@ -599,10 +651,11 @@ function registerIpcHandlers(storageManager) {
                 }
             } catch (e) {
                 if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
-                console.error('[ipcHandlers] Read keyring error inside sniff:', e);
+                log('Error executing powershell: ' + e.message);
             }
 
             if (!currentKeyring || !currentKeyring.token || !currentKeyring.token.access_token) {
+                log('No token found in keyring');
                 return { success: false, error: 'No token found in keyring' };
             }
 
@@ -658,10 +711,11 @@ function registerIpcHandlers(storageManager) {
             await fsPromises.writeFile(detailPath, JSON.stringify(newDetail, null, 2), 'utf-8');
             await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
 
-            console.log('[ipcHandlers] Sniff registered brand new account to pool:', email);
+            log('Sniff registered brand new account to pool: ' + email);
             return { success: true, email, accountId, newlySaved: true };
         } catch (e) {
-            console.error('[ipcHandlers] accounts:sniff error:', e);
+            console.error('[ipcHandlers] accounts:sniff exception:', e);
+            try { log('accounts:sniff exception: ' + e.message); } catch(_) {}
             return { success: false, error: e.message };
         }
     });
