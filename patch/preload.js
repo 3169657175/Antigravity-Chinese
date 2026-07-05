@@ -1912,17 +1912,17 @@ try {
             transition: transform 0.25s;
             pointer-events: none;
           }
-          .dropdown-list {
+                    .dropdown-list {
             display: none;
             position: absolute;
             bottom: 26px;
             left: 0;
             right: 0;
-            background: Canvas;
-            color: CanvasText;
-            border: 1px solid var(--ag-border);
+            background: var(--vscode-menu-background, var(--vscode-dropdown-background, Canvas)) !important;
+            color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground, CanvasText)) !important;
+            border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border, var(--ag-border))) !important;
             border-radius: 6px;
-            box-shadow: 0 -8px 24px rgba(0,0,0,0.16);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.12);
             z-index: 99999;
             padding: 4px;
             flex-direction: column;
@@ -1942,18 +1942,20 @@ try {
             cursor: pointer;
             border-radius: 4px;
             transition: background 0.1s;
-            color: CanvasText;
+            color: inherit;
           }
           .account-item:hover {
-            background: var(--ag-hover) !important;
+            background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, var(--ag-hover))) !important;
+            color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground, inherit)) !important;
           }
           .account-item.active {
-            background: var(--ag-active) !important;
-            color: var(--ag-accent) !important;
+            background: var(--vscode-list-activeSelectionBackground, var(--ag-active)) !important;
+            color: var(--vscode-list-activeSelectionForeground, var(--ag-accent)) !important;
             font-weight: bold !important;
           }
           .account-item.active:hover {
-            background: color-mix(in srgb, var(--ag-accent) 18%, transparent) !important;
+            background: var(--vscode-list-activeSelectionBackground, var(--ag-active)) !important;
+            opacity: 0.9;
           }
           .delete-btn {
             font-size: 14px;
@@ -1981,7 +1983,8 @@ try {
             font-weight: bold;
           }
           .add-new-item:hover {
-            background: var(--ag-active) !important;
+            background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, var(--ag-hover))) !important;
+            color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground, var(--ag-accent))) !important;
           }
         `;
         root.appendChild(style);
