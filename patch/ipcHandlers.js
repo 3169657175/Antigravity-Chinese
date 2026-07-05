@@ -720,6 +720,84 @@ function registerIpcHandlers(storageManager) {
             return { success: false, error: e.message };
         }
     });
+
+    // Accounts confirm delete handler (async native dialog box)
+    electron_1.ipcMain.handle('accounts:confirm-delete', async (event, { email, isCurrent }) => {
+        try {
+            const { dialog, BrowserWindow } = require('electron');
+            const win = BrowserWindow.fromWebContents(event.sender);
+            const message = isCurrent
+                ? `确定要删除当前正在使用的账号 ${email} 吗？\n删除后会清除系统凭据并自动重启客户端。`
+                : `确定要删除账号 ${email} 吗？\n删除后如需再次使用，必须重新登录。`;
+            const result = await dialog.showMessageBox(win, {
+                type: 'warning',
+                buttons: ['确定删除', '取消'],
+                defaultId: 1,
+                title: '删除账号',
+                message: message,
+                cancelId: 1
+            });
+            return result.response === 0;
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:confirm-delete error:', e);
+            return false;
+        }
+    });
+
+    // Accounts delete handler
+    electron_1.ipcMain.handle('accounts:delete', async (_event, accountId) => {
+        try {
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs/promises');
+            const userHome = os.homedir();
+            
+            const baseDir = path.join(userHome, '.antigravity_tools');
+            const accountsPath = path.join(baseDir, 'accounts.json');
+            
+            const raw = await fs.readFile(accountsPath, 'utf-8');
+            const data = JSON.parse(raw);
+            
+            // Remove from list
+            data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
+            
+            // Delete detail profile file
+            const detailPath = path.join(baseDir, 'accounts', `${accountId}.json`);
+            try {
+                await fs.unlink(detailPath);
+            } catch (e) {}
+            
+            let mustRelaunch = false;
+            if (data.current_account_id === accountId) {
+                data.current_account_id = '';
+                mustRelaunch = true;
+                
+                if (process.platform === 'win32') {
+                    const { execSync } = require('child_process');
+                    try {
+                        execSync('cmdkey /delete:gemini:antigravity');
+                    } catch (e) {}
+                    try {
+                        execSync('taskkill /F /IM language_server.exe');
+                    } catch (e) {}
+                }
+            }
+            
+            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            
+            if (mustRelaunch) {
+                setTimeout(() => {
+                    electron_1.app.relaunch();
+                    electron_1.app.exit(0);
+                }, 50);
+            }
+            
+            return { success: true, mustRelaunch };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:delete error:', e);
+            return { success: false, error: e.message };
+        }
+    });
 }
 
 async function pollLocalQuota() {

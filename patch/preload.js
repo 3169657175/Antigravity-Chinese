@@ -1613,70 +1613,189 @@ try {
         if (hourlyEl.textContent !== c5h) hourlyEl.textContent = c5h;
       }
 
-      // 仅在 select 节点不存在时（或者初始化获取到新账号列表时），才进行账号切换区域的 HTML 构建
-      let select = accountsContainer.querySelector('#antigravity-account-select');
-      if (!select && window.antigravityAccounts && window.antigravityAccounts.length > 0) {
+      // 仅在 trigger 节点不存在时（或者初始化获取到新账号列表时），才进行账号切换区域的 HTML 构建
+      let trigger = accountsContainer.querySelector('#antigravity-account-select-trigger');
+      if (!trigger && window.antigravityAccounts && window.antigravityAccounts.length > 0) {
+        const currentAcc = window.antigravityAccounts.find(a => a.id === window.antigravityCurrentAccount);
+        const triggerLabel = currentAcc ? `${currentAcc.name} (${currentAcc.email})` : '未登录或选择账号';
+
         accountsContainer.innerHTML = `
-          <div style="margin-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); padding-top: 6px; display: flex; flex-direction: column; gap: 4px;" onclick="event.stopPropagation();">
+          <div style="margin-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; position: relative;" onclick="event.stopPropagation();">
             <div style="font-size: 9px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
               <span style="text-transform: uppercase; opacity: 0.6; letter-spacing: 0.5px; user-select: none;">切换账号</span>
               <span id="antigravity-add-account" style="color: #3b82f6; cursor: pointer; font-weight: bold; text-decoration: none; transition: color 0.1s; user-select: none;">添加账号</span>
             </div>
-            <select id="antigravity-account-select" style="width: 100%; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(128,128,128,0.2); background: rgba(0,0,0,0.15); color: inherit; font-size: 10px; cursor: pointer; outline: none; font-family: inherit;">
-              ${window.antigravityAccounts.map(acc => {
-                const isSelected = acc.id === window.antigravityCurrentAccount ? 'selected' : '';
-                return `<option value="${acc.id}" ${isSelected} style="background: var(--background, #191919); color: var(--foreground, #fff);">${acc.name} (${acc.email})</option>`;
-              }).join('')}
-              <option value="__add_new_account__" style="background: var(--background, #191919); color: #3b82f6; font-weight: bold;">+ 登录新账号...</option>
-            </select>
+            
+            <div id="antigravity-account-select-trigger" style="width: 100%; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(128,128,128,0.25); background: rgba(128,128,128,0.06); color: inherit; font-size: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; box-sizing: border-box; transition: background 0.15s, border-color 0.15s; font-family: inherit;">
+              <span class="trigger-label" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 85%;">
+                ${triggerLabel}
+              </span>
+              <span style="font-size: 8px; opacity: 0.6; margin-left: 4px; transition: transform 0.25s; pointer-events: none;" class="arrow-icon">▼</span>
+            </div>
+
+            <div id="antigravity-account-dropdown" style="display: none; position: absolute; bottom: 26px; left: 0; right: 0; background: var(--background, #191919); border: 1px solid rgba(128,128,128,0.25); border-radius: 6px; box-shadow: 0 -4px 12px rgba(0,0,0,0.5); z-index: 99999; padding: 4px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; font-family: inherit; max-height: 200px; overflow-y: auto;">
+              <!-- Dropdown items will be dynamically generated -->
+            </div>
           </div>
         `;
 
-        select = accountsContainer.querySelector('#antigravity-account-select');
-        if (select) {
-          select.onchange = (e) => {
-            const targetId = e.target.value;
-            if (targetId === '__add_new_account__') {
-              select.disabled = true;
-              select.style.opacity = '0.5';
-              electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
-                if (confirmed) {
-                  electron_1.ipcRenderer.invoke('accounts:clear-keyring');
-                } else {
-                  select.disabled = false;
-                  select.style.opacity = '1';
-                  select.value = window.antigravityCurrentAccount;
-                }
-              }).catch(err => {
-                select.disabled = false;
-                select.style.opacity = '1';
-                select.value = window.antigravityCurrentAccount;
-              });
-              return;
-            }
-            if (targetId && targetId !== window.antigravityCurrentAccount) {
-              select.disabled = true;
-              select.style.opacity = '0.5';
-              electron_1.ipcRenderer.invoke('accounts:switch', targetId).then(res => {
-                if (!res.success) {
-                  alert('切换账号失败: ' + res.error);
-                  select.disabled = false;
-                  select.style.opacity = '1';
-                }
-              }).catch(err => {
-                alert('切换账号发生错误: ' + err.message);
-                select.disabled = false;
-                select.style.opacity = '1';
-              });
-            }
-          };
+        trigger = accountsContainer.querySelector('#antigravity-account-select-trigger');
+        const dropdown = accountsContainer.querySelector('#antigravity-account-dropdown');
+        const arrow = trigger.querySelector('.arrow-icon');
 
-          // 强行阻止点击下拉框时冒泡导致触发 settingsBtn.click() 打开设置页面
-          select.onclick = (e) => e.stopPropagation();
-          select.onmousedown = (e) => e.stopPropagation();
+        function renderDropdownItems() {
+          const listHtml = window.antigravityAccounts.map(acc => {
+            const isCurrent = acc.id === window.antigravityCurrentAccount;
+            const activeStyle = isCurrent ? 'background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-weight: bold;' : '';
+            return `
+              <div class="account-item" data-id="${acc.id}" style="padding: 6px 8px; font-size: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-radius: 4px; transition: background 0.1s; color: var(--foreground, #fff); ${activeStyle}">
+                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80%; pointer-events: none;">
+                  ${acc.name} (${acc.email})
+                </span>
+                <span class="delete-btn" data-id="${acc.id}" style="font-size: 14px; color: rgba(239, 68, 68, 0.6); padding: 0 6px; cursor: pointer; border-radius: 3px; font-weight: bold; transition: color 0.1s, background 0.1s; user-select: none;" title="删除此账号">×</span>
+              </div>
+            `;
+          }).join('') + `
+            <div class="account-item" data-id="__add_new_account__" style="padding: 6px 8px; font-size: 10px; display: flex; align-items: center; cursor: pointer; border-radius: 4px; transition: background 0.1s; color: #3b82f6; font-weight: bold;">
+              + 登录新账号...
+            </div>
+          `;
+          
+          dropdown.innerHTML = listHtml;
+
+          // Event bindings
+          const items = dropdown.querySelectorAll('.account-item');
+          items.forEach(item => {
+            const id = item.getAttribute('data-id');
+            const isCurrent = id === window.antigravityCurrentAccount;
+            
+            // Hover effect
+            if (id !== '__add_new_account__' && isCurrent) {
+              item.onmouseenter = () => { item.style.background = 'rgba(59, 130, 246, 0.22)'; };
+              item.onmouseleave = () => { item.style.background = 'rgba(59, 130, 246, 0.15)'; };
+            } else {
+              item.onmouseenter = () => { item.style.background = 'rgba(128, 128, 128, 0.12)'; };
+              item.onmouseleave = () => { item.style.background = 'transparent'; };
+            }
+
+            // Click behavior
+            item.onclick = (e) => {
+              e.stopPropagation();
+              dropdown.style.display = 'none';
+              arrow.style.transform = 'rotate(0deg)';
+
+              if (id === '__add_new_account__') {
+                electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
+                  if (confirmed) {
+                    electron_1.ipcRenderer.invoke('accounts:clear-keyring');
+                  }
+                });
+              } else if (!isCurrent) {
+                // Set loading state on trigger
+                const triggerLabelEl = trigger.querySelector('.trigger-label');
+                if (triggerLabelEl) triggerLabelEl.textContent = '正在切换...';
+                trigger.style.opacity = '0.5';
+                
+                electron_1.ipcRenderer.invoke('accounts:switch', id).then(res => {
+                  if (!res.success) {
+                    alert('切换账号失败: ' + res.error);
+                    trigger.style.opacity = '1';
+                    injectQuotaWidget();
+                  }
+                }).catch(err => {
+                  alert('切换账号发生错误: ' + err.message);
+                  trigger.style.opacity = '1';
+                  injectQuotaWidget();
+                });
+              }
+            };
+
+            // Delete button binding
+            const delBtn = item.querySelector('.delete-btn');
+            if (delBtn) {
+              const targetAcc = window.antigravityAccounts.find(a => a.id === id);
+              delBtn.onmouseenter = (ev) => {
+                ev.stopPropagation();
+                delBtn.style.color = '#ef4444';
+                delBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+              };
+              delBtn.onmouseleave = (ev) => {
+                ev.stopPropagation();
+                delBtn.style.color = 'rgba(239, 68, 68, 0.6)';
+                delBtn.style.background = 'transparent';
+              };
+              delBtn.onclick = (ev) => {
+                ev.stopPropagation(); // Avoid triggering switch
+                dropdown.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+
+                electron_1.ipcRenderer.invoke('accounts:confirm-delete', {
+                  email: targetAcc ? targetAcc.email : 'Unknown',
+                  isCurrent: isCurrent
+                }).then(confirmed => {
+                  if (confirmed) {
+                    electron_1.ipcRenderer.invoke('accounts:delete', id).then(res => {
+                      if (res.success) {
+                        if (res.mustRelaunch) {
+                          // Restart automatically
+                          return;
+                        }
+                        // Refresh accounts list
+                        electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
+                          window.antigravityAccounts = newList.accounts || [];
+                          window.antigravityCurrentAccount = newList.currentAccountId || '';
+                          injectQuotaWidget();
+                        });
+                      } else {
+                        alert('删除账号失败: ' + res.error);
+                      }
+                    });
+                  }
+                });
+              };
+            }
+          });
         }
 
-        // 添加账号按钮的点击与悬停事件处理
+        // Trigger click binding
+        trigger.onmouseenter = () => {
+          trigger.style.borderColor = 'rgba(128,128,128,0.4)';
+          trigger.style.background = 'rgba(128,128,128,0.1)';
+        };
+        trigger.onmouseleave = () => {
+          trigger.style.borderColor = 'rgba(128,128,128,0.25)';
+          trigger.style.background = 'rgba(128,128,128,0.06)';
+        };
+        trigger.onclick = (e) => {
+          e.stopPropagation();
+          const isOpen = dropdown.style.display === 'flex';
+          if (isOpen) {
+            dropdown.style.display = 'none';
+            arrow.style.transform = 'rotate(0deg)';
+          } else {
+            renderDropdownItems();
+            dropdown.style.display = 'flex';
+            arrow.style.transform = 'rotate(180deg)';
+          }
+        };
+
+        // Click outside listener (only bind once globally)
+        if (!window.antigravityDropdownListenerAdded) {
+          window.antigravityDropdownListenerAdded = true;
+          document.addEventListener('click', () => {
+            const dp = document.getElementById('antigravity-account-dropdown');
+            if (dp && dp.style.display === 'flex') {
+              dp.style.display = 'none';
+              const trg = document.getElementById('antigravity-account-select-trigger');
+              if (trg) {
+                const arr = trg.querySelector('.arrow-icon');
+                if (arr) arr.style.transform = 'rotate(0deg)';
+              }
+            }
+          });
+        }
+
+        // Add Account Button binding
         const addBtn = accountsContainer.querySelector('#antigravity-add-account');
         if (addBtn) {
           addBtn.onmouseenter = () => { addBtn.style.color = '#60a5fa'; };
@@ -1699,10 +1818,15 @@ try {
           };
           addBtn.onmousedown = (e) => e.stopPropagation();
         }
-      } else if (select && document.activeElement !== select) {
-        // 如果 select 存在仅做 value 的对齐同步
-        if (select.value !== window.antigravityCurrentAccount) {
-          select.value = window.antigravityCurrentAccount;
+      } else if (trigger) {
+        // Alignment trigger value
+        const currentAcc = window.antigravityAccounts ? window.antigravityAccounts.find(a => a.id === window.antigravityCurrentAccount) : null;
+        const triggerLabelEl = trigger.querySelector('.trigger-label');
+        if (triggerLabelEl) {
+          const currentText = currentAcc ? `${currentAcc.name} (${currentAcc.email})` : '未登录或选择账号';
+          if (triggerLabelEl.textContent.trim() !== currentText) {
+            triggerLabelEl.textContent = currentText;
+          }
         }
       }
     } catch (e) {
