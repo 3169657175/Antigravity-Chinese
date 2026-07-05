@@ -279,6 +279,203 @@ function registerIpcHandlers(storageManager) {
         lastPollTime = Date.now();
         pollLocalQuota();
     }, 5000);   // First poll after 5s
+
+    // Accounts list handler
+    electron_1.ipcMain.handle('accounts:list', async () => {
+        try {
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs/promises');
+            const userHome = os.homedir();
+            const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
+            
+            const raw = await fs.readFile(accountsPath, 'utf-8');
+            const data = JSON.parse(raw);
+            return {
+                accounts: (data.accounts || []).map(acc => ({
+                    id: acc.id,
+                    email: acc.email,
+                    name: acc.name
+                })),
+                currentAccountId: data.current_account_id || ''
+            };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:list error:', e);
+            return { accounts: [], currentAccountId: '' };
+        }
+    });
+
+    // Accounts switch handler
+    electron_1.ipcMain.handle('accounts:switch', async (_event, accountId) => {
+        try {
+            const os = require('os');
+            const path = require('path');
+            const fs = require('fs/promises');
+            const { execSync } = require('child_process');
+            const userHome = os.homedir();
+            
+            const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
+            const raw = await fs.readFile(accountsPath, 'utf-8');
+            const data = JSON.parse(raw);
+            
+            const acc = (data.accounts || []).find(a => a.id === accountId);
+            if (!acc) throw new Error('Account not found in registry');
+            
+            const detailPath = path.join(userHome, '.antigravity_tools', 'accounts', `${accountId}.json`);
+            const detailRaw = await fs.readFile(detailPath, 'utf-8');
+            const detail = JSON.parse(detailRaw);
+            
+            if (!detail.token) throw new Error('Token structure missing in account details');
+            
+            // Format to exact Windows credentials format required by native LS
+            const credentialObj = {
+                token: {
+                    access_token: detail.token.access_token,
+                    token_type: detail.token.token_type || 'Bearer',
+                    refresh_token: detail.token.refresh_token,
+                    expiry: new Date(detail.token.expiry_timestamp * 1000).toISOString().replace('.000Z', '.000000Z')
+                },
+                auth_method: 'consumer'
+            };
+            const credentialStr = JSON.stringify(credentialObj);
+            
+            // Write to Windows Credential Manager (Generic Credentials) as raw UTF-8 bytes to match keyring-rs
+            if (process.platform === 'win32') {
+                const nodeFs = require('fs');
+                const tempPsFile = path.join(os.tmpdir(), `agy_switch_cred_${Date.now()}.ps1`);
+                
+                const writeScript = `
+                    try {
+                        ` + '$definition = @"' + `
+                        using System;
+                        using System.Text;
+                        using System.Runtime.InteropServices;
+
+                        [StructLayout(LayoutKind.Sequential)]
+                        public struct CREDENTIAL {
+                            public uint Flags;
+                            public uint Type;
+                            public IntPtr TargetName;
+                            public IntPtr Comment;
+                            public long LastWritten;
+                            public int CredentialBlobSize;
+                            public IntPtr CredentialBlob;
+                            public uint Persist;
+                            public uint AttributeCount;
+                            public IntPtr Attributes;
+                            public IntPtr TargetAlias;
+                            public IntPtr UserName;
+                        }
+
+                        public class CredWriter {
+                            [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+                            public static extern bool CredWrite(IntPtr credential, int flags);
+
+                            public static bool WriteGenericCred(string targetName, string userName, string passwordUtf8) {
+                                byte[] blob = Encoding.UTF8.GetBytes(passwordUtf8);
+                                IntPtr pBlob = Marshal.AllocHGlobal(blob.Length);
+                                IntPtr pTarget = Marshal.StringToHGlobalUni(targetName);
+                                IntPtr pUser = Marshal.StringToHGlobalUni(userName);
+
+                                int structSize = Marshal.SizeOf(typeof(CREDENTIAL));
+                                IntPtr pCredStruct = Marshal.AllocHGlobal(structSize);
+
+                                try {
+                                    Marshal.Copy(blob, 0, pBlob, blob.Length);
+                                    
+                                    CREDENTIAL cred = new CREDENTIAL();
+                                    cred.Flags = 0;
+                                    cred.Type = 1; // Generic Credential (Type = 1)
+                                    cred.TargetName = pTarget;
+                                    cred.Comment = IntPtr.Zero;
+                                    cred.LastWritten = 0;
+                                    cred.CredentialBlobSize = blob.Length;
+                                    cred.CredentialBlob = pBlob;
+                                    cred.Persist = 2; // Local Machine persist
+                                    cred.AttributeCount = 0;
+                                    cred.Attributes = IntPtr.Zero;
+                                    cred.TargetAlias = IntPtr.Zero;
+                                    cred.UserName = pUser;
+
+                                    Marshal.StructureToPtr(cred, pCredStruct, false);
+                                    return CredWrite(pCredStruct, 0);
+                                } finally {
+                                    Marshal.FreeHGlobal(pBlob);
+                                    Marshal.FreeHGlobal(pTarget);
+                                    Marshal.FreeHGlobal(pUser);
+                                    Marshal.FreeHGlobal(pCredStruct);
+                                }
+                            }
+                        }
+"@
+                        Add-Type -TypeDefinition $definition -ErrorAction SilentlyContinue
+                        $res = [CredWriter]::WriteGenericCred("gemini:antigravity", "antigravity", '${credentialStr.replace(/'/g, "''")}')
+                        Write-Host "RESULT: $res"
+                    } catch {
+                        Write-Host "ERROR: $($_.Exception.Message)"
+                    }
+                `;
+                
+                // Write with UTF-16 LE BOM to temp file
+                const bom = Buffer.from([0xFF, 0xFE]);
+                const buf = Buffer.from(writeScript, 'utf16le');
+                nodeFs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
+                
+                try {
+                    const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
+                    console.log('[ipcHandlers] Write generic credential result:', out.trim());
+                    if (!out.includes('RESULT: True')) {
+                        throw new Error('System keyring write failed: ' + out.trim());
+                    }
+                } finally {
+                    if (nodeFs.existsSync(tempPsFile)) {
+                        nodeFs.unlinkSync(tempPsFile);
+                    }
+                }
+                console.log('[ipcHandlers] Successfully updated credentials for account:', acc.email);
+            }
+            
+            // Sync current_account_id back to index file
+            data.current_account_id = accountId;
+            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            
+            // Kill old language_server.exe immediately to free up gRPC ports before relaunch
+            if (process.platform === 'win32') {
+                try {
+                    execSync('taskkill /F /IM language_server.exe');
+                } catch (e) {}
+            }
+
+            // Trigger client restart (snappy 50ms delay)
+            setTimeout(() => {
+                electron_1.app.relaunch();
+                electron_1.app.exit(0);
+            }, 50);
+            
+            return { success: true };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:switch error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    // Accounts open manager handler
+    electron_1.ipcMain.handle('accounts:open-manager', async () => {
+        try {
+            const { spawn } = require('child_process');
+            // Use spawn with detached to safely launch the manager and unref it
+            const child = spawn('D:\\Antigravity Tools\\antigravity_tools.exe', [], {
+                detached: true,
+                stdio: 'ignore'
+            });
+            child.unref();
+            console.log('[ipcHandlers] Successfully spawned Antigravity Tools manager');
+            return { success: true };
+        } catch (e) {
+            console.error('[ipcHandlers] accounts:open-manager error:', e);
+            return { success: false, error: e.message };
+        }
+    });
 }
 
 async function pollLocalQuota() {

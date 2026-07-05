@@ -1430,6 +1430,25 @@ try {
 
   function injectQuotaWidget() {
     try {
+      // 1. 异步载入多账号列表并缓存于 window 对象中（增加即时重绘）
+      if (window.antigravityAccounts === undefined) {
+        window.antigravityAccounts = null;
+        try {
+          electron_1.ipcRenderer.invoke('accounts:list').then(res => {
+            window.antigravityAccounts = res.accounts || [];
+            window.antigravityCurrentAccount = res.currentAccountId || '';
+            // 异步数据一落地，立即强行重绘挂件，彻底消灭 2 秒的显示等待延迟
+            injectQuotaWidget();
+          }).catch(err => {
+            console.error('[preload] accounts:list invoke failed:', err);
+            window.antigravityAccounts = [];
+            injectQuotaWidget();
+          });
+        } catch (e) {
+          window.antigravityAccounts = [];
+        }
+      }
+
       const buttons = document.querySelectorAll('button, .sidebar-item, nav [role="button"], a');
       let settingsBtn = null;
       for (let i = 0; i < buttons.length; i++) {
@@ -1482,6 +1501,20 @@ try {
         widget.onclick = () => {
           settingsBtn.click();
         };
+
+        // 初始化只渲染静态骨架，防止 2s 心跳全量更新导致下拉框关闭
+        widget.innerHTML = `
+          <div class="quota-title" style="font-weight:bold; font-size:12px; margin-bottom:4px; letter-spacing:0.5px;"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
+            <span>每周额度：</span>
+            <span class="quota-weekly" style="font-weight:bold;">--</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom: 4px;">
+            <span>5H额度：</span>
+            <span class="quota-5h" style="font-weight:bold;">--</span>
+          </div>
+          <div class="accounts-container"></div>
+        `;
         
         settingsBtn.parentNode.insertBefore(widget, settingsBtn);
       }
@@ -1509,36 +1542,100 @@ try {
       const currentModel = getCurrentModel().toLowerCase();
       const isGemini = currentModel.includes('gemini');
 
+      const titleEl = widget.querySelector('.quota-title');
+      const weeklyEl = widget.querySelector('.quota-weekly');
+      const hourlyEl = widget.querySelector('.quota-5h');
+      const accountsContainer = widget.querySelector('.accounts-container');
+
+      // 增量刷新配额文本数值，而不重绘整个 DOM 树
       if (isGemini) {
-        widget.innerHTML = `
-          <div style="font-weight:bold; font-size:12px; color:#3b82f6; text-transform:lowercase; margin-bottom:4px; letter-spacing:0.5px;">gemini</div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
-            <span>每周额度：</span>
-            <span style="font-weight:bold;">${gWeekly}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85;">
-            <span>5H额度：</span>
-            <span style="font-weight:bold;">${g5h}</span>
-          </div>
-        `;
+        if (titleEl.textContent !== 'gemini') {
+          titleEl.textContent = 'gemini';
+          titleEl.style.color = '#3b82f6';
+        }
+        if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
+        if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
       } else {
         const isGpt = currentModel.includes('gpt');
         const titleText = isGpt ? 'gpt' : 'claude';
         const color = isGpt ? '#f59e0b' : '#10b981';
-        widget.innerHTML = `
-          <div style="font-weight:bold; font-size:12px; color:${color}; text-transform:lowercase; margin-bottom:4px; letter-spacing:0.5px;">${titleText}</div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
-            <span>每周额度：</span>
-            <span style="font-weight:bold;">${cWeekly}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85;">
-            <span>5H额度：</span>
-            <span style="font-weight:bold;">${c5h}</span>
+        if (titleEl.textContent !== titleText) {
+          titleEl.textContent = titleText;
+          titleEl.style.color = color;
+        }
+        if (weeklyEl.textContent !== cWeekly) weeklyEl.textContent = cWeekly;
+        if (hourlyEl.textContent !== c5h) hourlyEl.textContent = c5h;
+      }
+
+      // 仅在 select 节点不存在时（或者初始化获取到新账号列表时），才进行账号切换区域的 HTML 构建
+      let select = accountsContainer.querySelector('#antigravity-account-select');
+      if (!select && window.antigravityAccounts && window.antigravityAccounts.length > 0) {
+        accountsContainer.innerHTML = `
+          <div style="margin-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); padding-top: 6px; display: flex; flex-direction: column; gap: 4px;" onclick="event.stopPropagation();">
+            <div style="font-size: 9px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <span style="text-transform: uppercase; opacity: 0.6; letter-spacing: 0.5px; user-select: none;">切换账号</span>
+              <span id="antigravity-add-account" style="color: #3b82f6; cursor: pointer; font-weight: bold; text-decoration: none; transition: color 0.1s; user-select: none;">添加账号</span>
+            </div>
+            <select id="antigravity-account-select" style="width: 100%; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(128,128,128,0.2); background: rgba(0,0,0,0.15); color: inherit; font-size: 10px; cursor: pointer; outline: none; font-family: inherit;">
+              ${window.antigravityAccounts.map(acc => {
+                const isSelected = acc.id === window.antigravityCurrentAccount ? 'selected' : '';
+                return `<option value="${acc.id}" ${isSelected} style="background: var(--background, #191919); color: var(--foreground, #fff);">${acc.name} (${acc.email})</option>`;
+              }).join('')}
+            </select>
           </div>
         `;
+
+        select = accountsContainer.querySelector('#antigravity-account-select');
+        if (select) {
+          select.onchange = (e) => {
+            const targetId = e.target.value;
+            if (targetId && targetId !== window.antigravityCurrentAccount) {
+              select.disabled = true;
+              select.style.opacity = '0.5';
+              electron_1.ipcRenderer.invoke('accounts:switch', targetId).then(res => {
+                if (!res.success) {
+                  alert('切换账号失败: ' + res.error);
+                  select.disabled = false;
+                  select.style.opacity = '1';
+                }
+              }).catch(err => {
+                alert('切换账号发生错误: ' + err.message);
+                select.disabled = false;
+                select.style.opacity = '1';
+              });
+            }
+          };
+
+          // 强行阻止点击下拉框时冒泡导致触发 settingsBtn.click() 打开设置页面
+          select.onclick = (e) => e.stopPropagation();
+          select.onmousedown = (e) => e.stopPropagation();
+        }
+
+        // 添加账号按钮的点击与悬停事件处理
+        const addBtn = accountsContainer.querySelector('#antigravity-add-account');
+        if (addBtn) {
+          addBtn.onmouseenter = () => { addBtn.style.color = '#60a5fa'; };
+          addBtn.onmouseleave = () => { addBtn.style.color = '#3b82f6'; };
+          addBtn.onclick = (e) => {
+            e.stopPropagation();
+            electron_1.ipcRenderer.invoke('accounts:open-manager').then(res => {
+              if (!res.success) {
+                alert('打开管理器失败: ' + res.error);
+              }
+            }).catch(err => {
+              alert('打开管理器发生错误: ' + err.message);
+            });
+          };
+          addBtn.onmousedown = (e) => e.stopPropagation();
+        }
+      } else if (select && document.activeElement !== select) {
+        // 如果 select 存在仅做 value 的对齐同步
+        if (select.value !== window.antigravityCurrentAccount) {
+          select.value = window.antigravityCurrentAccount;
+        }
       }
     } catch (e) {
-      console.error('Quota widget injection error:', e);
+      console.error('Quota widget error:', e);
     }
   }
 
