@@ -558,106 +558,70 @@ function registerIpcHandlers(storageManager) {
                 return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
             }
 
-            log('New email detected, reading keyring token...');
-            if (process.platform !== 'win32') {
-                log('Unsupported platform');
-                return { success: false, error: 'Unsupported platform' };
+            log('New email detected, reading token from state.vscdb...');
+
+            // 直接读 Antigravity 的 state.vscdb 数据库获取 Token（官方 Antigravity-Manager 同款方案）
+            // 数据库路径: %APPDATA%\Antigravity IDE\User\globalStorage\state.vscdb
+            const { execSync } = require('child_process');
+            const appdata = process.env.APPDATA || '';
+            const dbCandidates = [
+                path.join(appdata, 'Antigravity IDE', 'User', 'globalStorage', 'state.vscdb'),
+                path.join(appdata, 'Antigravity', 'User', 'globalStorage', 'state.vscdb'),
+            ];
+            let dbPath = null;
+            for (const c of dbCandidates) {
+                if (fs.existsSync(c)) { dbPath = c; break; }
             }
-            
-            const tempPsFile = path.join(os.tmpdir(), `agy_read_cred_${Date.now()}.ps1`);
-            const readScript = `
-                try {
-                    ` + '$definition = @"' + `
-                    using System;
-                    using System.Text;
-                    using System.Runtime.InteropServices;
+            log('state.vscdb path: ' + (dbPath || 'NOT FOUND'));
+            if (!dbPath) {
+                return { success: false, error: 'state.vscdb not found' };
+            }
 
-                    [StructLayout(LayoutKind.Sequential)]
-                    public struct CREDENTIAL {
-                        public uint Flags;
-                        public uint Type;
-                        public IntPtr TargetName;
-                        public IntPtr Comment;
-                        public long LastWritten;
-                        public int CredentialBlobSize;
-                        public IntPtr CredentialBlob;
-                        public uint Persist;
-                        public uint AttributeCount;
-                        public IntPtr Attributes;
-                        public IntPtr TargetAlias;
-                        public IntPtr UserName;
-                    }
+            // 用 Python sqlite3 读取 Token JSON
+            const pyScript = `
+import sqlite3, json, sys
+db = sys.argv[1]
+conn = sqlite3.connect(db)
+cur = conn.cursor()
+cur.execute("SELECT value FROM ItemTable WHERE key=?", ("gemini:antigravity",))
+row = cur.fetchone()
+if row:
+    print("KEYRING:" + row[0])
+else:
+    print("KEYRING:")
+conn.close()
+`.trim();
+            const tempPy = path.join(os.tmpdir(), 'agy_read_db_' + Date.now() + '.py');
+            fs.writeFileSync(tempPy, pyScript, 'utf-8');
 
-                    public class CredReader {
-                        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-                        public static extern bool CredEnumerate(string filter, int flag, out int count, out IntPtr pCredentials);
-
-                        [DllImport("advapi32.dll", SetLastError = true)]
-                        public static extern void CredFree(IntPtr pCredentials);
-
-                        public static string ReadGenericCred(string targetName) {
-                            int count;
-                            IntPtr pCredentials;
-                            if (CredEnumerate(null, 0, out count, out pCredentials)) {
-                                IntPtr[] credentials = new IntPtr[count];
-                                Marshal.Copy(pCredentials, credentials, 0, count);
-                                try {
-                                    for (int i = 0; i < count; i++) {
-                                        CREDENTIAL cred = (CREDENTIAL)Marshal.PtrToStructure(credentials[i], typeof(CREDENTIAL));
-                                        string tName = Marshal.PtrToStringUni(cred.TargetName);
-                                        if (tName != null && tName.ToLower() == targetName.ToLower()) {
-                                            if (cred.CredentialBlob != IntPtr.Zero && cred.CredentialBlobSize > 0) {
-                                                byte[] blob = new byte[cred.CredentialBlobSize];
-                                                Marshal.Copy(cred.CredentialBlob, blob, 0, cred.CredentialBlobSize);
-                                                return Encoding.UTF8.GetString(blob);
-                                            }
-                                        }
-                                    }
-                                } finally {
-                                    CredFree(pCredentials);
-                                }
-                            }
-                            return "";
-                        }
-                    }
-"@
-                    Add-Type -TypeDefinition $definition -ErrorAction SilentlyContinue
-                    $res = [CredReader]::ReadGenericCred("gemini:antigravity")
-                    Write-Host "VALUE: $res"
-                } catch {
-                    Write-Host "ERROR: $($_.Exception.Message)"
-                }
-            `;
-            
-            const bom = Buffer.from([0xFF, 0xFE]);
-            const buf = Buffer.from(readScript, 'utf16le');
-            fs.writeFileSync(tempPsFile, Buffer.concat([bom, buf]));
-            
             let currentKeyring = null;
             try {
-                const { execSync } = require('child_process');
-                const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempPsFile}"`, { encoding: 'utf-8', timeout: 5000 });
-                log('Powershell keyring output: ' + out.trim());
-                if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
-                
-                const lines = out.split('\n');
-                for (const line of lines) {
-                    if (line.startsWith('VALUE: ')) {
-                        const jsonStr = line.substring(7).trim();
-                        if (jsonStr) {
-                            currentKeyring = JSON.parse(jsonStr);
-                        }
+                const out = execSync(`python "${tempPy}" "${dbPath}"`, { encoding: 'utf-8', timeout: 8000 });
+                if (fs.existsSync(tempPy)) fs.unlinkSync(tempPy);
+                log('DB read output: ' + out.substring(0, 200));
+                const match = /^KEYRING:(.+)$/m.exec(out);
+                if (match && match[1].trim()) {
+                    try {
+                        currentKeyring = JSON.parse(match[1].trim());
+                    } catch(pe) {
+                        log('JSON parse error: ' + pe.message + ' raw: ' + match[1].trim().substring(0, 100));
                     }
                 }
-            } catch (e) {
-                if (fs.existsSync(tempPsFile)) fs.unlinkSync(tempPsFile);
-                log('Error executing powershell: ' + e.message);
+            } catch(e) {
+                if (fs.existsSync(tempPy)) try { fs.unlinkSync(tempPy); } catch(_) {}
+                log('DB read error: ' + e.message);
             }
 
             if (!currentKeyring || !currentKeyring.token || !currentKeyring.token.access_token) {
-                log('No token found in keyring');
-                return { success: false, error: 'No token found in keyring' };
+                log('No token found in DB, falling back to keyring...');
+                // 降级：尝试读 Windows Keyring
+                try {
+                    const credOut = execSync('cmdkey /list:gemini:antigravity', { encoding: 'utf-8', timeout: 3000 });
+                    log('Keyring list: ' + credOut.substring(0, 100));
+                } catch(_) {}
+                return { success: false, error: 'No token found in state.vscdb' };
             }
+
 
             const crypto = require('crypto');
             await fsPromises.mkdir(path.join(baseDir, 'accounts'), { recursive: true });
