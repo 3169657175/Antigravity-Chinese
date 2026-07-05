@@ -1630,6 +1630,50 @@ try {
     });
   }
 
+  let startupSniffInterval;
+  function startStartupSniff() {
+    const log = (msg) => {
+        try {
+            electron_1.ipcRenderer.invoke('debug:log', '[preload-startup] ' + msg);
+        } catch(e) {}
+    };
+    log('startStartupSniff initiated');
+    let tries = 0;
+    startupSniffInterval = setInterval(() => {
+      tries++;
+      if (window.antigravitySniffingInProgress) return;
+      window.antigravitySniffingInProgress = true;
+      
+      log('Startup sniff try #' + tries);
+      electron_1.ipcRenderer.invoke('accounts:sniff').then(sniffRes => {
+        window.antigravitySniffingInProgress = false;
+        log('Startup sniff try #' + tries + ' response: ' + JSON.stringify(sniffRes));
+        if (sniffRes && sniffRes.success) {
+          log('Startup sniff succeeded, clearing startup loop.');
+          clearInterval(startupSniffInterval);
+          
+          // Reload list to ensure current account is in sync
+          electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
+            window.antigravityAccounts = newList.accounts || [];
+            window.antigravityCurrentAccount = newList.currentAccountId || '';
+            log('Startup accounts synced, current=' + window.antigravityCurrentAccount);
+            injectQuotaWidget();
+          });
+        }
+        if (tries >= 15) {
+          log('Startup sniff reached maximum tries, clearing.');
+          clearInterval(startupSniffInterval);
+        }
+      }).catch(err => {
+        window.antigravitySniffingInProgress = false;
+        log('Startup sniff error: ' + err.message);
+        if (tries >= 15) {
+          clearInterval(startupSniffInterval);
+        }
+      });
+    }, 2000);
+  }
+
   function injectQuickLogin() {
     try {
       const buttons = Array.from(document.querySelectorAll('button'));
@@ -1741,7 +1785,7 @@ try {
             window.antigravityCurrentAccount = res.currentAccountId || '';
             // 异步数据一落地，立即强行重绘挂件，彻底消灭 2 秒的显示等待延迟
             injectQuotaWidget();
-            runGrpcSniff();
+            startStartupSniff();
           }).catch(err => {
             console.error('[preload] accounts:list invoke failed:', err);
             window.antigravityAccounts = [];
@@ -2023,7 +2067,7 @@ try {
           for (let i = 0; i < interactives.length; i++) {
             const el = interactives[i];
             const text = el.textContent ? el.textContent.trim() : '';
-            const m = text.match(/\\b(Gemini|Claude|GPT-OSS|GPT)\\b/i);
+            const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
             if (m) {
               return m[1];
             }

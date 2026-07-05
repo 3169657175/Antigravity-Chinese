@@ -322,30 +322,70 @@ function registerIpcHandlers(storageManager) {
         lastUserActiveTime = Date.now();
     });
 
-    // Dynamic heartbeat scheduler: check every 5 seconds
-    setInterval(() => {
-        const now = Date.now();
-        const isActive = now - lastUserActiveTime < 15000; // Active if user interacted in the last 15 seconds
-        
-        if (isActive) {
-            // In active mode, poll every 5 seconds
-            if (now - lastPollTime >= 5000) {
-                lastPollTime = now;
-                pollLocalQuota();
+    function startRegularQuotaScheduler() {
+        // Dynamic heartbeat scheduler: check every 5 seconds
+        setInterval(() => {
+            const now = Date.now();
+            const isActive = now - lastUserActiveTime < 15000; // Active if user interacted in the last 15 seconds
+            
+            if (isActive) {
+                // In active mode, poll every 5 seconds
+                if (now - lastPollTime >= 5000) {
+                    lastPollTime = now;
+                    pollLocalQuota();
+                }
+            } else {
+                // In idle mode, poll every 30 seconds
+                if (now - lastPollTime >= 30000) {
+                    lastPollTime = now;
+                    pollLocalQuota();
+                }
             }
-        } else {
-            // In idle mode, poll every 30 seconds
-            if (now - lastPollTime >= 30000) {
-                lastPollTime = now;
-                pollLocalQuota();
+        }, 5000);
+    }
+
+    let startupQuotaPolled = false;
+    let startupTries = 0;
+    let startupPollInterval = setInterval(async () => {
+        startupTries++;
+        try {
+            const languageServer = require("./languageServer");
+            const port = languageServer.getLsPort();
+            const csrf = languageServer.getLsCsrf();
+            if (port && csrf) {
+                const forceRefreshPayload = Buffer.from([0, 0, 0, 0, 2, 16, 1]);
+                const data = await requestGrpc(port, csrf, '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary', forceRefreshPayload);
+                if (data && data.length > 0) {
+                    const quotas = parseProtoQuota(data);
+                    if (quotas && Object.keys(quotas).length > 0) {
+                        // Success! Update local storage
+                        const windows = electron_1.BrowserWindow.getAllWindows();
+                        for (const win of windows) {
+                            if (win.webContents) {
+                                win.webContents.executeJavaScript(`
+                                    localStorage.setItem("quota_gemini_weekly", "${quotas.gemini_weekly || '0%'}");
+                                    localStorage.setItem("quota_gemini_5h", "${quotas.gemini_5h || '0%'}");
+                                    localStorage.setItem("quota_claude_weekly", "${quotas.claude_weekly || '0%'}");
+                                    localStorage.setItem("quota_claude_5h", "${quotas.claude_5h || '0%'}");
+                                `).catch(()=>{});
+                            }
+                        }
+                        clearInterval(startupPollInterval);
+                        startupQuotaPolled = true;
+                        startRegularQuotaScheduler();
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Startup quota poll error:', e);
+        }
+        if (startupTries >= 15) {
+            clearInterval(startupPollInterval);
+            if (!startupQuotaPolled) {
+                startRegularQuotaScheduler();
             }
         }
-    }, 5000);
-
-    setTimeout(() => {
-        lastPollTime = Date.now();
-        pollLocalQuota();
-    }, 5000);   // First poll after 5s
+    }, 2000);
 
     // Accounts list handler
     electron_1.ipcMain.handle('accounts:list', async () => {
