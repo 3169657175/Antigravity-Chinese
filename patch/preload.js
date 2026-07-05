@@ -1859,10 +1859,12 @@ try {
             border-color: rgba(128,128,128,0.4) !important;
           }
           .trigger-label {
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: nowrap;
-            max-width: 85%;
+            display: inline-block !important;
+            text-overflow: ellipsis !important;
+            overflow: hidden !important;
+            white-space: nowrap !important;
+            max-width: 80% !important;
+            box-sizing: border-box !important;
           }
           .arrow-icon {
             font-size: 8px;
@@ -2050,7 +2052,7 @@ try {
             const activeClass = isCurrent ? 'active' : '';
             return `
               <div class="account-item ${activeClass}" data-id="${acc.id}">
-                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80%; pointer-events: none;">
+                <span style="display: inline-block !important; text-overflow: ellipsis !important; overflow: hidden !important; white-space: nowrap !important; max-width: 80% !important; pointer-events: none; box-sizing: border-box !important;">
                   ${acc.name} (${acc.email})
                 </span>
                 <span class="delete-btn" data-id="${acc.id}" title="删除此账号">×</span>
@@ -2200,6 +2202,7 @@ try {
           }
         }
       }
+
     } catch (e) {
       console.error('Quota widget error:', e);
     }
