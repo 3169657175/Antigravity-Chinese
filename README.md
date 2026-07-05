@@ -53,17 +53,21 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 ---
 
-## 🔄 一键卸载/还原
+## 🔄 一键卸载/还原 (v1.0.4 新增)
 
-如果您想换回官方英文版，只需前往 Antigravity 的安装目录（默认为 `C:\Users\您的用户名\AppData\Local\Programs\antigravity\resources\`）：
-1. 删掉被修改的 `app.asar`。
-2. 将备份文件 `app.asar.backup` 改回 `app.asar` 即可。
+如果您想换回官方英文版，无需繁琐地去删除和改名文件：
+1. 直接双击运行项目根目录下的 **`一键还原官方原版.bat`**。
+2. 还原程序会自动申请权限、关闭运行中的客户端，并将备份的原版核心包一键还原。
+3. 自动从开机启动项中注销并清理防覆盖自愈脚本，实现干净无残留卸载。
 
 ---
 
 ## 📁 项目结构
 
 * `patch/`：优化与汉化补丁的源码
-* `安装汉化与优化补丁.bat`：Windows 一键运行脚本
+* `安装汉化与优化补丁.bat`：Windows 一键安装运行脚本
+* `一键还原官方原版.bat`：Windows 一键还原官方原版运行脚本 [NEW]
 * `install.ps1`：PowerShell 核心安装与 ASAR 打包器
+* `restore.ps1`：PowerShell 核心还原与清理器 [NEW]
+* `auto_heal.ps1`：动态防自动更新覆盖的开机自愈服务脚本
 * `README.md`：本说明书
