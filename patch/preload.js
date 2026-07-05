@@ -1646,6 +1646,7 @@ try {
         widget.id = 'antigravity-quota-widget';
         widget.style.padding = '8px 12px';
         widget.style.margin = '4px 12px 10px 12px';
+        widget.style.boxSizing = 'border-box';
         widget.style.borderRadius = '6px';
         widget.style.fontSize = '11px';
         widget.style.fontFamily = 'var(--font-family, sans-serif)';
