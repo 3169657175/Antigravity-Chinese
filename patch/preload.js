@@ -1428,6 +1428,141 @@ try {
     return null;
   }
 
+  function showBeautifulConfirm(title, message, confirmText = '确定', cancelText = '取消') {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100vw';
+      overlay.style.height = '100vh';
+      overlay.style.background = 'rgba(0, 0, 0, 0.45)';
+      overlay.style.backdropFilter = 'blur(16px) saturate(140%)';
+      overlay.style.webkitBackdropFilter = 'blur(16px) saturate(140%)';
+      overlay.style.zIndex = '999999';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+
+      const card = document.createElement('div');
+      card.style.background = 'rgba(23, 23, 23, 0.82)';
+      card.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+      card.style.borderRadius = '14px';
+      card.style.padding = '24px 28px';
+      card.style.width = '380px';
+      card.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.65)';
+      card.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      card.style.transform = 'scale(0.92) translateY(10px)';
+      card.style.transition = 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease';
+      card.style.opacity = '0';
+      card.style.color = '#e5e5e5';
+
+      const titleEl = document.createElement('div');
+      titleEl.style.fontSize = '16px';
+      titleEl.style.fontWeight = '600';
+      titleEl.style.color = '#ffffff';
+      titleEl.style.marginBottom = '12px';
+      titleEl.style.letterSpacing = '0.5px';
+      titleEl.textContent = title;
+
+      const descEl = document.createElement('div');
+      descEl.style.fontSize = '13.5px';
+      descEl.style.lineHeight = '1.6';
+      descEl.style.color = '#a3a3a3';
+      descEl.style.marginBottom = '24px';
+      descEl.style.whiteSpace = 'pre-wrap';
+      descEl.textContent = message;
+
+      const btnArea = document.createElement('div');
+      btnArea.style.display = 'flex';
+      btnArea.style.justifyContent = 'flex-end';
+      btnArea.style.gap = '12px';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.style.background = 'transparent';
+      cancelBtn.style.border = '1px solid rgba(255, 255, 255, 0.15)';
+      cancelBtn.style.borderRadius = '8px';
+      cancelBtn.style.padding = '8px 16px';
+      cancelBtn.style.fontSize = '12.5px';
+      cancelBtn.style.fontWeight = '500';
+      cancelBtn.style.color = '#d4d4d4';
+      cancelBtn.style.cursor = 'pointer';
+      cancelBtn.style.transition = 'all 0.15s ease';
+      cancelBtn.textContent = cancelText;
+
+      cancelBtn.onmouseenter = () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        cancelBtn.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+        cancelBtn.style.color = '#ffffff';
+      };
+      cancelBtn.onmouseleave = () => {
+        cancelBtn.style.background = 'transparent';
+        cancelBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        cancelBtn.style.color = '#d4d4d4';
+      };
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.style.background = 'linear-gradient(135deg, #3b82f6, #1d4ed8)';
+      confirmBtn.style.border = 'none';
+      confirmBtn.style.borderRadius = '8px';
+      confirmBtn.style.padding = '8px 20px';
+      confirmBtn.style.fontSize = '12.5px';
+      confirmBtn.style.fontWeight = '600';
+      confirmBtn.style.color = '#ffffff';
+      confirmBtn.style.cursor = 'pointer';
+      confirmBtn.style.boxShadow = '0 2px 8px rgba(29, 78, 216, 0.3)';
+      confirmBtn.style.transition = 'all 0.15s ease';
+      confirmBtn.textContent = confirmText;
+
+      confirmBtn.onmouseenter = () => {
+        confirmBtn.style.transform = 'translateY(-1px)';
+        confirmBtn.style.boxShadow = '0 4px 12px rgba(29, 78, 216, 0.45)';
+        confirmBtn.style.filter = 'brightness(1.1)';
+      };
+      confirmBtn.onmouseleave = () => {
+        confirmBtn.style.transform = 'translateY(0)';
+        confirmBtn.style.boxShadow = '0 2px 8px rgba(29, 78, 216, 0.3)';
+        confirmBtn.style.filter = 'brightness(1)';
+      };
+
+      btnArea.appendChild(cancelBtn);
+      btnArea.appendChild(confirmBtn);
+      card.appendChild(titleEl);
+      card.appendChild(descEl);
+      card.appendChild(btnArea);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      const close = (result) => {
+        overlay.style.opacity = '0';
+        card.style.transform = 'scale(0.92) translateY(10px)';
+        setTimeout(() => {
+          if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+          }
+          resolve(result);
+        }, 220);
+      };
+
+      cancelBtn.onclick = (e) => { e.stopPropagation(); close(false); };
+      confirmBtn.onclick = (e) => { e.stopPropagation(); close(true); };
+      overlay.onclick = (ev) => {
+        if (ev.target === overlay) {
+          ev.stopPropagation();
+          close(false);
+        }
+      };
+
+      setTimeout(() => {
+        overlay.style.opacity = '1';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1) translateY(0)';
+      }, 20);
+    });
+  }
+
   function runGrpcSniff() {
     const log = (msg) => {
         try {
@@ -1675,7 +1810,7 @@ try {
               arrow.style.transform = 'rotate(0deg)';
 
               if (id === '__add_new_account__') {
-                electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
+                showBeautifulConfirm('登录新账号', '是否要清空当前登录状态并重启客户端以登录新账号？', '确定', '取消').then(confirmed => {
                   if (confirmed) {
                     electron_1.ipcRenderer.invoke('accounts:clear-keyring');
                   }
@@ -1719,10 +1854,10 @@ try {
                 dropdown.style.display = 'none';
                 arrow.style.transform = 'rotate(0deg)';
 
-                electron_1.ipcRenderer.invoke('accounts:confirm-delete', {
-                  email: targetAcc ? targetAcc.email : 'Unknown',
-                  isCurrent: isCurrent
-                }).then(confirmed => {
+                const deleteMessage = isCurrent
+                  ? `确定要删除当前正在使用的账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\n删除后会清除系统凭据并自动重启客户端。`
+                  : `确定要删除账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\n删除后如需再次使用，必须重新登录。`;
+                showBeautifulConfirm('删除账号', deleteMessage, '确定删除', '取消').then(confirmed => {
                   if (confirmed) {
                     electron_1.ipcRenderer.invoke('accounts:delete', id).then(res => {
                       if (res.success) {
@@ -1737,7 +1872,7 @@ try {
                           injectQuotaWidget();
                         });
                       } else {
-                        alert('删除账号失败: ' + res.error);
+                        showBeautifulConfirm('错误提示', '删除账号失败: ' + res.error, '好的', '关闭');
                       }
                     });
                   }
@@ -1794,7 +1929,7 @@ try {
             e.stopPropagation();
             addBtn.style.pointerEvents = 'none';
             addBtn.style.opacity = '0.5';
-            electron_1.ipcRenderer.invoke('accounts:confirm-clear').then(confirmed => {
+            showBeautifulConfirm('登录新账号', '是否要清空当前登录状态并重启客户端以登录新账号？', '确定', '取消').then(confirmed => {
               if (confirmed) {
                 electron_1.ipcRenderer.invoke('accounts:clear-keyring');
               } else {
