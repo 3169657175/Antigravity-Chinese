@@ -1720,6 +1720,7 @@ try {
         } catch (e) {
           window.antigravityAccounts = [];
         }
+        return;
       } else {
         runGrpcSniff();
       }
@@ -1745,68 +1746,226 @@ try {
       if (!settingsBtn) return;
       
       let widget = document.getElementById('antigravity-quota-widget');
+      let root = widget ? widget.shadowRoot : null;
+      
       if (!widget) {
         widget = document.createElement('div');
         widget.id = 'antigravity-quota-widget';
-        widget.style.padding = '8px 12px';
+        widget.style.padding = '0';
         widget.style.margin = '4px 12px 10px 12px';
         widget.style.boxSizing = 'border-box';
-        widget.style.borderRadius = '6px';
-        widget.style.fontSize = '11px';
-        widget.style.fontFamily = 'var(--font-family, sans-serif)';
-        widget.style.border = '1px solid rgba(128,128,128,0.15)';
-        widget.style.background = 'rgba(128,128,128,0.05)';
-        widget.style.color = 'var(--foreground, inherit)';
-        widget.style.opacity = '0.75';
-        widget.style.display = 'flex';
-        widget.style.flexDirection = 'column';
-        widget.style.gap = '4px';
-        widget.style.cursor = 'pointer';
-        widget.style.transition = 'opacity 0.2s, background 0.2s';
+        widget.style.background = 'transparent';
+        widget.style.border = 'none';
+        widget.style.overflow = 'visible';
         
-        widget.onmouseenter = () => {
-          widget.style.opacity = '1';
-          widget.style.background = 'rgba(128,128,128,0.08)';
-          widget.setAttribute('title', '点击设置可以刷新额度详情');
-        };
-        widget.onmouseleave = () => {
-          widget.style.opacity = '0.75';
-          widget.style.background = 'rgba(128,128,128,0.05)';
-        };
+        root = widget.attachShadow({ mode: 'open' });
         
-        widget.onclick = () => {
-          settingsBtn.click();
-        };
-
-        // 初始化只渲染静态骨架，防止 2s 心跳全量更新导致下拉框关闭
-        widget.innerHTML = `
-          <div class="quota-title" style="font-weight:bold; font-size:12px; margin-bottom:4px; letter-spacing:0.5px;"></div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom:2px;">
+        const style = document.createElement('style');
+        style.textContent = `
+          .widget-card {
+            box-sizing: border-box !important;
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            font-size: 11px !important;
+            font-family: var(--font-family, sans-serif) !important;
+            border: 1px solid rgba(128,128,128,0.15) !important;
+            background: rgba(128,128,128,0.05) !important;
+            color: var(--foreground, inherit) !important;
+            opacity: 0.75 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 4px !important;
+            cursor: pointer !important;
+            transition: opacity 0.2s, background 0.2s !important;
+            position: relative;
+            overflow: visible !important;
+          }
+          .widget-card:hover {
+            opacity: 1 !important;
+            background: rgba(128,128,128,0.08) !important;
+          }
+          .quota-title {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+          }
+          .weekly-row, .hourly-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0.85;
+            margin-bottom: 2px;
+            overflow: hidden !important;
+          }
+          .quota-weekly, .quota-5h {
+            font-weight: bold;
+          }
+          .accounts-container {
+            margin-top: 6px;
+            border-top: 1px solid rgba(128,128,128,0.15);
+            padding-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+            overflow: visible !important;
+          }
+          .switcher-header {
+            font-size: 9px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+            overflow: hidden !important;
+          }
+          .switcher-title {
+            text-transform: uppercase;
+            opacity: 0.6;
+            letter-spacing: 0.5px;
+            user-select: none;
+          }
+          .add-link {
+            color: #3b82f6;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            transition: color 0.1s;
+            user-select: none;
+          }
+          .add-link:hover {
+            color: #60a5fa !important;
+          }
+          .select-trigger {
+            width: 100%;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(128,128,128,0.25);
+            background: rgba(128,128,128,0.06);
+            color: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            box-sizing: border-box;
+            transition: background 0.15s, border-color 0.15s;
+            font-family: inherit;
+            overflow: hidden !important;
+          }
+          .select-trigger:hover {
+            background: rgba(128,128,128,0.12) !important;
+            border-color: rgba(128,128,128,0.4) !important;
+          }
+          .trigger-label {
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 85%;
+          }
+          .arrow-icon {
+            font-size: 8px;
+            opacity: 0.6;
+            margin-left: 4px;
+            transition: transform 0.25s;
+            pointer-events: none;
+          }
+          .dropdown-list {
+            display: none;
+            position: absolute;
+            bottom: 26px;
+            left: 0;
+            right: 0;
+            background: var(--background, #191919);
+            border: 1px solid rgba(128,128,128,0.25);
+            border-radius: 6px;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.5);
+            z-index: 99999;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            box-sizing: border-box;
+            font-family: inherit;
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+          }
+          .account-item {
+            padding: 6px 8px;
+            font-size: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.1s;
+            color: var(--foreground, #fff);
+          }
+          .account-item:hover {
+            background: rgba(128, 128, 128, 0.12) !important;
+          }
+          .account-item.active {
+            background: rgba(59, 130, 246, 0.15) !important;
+            color: #3b82f6 !important;
+            font-weight: bold !important;
+          }
+          .account-item.active:hover {
+            background: rgba(59, 130, 246, 0.22) !important;
+          }
+          .delete-btn {
+            font-size: 14px;
+            color: rgba(239, 68, 68, 0.6);
+            padding: 0 6px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: bold;
+            transition: color 0.1s, background 0.1s;
+            user-select: none;
+          }
+          .delete-btn:hover {
+            color: rgba(239, 68, 68, 1) !important;
+            background: rgba(239, 68, 68, 0.15) !important;
+          }
+          .add-new-item {
+            padding: 6px 8px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.1s;
+            color: #3b82f6;
+            font-weight: bold;
+          }
+          .add-new-item:hover {
+            background: rgba(59, 130, 246, 0.1) !important;
+          }
+        `;
+        root.appendChild(style);
+        
+        const card = document.createElement('div');
+        card.className = 'widget-card';
+        card.innerHTML = `
+          <div class="quota-title"></div>
+          <div class="weekly-row">
             <span>每周额度：</span>
-            <span class="quota-weekly" style="font-weight:bold;">--</span>
+            <span class="quota-weekly">--</span>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; opacity:0.85; margin-bottom: 4px;">
+          <div class="hourly-row">
             <span>5H额度：</span>
-            <span class="quota-5h" style="font-weight:bold;">--</span>
+            <span class="quota-5h">--</span>
           </div>
           <div class="accounts-container"></div>
         `;
+        root.appendChild(card);
+        
+        card.onclick = () => {
+          settingsBtn.click();
+        };
         
         settingsBtn.parentNode.insertBefore(widget, settingsBtn);
-
-        // 动态向上遍历父级链，彻底禁用侧边栏容器的横向溢出滚动条，规避 Chromium 残留滚动条的渲染 Bug
-        try {
-          let p = widget.parentElement;
-          while (p && p.tagName !== 'BODY') {
-            const comp = window.getComputedStyle(p);
-            if (comp.overflowX === 'auto' || comp.overflowX === 'scroll' || comp.overflow === 'auto' || comp.overflow === 'scroll') {
-              p.style.setProperty('overflow-x', 'hidden', 'important');
-            }
-            p = p.parentElement;
-          }
-        } catch (e) {
-          console.error('[preload] Failed to set parent overflow-x to hidden:', e);
-        }
       }
       
       const gWeekly = localStorage.getItem('quota_gemini_weekly') || '--';
@@ -1820,7 +1979,7 @@ try {
           for (let i = 0; i < interactives.length; i++) {
             const el = interactives[i];
             const text = el.textContent ? el.textContent.trim() : '';
-            const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
+            const m = text.match(/\\b(Gemini|Claude|GPT-OSS|GPT)\\b/i);
             if (m) {
               return m[1];
             }
@@ -1832,10 +1991,10 @@ try {
       const currentModel = getCurrentModel().toLowerCase();
       const isGemini = currentModel.includes('gemini');
 
-      const titleEl = widget.querySelector('.quota-title');
-      const weeklyEl = widget.querySelector('.quota-weekly');
-      const hourlyEl = widget.querySelector('.quota-5h');
-      const accountsContainer = widget.querySelector('.accounts-container');
+      const titleEl = root.querySelector('.quota-title');
+      const weeklyEl = root.querySelector('.quota-weekly');
+      const hourlyEl = root.querySelector('.quota-5h');
+      const accountsContainer = root.querySelector('.accounts-container');
 
       // 增量刷新配额文本数值，而不重绘整个 DOM 树
       if (isGemini) {
@@ -1857,27 +2016,25 @@ try {
         if (hourlyEl.textContent !== c5h) hourlyEl.textContent = c5h;
       }
 
-      // 仅在 trigger 节点不存在时（或者初始化获取到新账号列表时），才进行账号切换区域的 HTML 构建
+      // 仅在 trigger 节点不存在时（或者初始化获取到新账号列表时），才进行账号切换区域 of HTML 构建
       let trigger = accountsContainer.querySelector('#antigravity-account-select-trigger');
       if (!trigger && window.antigravityAccounts && window.antigravityAccounts.length > 0) {
         const currentAcc = window.antigravityAccounts.find(a => a.id === window.antigravityCurrentAccount);
         const triggerLabel = currentAcc ? `${currentAcc.name} (${currentAcc.email})` : '未登录或选择账号';
 
         accountsContainer.innerHTML = `
-          <div style="margin-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; position: relative;" onclick="event.stopPropagation();">
-            <div style="font-size: 9px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-              <span style="text-transform: uppercase; opacity: 0.6; letter-spacing: 0.5px; user-select: none;">切换账号</span>
-              <span id="antigravity-add-account" style="color: #3b82f6; cursor: pointer; font-weight: bold; text-decoration: none; transition: color 0.1s; user-select: none;">添加账号</span>
+          <div style="display: flex; flex-direction: column; gap: 4px; position: relative;" onclick="event.stopPropagation();">
+            <div class="switcher-header">
+              <span class="switcher-title">切换账号</span>
+              <span id="antigravity-add-account" class="add-link">添加账号</span>
             </div>
             
-            <div id="antigravity-account-select-trigger" style="width: 100%; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(128,128,128,0.25); background: rgba(128,128,128,0.06); color: inherit; font-size: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; box-sizing: border-box; transition: background 0.15s, border-color 0.15s; font-family: inherit;">
-              <span class="trigger-label" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 85%;">
-                ${triggerLabel}
-              </span>
-              <span style="font-size: 8px; opacity: 0.6; margin-left: 4px; transition: transform 0.25s; pointer-events: none;" class="arrow-icon">▼</span>
+            <div id="antigravity-account-select-trigger" class="select-trigger">
+              <span class="trigger-label">${triggerLabel}</span>
+              <span class="arrow-icon">▼</span>
             </div>
 
-            <div id="antigravity-account-dropdown" style="display: none; position: absolute; bottom: 26px; left: 0; right: 0; background: var(--background, #191919); border: 1px solid rgba(128,128,128,0.25); border-radius: 6px; box-shadow: 0 -4px 12px rgba(0,0,0,0.5); z-index: 99999; padding: 4px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; font-family: inherit; max-height: 200px; overflow-y: auto;">
+            <div id="antigravity-account-dropdown" class="dropdown-list">
               <!-- Dropdown items will be dynamically generated -->
             </div>
           </div>
@@ -1890,17 +2047,17 @@ try {
         function renderDropdownItems() {
           const listHtml = window.antigravityAccounts.map(acc => {
             const isCurrent = acc.id === window.antigravityCurrentAccount;
-            const activeStyle = isCurrent ? 'background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-weight: bold;' : '';
+            const activeClass = isCurrent ? 'active' : '';
             return `
-              <div class="account-item" data-id="${acc.id}" style="padding: 6px 8px; font-size: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-radius: 4px; transition: background 0.1s; color: var(--foreground, #fff); ${activeStyle}">
+              <div class="account-item ${activeClass}" data-id="${acc.id}">
                 <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80%; pointer-events: none;">
                   ${acc.name} (${acc.email})
                 </span>
-                <span class="delete-btn" data-id="${acc.id}" style="font-size: 14px; color: rgba(239, 68, 68, 0.6); padding: 0 6px; cursor: pointer; border-radius: 3px; font-weight: bold; transition: color 0.1s, background 0.1s; user-select: none;" title="删除此账号">×</span>
+                <span class="delete-btn" data-id="${acc.id}" title="删除此账号">×</span>
               </div>
             `;
           }).join('') + `
-            <div class="account-item" data-id="__add_new_account__" style="padding: 6px 8px; font-size: 10px; display: flex; align-items: center; cursor: pointer; border-radius: 4px; transition: background 0.1s; color: #3b82f6; font-weight: bold;">
+            <div class="add-new-item" data-id="__add_new_account__">
               + 登录新账号...
             </div>
           `;
@@ -1908,19 +2065,10 @@ try {
           dropdown.innerHTML = listHtml;
 
           // Event bindings
-          const items = dropdown.querySelectorAll('.account-item');
+          const items = dropdown.querySelectorAll('.account-item, .add-new-item');
           items.forEach(item => {
-            const id = item.getAttribute('data-id');
-            const isCurrent = id === window.antigravityCurrentAccount;
-            
-            // Hover effect
-            if (id !== '__add_new_account__' && isCurrent) {
-              item.onmouseenter = () => { item.style.background = 'rgba(59, 130, 246, 0.22)'; };
-              item.onmouseleave = () => { item.style.background = 'rgba(59, 130, 246, 0.15)'; };
-            } else {
-              item.onmouseenter = () => { item.style.background = 'rgba(128, 128, 128, 0.12)'; };
-              item.onmouseleave = () => { item.style.background = 'transparent'; };
-            }
+            const itemId = item.getAttribute('data-id');
+            const isCurrent = itemId === window.antigravityCurrentAccount;
 
             // Click behavior
             item.onclick = (e) => {
@@ -1928,19 +2076,18 @@ try {
               dropdown.style.display = 'none';
               arrow.style.transform = 'rotate(0deg)';
 
-              if (id === '__add_new_account__') {
+              if (itemId === '__add_new_account__') {
                 showBeautifulConfirm('登录新账号', '是否要清空当前登录状态并重启客户端以登录新账号？', '确定', '取消').then(confirmed => {
                   if (confirmed) {
                     electron_1.ipcRenderer.invoke('accounts:clear-keyring');
                   }
                 });
               } else if (!isCurrent) {
-                // Set loading state on trigger
                 const triggerLabelEl = trigger.querySelector('.trigger-label');
                 if (triggerLabelEl) triggerLabelEl.textContent = '正在切换...';
                 trigger.style.opacity = '0.5';
                 
-                electron_1.ipcRenderer.invoke('accounts:switch', id).then(res => {
+                electron_1.ipcRenderer.invoke('accounts:switch', itemId).then(res => {
                   if (!res.success) {
                     alert('切换账号失败: ' + res.error);
                     trigger.style.opacity = '1';
@@ -1957,34 +2104,22 @@ try {
             // Delete button binding
             const delBtn = item.querySelector('.delete-btn');
             if (delBtn) {
-              const targetAcc = window.antigravityAccounts.find(a => a.id === id);
-              delBtn.onmouseenter = (ev) => {
-                ev.stopPropagation();
-                delBtn.style.color = '#ef4444';
-                delBtn.style.background = 'rgba(239, 68, 68, 0.15)';
-              };
-              delBtn.onmouseleave = (ev) => {
-                ev.stopPropagation();
-                delBtn.style.color = 'rgba(239, 68, 68, 0.6)';
-                delBtn.style.background = 'transparent';
-              };
+              const targetAcc = window.antigravityAccounts.find(a => a.id === itemId);
               delBtn.onclick = (ev) => {
                 ev.stopPropagation(); // Avoid triggering switch
                 dropdown.style.display = 'none';
                 arrow.style.transform = 'rotate(0deg)';
 
                 const deleteMessage = isCurrent
-                  ? `确定要删除当前正在使用的账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\n删除后会清除系统凭据并自动重启客户端。`
-                  : `确定要删除账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\n删除后如需再次使用，必须重新登录。`;
+                  ? `确定要删除当前正在使用的账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\\n删除后会清除系统凭据并自动重启客户端。`
+                  : `确定要删除账号 ${targetAcc ? targetAcc.email : 'Unknown'} 吗？\\n删除后如需再次使用，必须重新登录。`;
                 showBeautifulConfirm('删除账号', deleteMessage, '确定删除', '取消').then(confirmed => {
                   if (confirmed) {
-                    electron_1.ipcRenderer.invoke('accounts:delete', id).then(res => {
+                    electron_1.ipcRenderer.invoke('accounts:delete', itemId).then(res => {
                       if (res.success) {
                         if (res.mustRelaunch) {
-                          // Restart automatically
                           return;
                         }
-                        // Refresh accounts list
                         electron_1.ipcRenderer.invoke('accounts:list').then(newList => {
                           window.antigravityAccounts = newList.accounts || [];
                           window.antigravityCurrentAccount = newList.currentAccountId || '';
@@ -2001,15 +2136,6 @@ try {
           });
         }
 
-        // Trigger click binding
-        trigger.onmouseenter = () => {
-          trigger.style.borderColor = 'rgba(128,128,128,0.4)';
-          trigger.style.background = 'rgba(128,128,128,0.1)';
-        };
-        trigger.onmouseleave = () => {
-          trigger.style.borderColor = 'rgba(128,128,128,0.25)';
-          trigger.style.background = 'rgba(128,128,128,0.06)';
-        };
         trigger.onclick = (e) => {
           e.stopPropagation();
           const isOpen = dropdown.style.display === 'flex';
@@ -2027,13 +2153,16 @@ try {
         if (!window.antigravityDropdownListenerAdded) {
           window.antigravityDropdownListenerAdded = true;
           document.addEventListener('click', () => {
-            const dp = document.getElementById('antigravity-account-dropdown');
-            if (dp && dp.style.display === 'flex') {
-              dp.style.display = 'none';
-              const trg = document.getElementById('antigravity-account-select-trigger');
-              if (trg) {
-                const arr = trg.querySelector('.arrow-icon');
-                if (arr) arr.style.transform = 'rotate(0deg)';
+            const w = document.getElementById('antigravity-quota-widget');
+            if (w && w.shadowRoot) {
+              const dp = w.shadowRoot.querySelector('#antigravity-account-dropdown');
+              if (dp && dp.style.display === 'flex') {
+                dp.style.display = 'none';
+                const trg = w.shadowRoot.querySelector('#antigravity-account-select-trigger');
+                if (trg) {
+                  const arr = trg.querySelector('.arrow-icon');
+                  if (arr) arr.style.transform = 'rotate(0deg)';
+                }
               }
             }
           });
@@ -2042,8 +2171,6 @@ try {
         // Add Account Button binding
         const addBtn = accountsContainer.querySelector('#antigravity-add-account');
         if (addBtn) {
-          addBtn.onmouseenter = () => { addBtn.style.color = '#60a5fa'; };
-          addBtn.onmouseleave = () => { addBtn.style.color = '#3b82f6'; };
           addBtn.onclick = (e) => {
             e.stopPropagation();
             addBtn.style.pointerEvents = 'none';
