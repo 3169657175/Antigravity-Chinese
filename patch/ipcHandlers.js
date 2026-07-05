@@ -52,6 +52,59 @@ function getLogPath(filename) {
         return filename;
     }
 }
+
+// Helper to read JSON with retries to resolve write race conditions
+async function readJsonWithRetry(filePath, retries = 5, delay = 50) {
+    const fs = require('fs/promises');
+    for (let i = 0; i < retries; i++) {
+        try {
+            const raw = await fs.readFile(filePath, 'utf-8');
+            if (!raw && retries > 1) {
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            return JSON.parse(raw);
+        } catch (e) {
+            if (e.code === 'ENOENT') {
+                throw e;
+            }
+            if (i === retries - 1) {
+                throw e;
+            }
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
+
+// Helper to write JSON atomically (using temp file and rename) to prevent corruption
+async function writeJsonAtomic(filePath, data, retries = 5, delay = 50) {
+    const fs = require('fs/promises');
+    const path = require('path');
+    const dir = path.dirname(filePath);
+    const tmpPath = path.join(dir, path.basename(filePath) + '.' + Math.random().toString(36).substring(2) + '.tmp');
+    
+    await fs.mkdir(dir, { recursive: true });
+    const content = JSON.stringify(data, null, 2);
+    await fs.writeFile(tmpPath, content, 'utf-8');
+    
+    for (let i = 0; i < retries; i++) {
+        try {
+            await fs.rename(tmpPath, filePath);
+            return;
+        } catch (e) {
+            if (i === retries - 1) {
+                try {
+                    await fs.writeFile(filePath, content, 'utf-8');
+                    await fs.unlink(tmpPath).catch(() => {});
+                    return;
+                } catch (writeErr) {
+                    throw writeErr;
+                }
+            }
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
 const electron_updater_1 = require("electron-updater");
 const updater_1 = require("./updater");
 const main_1 = __importDefault(require("electron-log/main"));
@@ -302,9 +355,16 @@ function registerIpcHandlers(storageManager) {
             const fs = require('fs/promises');
             const userHome = os.homedir();
             const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
-            
-            const raw = await fs.readFile(accountsPath, 'utf-8');
-            const data = JSON.parse(raw);
+            let data;
+            try {
+                data = await readJsonWithRetry(accountsPath);
+            } catch (e) {
+                if (e.code === 'ENOENT') {
+                    data = { version: "2.0", accounts: [], current_account_id: "" };
+                } else {
+                    throw e;
+                }
+            }
             return {
                 accounts: (data.accounts || []).map(acc => ({
                     id: acc.id,
@@ -329,15 +389,13 @@ function registerIpcHandlers(storageManager) {
             const userHome = os.homedir();
             
             const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
-            const raw = await fs.readFile(accountsPath, 'utf-8');
-            const data = JSON.parse(raw);
+            const data = await readJsonWithRetry(accountsPath);
             
             const acc = (data.accounts || []).find(a => a.id === accountId);
             if (!acc) throw new Error('Account not found in registry');
             
             const detailPath = path.join(userHome, '.antigravity_tools', 'accounts', `${accountId}.json`);
-            const detailRaw = await fs.readFile(detailPath, 'utf-8');
-            const detail = JSON.parse(detailRaw);
+            const detail = await readJsonWithRetry(detailPath);
             
             if (!detail.token) throw new Error('Token structure missing in account details');
             
@@ -451,7 +509,7 @@ function registerIpcHandlers(storageManager) {
             
             // Sync current_account_id back to index file
             data.current_account_id = accountId;
-            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            await writeJsonAtomic(accountsPath, data);
             
             // Kill old language_server.exe immediately to free up gRPC ports before relaunch
             if (process.platform === 'win32') {
@@ -547,13 +605,16 @@ function registerIpcHandlers(storageManager) {
             await fsPromises.mkdir(baseDir, { recursive: true });
             
             const accountsPath = path.join(baseDir, 'accounts.json');
-            let dataPool = { version: "2.0", accounts: [], current_account_id: "" };
-            
+            let dataPool;
             try {
-                const rawPool = await fsPromises.readFile(accountsPath, 'utf-8');
-                dataPool = JSON.parse(rawPool);
+                dataPool = await readJsonWithRetry(accountsPath);
             } catch (e) {
-                log('Error reading accounts.json: ' + e.message);
+                if (e.code === 'ENOENT') {
+                    dataPool = { version: "2.0", accounts: [], current_account_id: "" };
+                } else {
+                    log('Error reading accounts.json, aborting sniff: ' + e.message);
+                    return { success: false, error: 'Database read failed: ' + e.message };
+                }
             }
 
 
@@ -713,8 +774,7 @@ conn.close()
                 if (currentKeyring && currentKeyring.token && currentKeyring.token.access_token) {
                     const detailPath = path.join(baseDir, 'accounts', `${existingAcc.id}.json`);
                     try {
-                        const detailRaw = await fsPromises.readFile(detailPath, 'utf-8');
-                        const detail = JSON.parse(detailRaw);
+                        const detail = await readJsonWithRetry(detailPath);
                         
                         // 用新 Token 覆盖旧 Token
                         const token = currentKeyring.token;
@@ -726,7 +786,7 @@ conn.close()
                             detail.token.project_id = token.project_id;
                         }
                         
-                        await fsPromises.writeFile(detailPath, JSON.stringify(detail, null, 2), 'utf-8');
+                        await writeJsonAtomic(detailPath, detail);
                         log('Successfully updated token for existing account: ' + email);
                     } catch(e) {
                         log('Failed to update existing account detail file: ' + e.message);
@@ -736,7 +796,7 @@ conn.close()
                 }
 
                 dataPool.current_account_id = existingAcc.id;
-                await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+                await writeJsonAtomic(accountsPath, dataPool);
                 log('Updated current_account_id to ' + existingAcc.id);
                 return { success: true, email, accountId: existingAcc.id, updatedCurrent: true };
             }
@@ -796,8 +856,8 @@ conn.close()
                 ]
             };
 
-            await fsPromises.writeFile(detailPath, JSON.stringify(newDetail, null, 2), 'utf-8');
-            await fsPromises.writeFile(accountsPath, JSON.stringify(dataPool, null, 2), 'utf-8');
+            await writeJsonAtomic(detailPath, newDetail);
+            await writeJsonAtomic(accountsPath, dataPool);
 
             log('Sniff registered brand new account to pool: ' + email);
             return { success: true, email, accountId, newlySaved: true };
@@ -824,13 +884,11 @@ conn.close()
             try {
                 const os = require('os');
                 const path = require('path');
-                const fs = require('fs/promises');
                 const userHome = os.homedir();
                 const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
-                const raw = await fs.readFile(accountsPath, 'utf-8');
-                const data = JSON.parse(raw);
+                const data = await readJsonWithRetry(accountsPath);
                 data.current_account_id = '';
-                await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+                await writeJsonAtomic(accountsPath, data);
             } catch (e) {}
 
             // Kill old language_server.exe immediately to free up gRPC ports before relaunch
@@ -906,8 +964,7 @@ conn.close()
             const baseDir = path.join(userHome, '.antigravity_tools');
             const accountsPath = path.join(baseDir, 'accounts.json');
             
-            const raw = await fs.readFile(accountsPath, 'utf-8');
-            const data = JSON.parse(raw);
+            const data = await readJsonWithRetry(accountsPath);
             
             // Remove from list
             data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
@@ -934,7 +991,7 @@ conn.close()
                 }
             }
             
-            await fs.writeFile(accountsPath, JSON.stringify(data, null, 2), 'utf-8');
+            await writeJsonAtomic(accountsPath, data);
             
             if (mustRelaunch) {
                 setTimeout(() => {

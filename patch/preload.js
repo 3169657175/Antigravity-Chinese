@@ -1752,7 +1752,7 @@ try {
         }
         return;
       } else {
-        runGrpcSniff();
+        // runGrpcSniff is called on window focus and on a 30s interval to prevent write race conditions
       }
 
       const buttons = document.querySelectorAll('button, .sidebar-item, nav [role="button"], a');
@@ -2507,6 +2507,8 @@ try {
       setupInstantWidgetRefresh();
       setInterval(injectQuotaWidget, 2000);
       setInterval(injectQuickLogin, 1000);
+      setInterval(runGrpcSniff, 30000);
+      window.addEventListener('focus', runGrpcSniff);
     });
   } else {
     startObserver();
@@ -2514,5 +2516,7 @@ try {
     setupInstantWidgetRefresh();
     setInterval(injectQuotaWidget, 2000);
     setInterval(injectQuickLogin, 1000);
+    setInterval(runGrpcSniff, 30000);
+    window.addEventListener('focus', runGrpcSniff);
   }
 })();
