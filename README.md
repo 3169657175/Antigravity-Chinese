@@ -75,3 +75,12 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 * `restore.ps1`：PowerShell 核心还原与清理器 [NEW]
 * `auto_heal.ps1`：动态防自动更新覆盖的开机自愈服务脚本
 * `README.md`：本说明书
+<img width="2099" height="1349" alt="f54cb9ea05f7bc8e381248cbf6cc99c1" src="https://github.com/user-attachments/assets/670b81e0-ec00-4d00-9adc-0a5a1f255ebe" />
+<img width="2099" height="1349" alt="26c840e071acd86153f818b072cd10d8" src="https://github.com/user-attachments/assets/24b8632f-1640-488e-b430-16027b4db58b" />
+<img width="2099" height="1349" alt="908854b247c173276bfa27b39c5f9aeb" src="https://github.com/user-attachments/assets/b35ecaaa-3be5-42c2-97c7-770b9ef557f0" />
+<img width="2099" height="1349" alt="e36c48ba36a2508121e8e8639140a3cd" src="https://github.com/user-attachments/assets/c159a5d3-e53d-41d1-bbac-2ecf7c3b2176" />
+<img width="2099" height="1349" alt="f9a8f4876cb610c8264a5e34b9a8c455" src="https://github.com/user-attachments/assets/3758b0dd-8e85-47a4-bda4-0d921fa5b89f" />
+
+
+
+
