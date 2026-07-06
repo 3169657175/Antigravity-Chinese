@@ -1190,7 +1190,7 @@ conn.close()
             }
 
             // 7. 生成重启覆盖批处理脚本 (写在 scratch 目录下，以便它运行后可以安全地物理清理整个 tempDir 临时下载目录)
-            const appPath = path.join(userHome, 'AppData', 'Local', 'Programs', 'antigravity');
+            const appPath = path.join(process.env.LOCALAPPDATA || path.join(userHome, 'AppData', 'Local'), 'Programs', 'antigravity');
             const asarPath = path.join(appPath, 'resources', 'app.asar');
             const restartBatPath = path.join(scratchDir, 'restart.bat');
             

@@ -1,4 +1,4 @@
-﻿# Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
+# Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
 # Cross-version safe local asar patching mechanism
 
 $Host.UI.RawUI.WindowTitle = "Antigravity 2.0 汉化优化"
@@ -130,7 +130,7 @@ if (Test-Path "$appPath\resources\app.asar.unpacked") {
 $startupFile = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\AntigravityPatchAutoHealer.vbs"
 $vbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -File ""$scriptDir\auto_heal.ps1""", 0, False
+WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File """ & Chr(34) & "$scriptDir\auto_heal.ps1" & Chr(34) & """", 0, False
 "@
 [System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::ASCII)
 
