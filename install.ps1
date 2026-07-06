@@ -1,113 +1,109 @@
-# Antigravity 2.0 Chinese Localization Patch Installer v2
-# Direct compilation without complex branches
+# Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
+# Cross-version safe local asar patching mechanism
 
-$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 Chinese Patch Installer v2"
+$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 Chinese Patch Installer"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "      Antigravity 2.0 Chinese Patch Installer (v2)        " -ForegroundColor Cyan
+Write-Host "      Antigravity 2.0 Chinese Patch Installer    " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
+# 1. Locate Antigravity directory
 $appPath = "$env:LOCALAPPDATA\Programs\antigravity"
 $asarPath = "$appPath\resources\app.asar"
 $backupPath = "$appPath\resources\app.asar.backup"
 
 if (-not (Test-Path $asarPath)) {
-    Write-Host "[X] ERROR: Client core app.asar not found!" -ForegroundColor Red
+    Write-Host "[X] ERROR: Antigravity client not found at default path:" -ForegroundColor Red
+    Write-Host "    $asarPath" -ForegroundColor Red
+    Write-Host "    Please ensure Antigravity client is installed." -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "[OK] Found core file: $asarPath" -ForegroundColor Green
+Write-Host "[OK] Found client core file: $asarPath" -ForegroundColor Green
 
-
-
-# 2. Backup app.asar if not exists
+# 3. Create backup if it doesn't exist
 if (-not (Test-Path $backupPath)) {
-    Write-Host "[+] Backing up original app.asar..." -ForegroundColor Green
+    Write-Host "[+] Creating official app.asar backup..." -ForegroundColor Green
     Copy-Item -Path $asarPath -Destination $backupPath -Force
+} else {
+    Write-Host "[*] Backup already exists, proceeding with installation" -ForegroundColor Yellow
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$prebuiltAsar = Join-Path $scriptDir "app.asar"
 
-# 3. Check compilation requirements
-$npxCheck = Get-Command npx -ErrorAction SilentlyContinue
-if (-not $npxCheck) {
-    Write-Host "[X] ERROR: Node.js (npx) is required for repack compiling." -ForegroundColor Red
-    exit 1
-}
+# 4. Check if prebuilt package is available (Bypasses Node.js requirement)
+if (Test-Path $prebuiltAsar) {
+    Write-Host "[+] Found prebuilt package, deploying directly..." -ForegroundColor Cyan
+    try {
+        Copy-Item -Path $prebuiltAsar -Destination $asarPath -Force
+        
+        $prebuiltUnpacked = Join-Path $scriptDir "app.asar.unpacked"
+        if (Test-Path $prebuiltUnpacked) {
+            Write-Host "[+] Deploying app.asar.unpacked dependencies..." -ForegroundColor Cyan
+            $destUnpacked = Join-Path $appPath "resources\app.asar.unpacked"
+            if (Test-Path $destUnpacked) {
+                Remove-Item -Path $destUnpacked -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Copy-Item -Path $prebuiltUnpacked -Destination "$appPath\resources" -Recurse -Force
+        }
+        Write-Host "[OK] Prebuilt package deployed successfully!" -ForegroundColor Green
+    } catch {
+        Write-Host "[X] Failed to deploy prebuilt package: $_" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    # 5. Check for node/npx (Compilation fallback)
+    $npxCheck = Get-Command npx -ErrorAction SilentlyContinue
+    if (-not $npxCheck) {
+        Write-Host "[X] ERROR: Node.js (npx) is not installed on this system." -ForegroundColor Red
+        Write-Host "    Local compilation requires Node.js." -ForegroundColor Yellow
+        Write-Host "    Please install Node.js from https://nodejs.org and try again." -ForegroundColor Yellow
+        exit 1
+    }
 
-# 4. Clear and Extract
-$tempDir = "$env:TEMP\antigravity-unpack-repo"
-if (Test-Path $tempDir) {
+    # 6. Extract to temporary folder
+    $tempDir = "$env:TEMP\antigravity-unpack-repo"
+    if (Test-Path $tempDir) {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host "[+] Extracting app.asar..." -ForegroundColor Cyan
+    & npx.cmd -y @electron/asar extract $asarPath $tempDir
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[X] Extraction failed. Check permissions." -ForegroundColor Red
+        exit 1
+    }
+
+    # 7. Apply patch files
+    Write-Host "[+] Applying Chinese patch..." -ForegroundColor Cyan
+    $patchDir = Join-Path $scriptDir "patch"
+
+    Copy-Item -Path "$patchDir\preload.js" -Destination "$tempDir\dist\preload.js" -Force
+    Copy-Item -Path "$patchDir\ideInstall\wizardPreload.js" -Destination "$tempDir\dist\ideInstall\wizardPreload.js" -Force
+    Copy-Item -Path "$patchDir\menu.js" -Destination "$tempDir\dist\menu.js" -Force
+    Copy-Item -Path "$patchDir\tray.js" -Destination "$tempDir\dist\tray.js" -Force
+    Copy-Item -Path "$patchDir\main.js" -Destination "$tempDir\dist\main.js" -Force
+    Copy-Item -Path "$patchDir\utils.js" -Destination "$tempDir\dist\utils.js" -Force
+    Copy-Item -Path "$patchDir\languageServer.js" -Destination "$tempDir\dist\languageServer.js" -Force
+    Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandlers.js" -Force
+
+    # 8. Repack asar
+    Write-Host "[+] Repacking app.asar..." -ForegroundColor Cyan
+    & npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[X] Repack failed. Restoring original backup..." -ForegroundColor Red
+        Copy-Item -Path $backupPath -Destination $asarPath -Force
+        exit 1
+    }
+
+    # Clean up
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "[+] Extracting app.asar package..." -ForegroundColor Cyan
-& npx.cmd -y @electron/asar extract $asarPath $tempDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[X] Extraction failed!" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "[+] Waiting for file handles to flush..." -ForegroundColor Gray
-Start-Sleep -Seconds 3
-
-# 5. Apply new patch files
-Write-Host "[+] Compiling sandbox bundle and injecting Chinese v2 patch..." -ForegroundColor Cyan
-$patchDir = Join-Path $scriptDir "patch"
-
-# Run sandbox bundle generator
-& node.exe "$scriptDir\bundle.js"
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Bundle compilation failed!"
-    exit 1
-}
-
-Write-Host "    [DEBUG] Source preload.js size: $((Get-Item "$scriptDir\dist_preload.js").Length) bytes" -ForegroundColor Gray
-
-# Use .NET native file copy for strict verification
-try {
-    [System.IO.File]::Copy("$scriptDir\dist_preload.js", "$tempDir\dist\preload.js", $true)
-    [System.IO.File]::Copy("$patchDir\menu.js", "$tempDir\dist\menu.js", $true)
-    [System.IO.File]::Copy("$patchDir\tray.js", "$tempDir\dist\tray.js", $true)
-    [System.IO.File]::Copy("$patchDir\main.js", "$tempDir\dist\main.js", $true)
-    [System.IO.File]::Copy("$patchDir\utils.js", "$tempDir\dist\utils.js", $true)
-    [System.IO.File]::Copy("$patchDir\languageServer.js", "$tempDir\dist\languageServer.js", $true)
-    [System.IO.File]::Copy("$patchDir\ipcHandlers.js", "$tempDir\dist\ipcHandlers.js", $true)
-} catch {
-    Write-Error "CRITICAL ERROR during file override: $_"
-    exit 1
-}
-
-# Copy catalogs (exclude raw source core/modules since they are now bundled inside preload.js)
-if (Test-Path "$patchDir\ideInstall") {
-    Copy-Item -Path "$patchDir\ideInstall" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
-}
-if (Test-Path "$patchDir\locales") {
-    Copy-Item -Path "$patchDir\locales" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
-}
-
-$appliedSize = (Get-Item "$tempDir\dist\preload.js").Length
-Write-Host "    [DEBUG] Applied preload.js size: $appliedSize bytes" -ForegroundColor Gray
-if ($appliedSize -gt 250000) {
-    Write-Error "CRITICAL ERROR: preload.js replacement failed! Size: $appliedSize"
-    exit 1
-}
-
-# 6. Repack asar package
-Write-Host "[+] Compiling and repacking app.asar..." -ForegroundColor Cyan
-& npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[X] Repacking failed!" -ForegroundColor Red
-    exit 1
-}
-
-Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
-# Clean temp bundle file
-Remove-Item -Path "$scriptDir\dist_preload.js" -Force -ErrorAction SilentlyContinue
-
-# 7. Register Auto-Healer Cache
-Write-Host "[+] Syncing auto-healer offline cache..." -ForegroundColor Cyan
+# 9. Register Auto-Healer in Startup Folder
+Write-Host "[+] Registering patch auto-healer..." -ForegroundColor Cyan
 $scratchDir = Join-Path $env:USERPROFILE ".gemini\antigravity\scratch"
 if (-not (Test-Path $scratchDir)) {
     New-Item -ItemType Directory -Path $scratchDir -Force | Out-Null

@@ -1,10 +1,19 @@
 @echo off
-CHCP 65001 > nul
-echo ==========================================================
-echo         Antigravity 2.0 Chinese Patch Installer (v2)
-echo ==========================================================
-echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
-echo.
-echo Press any key to exit...
-pause > nul
+title Antigravity Chinese Patch Installer
+cd /d "%~dp0"
+
+:: Check for Administrator privileges
+net session >nul 2>&1
+if %errorLevel% == 0 (
+    echo [OK] Running with Administrator privileges.
+) else (
+    echo [!] Requesting Administrator privileges...
+    powershell -Command "Start-Process '%~dp0%~nx0' -Verb RunAs"
+    exit /b
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
+if %errorLevel% neq 0 (
+    echo [!] Installer script executed with errors.
+)
+pause
