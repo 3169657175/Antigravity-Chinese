@@ -48,6 +48,14 @@
 *保存凭据清除与安全验证弹窗：*
 <img width="2099" height="1349" alt="e36c48ba36a2508121e8e8639140a3cd" src="https://github.com/user-attachments/assets/c159a5d3-e53d-41d1-bbac-2ecf7c3b2176" />
 
+### 6. 一键自动检测更新与自动重启（✨ 独家首创）
+* **主进程穿透检测**：由于客户端内置沙箱具备严格的 CSP 网页安全域名限制，更新检测自动上移至底层的 Node.js 主进程，彻底实现 100% 畅通的版本更新检测。
+* **非侵入式绝对定位**：借鉴开源项目 `CodexPlus` 方案，版本号与更新提示按钮强制绝对浮动在窗口右上角控制栏左侧（向左偏移 180px 避开原生最小化按钮），美观协调且能够完美响应鼠标悬停与一键升级点击。
+* **无感静默热重包**：点击“有新版本”即可在后台全自动静默下载、解压、提取旧版 `app.asar`、注入优化代码、自动重包、生成重启覆盖脚本。点击“重启生效”在秒级内瞬间热重载。
+
+*右上角常驻版本指示与一键热更新气泡：*
+<img width="2099" height="1349" alt="image" src="https://github.com/user-attachments/assets/28df01cc-9859-41a8-a55b-a48b280c0307" />
+
 ---
 
 ## 💾 快速安装
@@ -89,7 +97,6 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 * `restore.ps1`：PowerShell 核心还原与清理器
 * `auto_heal.ps1`：防更新覆盖的开机自愈服务脚本
 * `README.md`：本说明文档
-<img width="2099" height="1349" alt="image" src="https://github.com/user-attachments/assets/28df01cc-9859-41a8-a55b-a48b280c0307" />
 
 
 
