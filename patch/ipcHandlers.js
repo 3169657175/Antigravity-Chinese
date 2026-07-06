@@ -53,6 +53,17 @@ function getLogPath(filename) {
     }
 }
 
+const DEBUG_QUOTA_LOGS = process.env.ANTIGRAVITY_DEBUG_QUOTA === '1';
+function appendQuotaDebugLog(text) {
+    if (!DEBUG_QUOTA_LOGS) {
+        return;
+    }
+    try {
+        const fs = require('fs');
+        fs.appendFileSync(getLogPath('mcp_spy.txt'), text, 'utf-8');
+    } catch (e) {}
+}
+
 // Helper to read JSON with retries to resolve write race conditions
 async function readJsonWithRetry(filePath, retries = 5, delay = 50) {
     const fs = require('fs/promises');
@@ -1189,11 +1200,7 @@ async function pollLocalQuota() {
         const port = languageServer.getLsPort();
         const csrf = languageServer.getLsCsrf();
         
-        // Diagnostic tick log
-        try {
-            const fs = require('fs');
-            fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_TICK] port=${port} csrf=${csrf}\n`, 'utf-8');
-        } catch (e) {}
+        appendQuotaDebugLog(`[MAIN_POLL_TICK] port=${port} csrf=${csrf}\n`);
 
         if (!port || !csrf) return;
 
@@ -1205,11 +1212,7 @@ async function pollLocalQuota() {
             const quotas = parseProtoQuota(data);
             
             if (quotas && Object.keys(quotas).length > 0) {
-                // Diagnostic log
-                try {
-                    const fs = require('fs');
-                    fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_SUCCESS] quotas=${JSON.stringify(quotas)}\n`, 'utf-8');
-                } catch (e) {}
+                appendQuotaDebugLog(`[MAIN_POLL_SUCCESS] quotas=${JSON.stringify(quotas)}\n`);
 
                 const windows = electron_1.BrowserWindow.getAllWindows();
                 for (const win of windows) {
@@ -1223,22 +1226,13 @@ async function pollLocalQuota() {
                     }
                 }
             } else {
-                try {
-                    const fs = require('fs');
-                    fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_EMPTY_QUOTAS] parsed 0 quotas\n`, 'utf-8');
-                } catch (e) {}
+                appendQuotaDebugLog(`[MAIN_POLL_EMPTY_QUOTAS] parsed 0 quotas\n`);
             }
         } else {
-            try {
-                const fs = require('fs');
-                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_EMPTY_DATA] response length is 0\n`, 'utf-8');
-            } catch (e) {}
+            appendQuotaDebugLog(`[MAIN_POLL_EMPTY_DATA] response length is 0\n`);
         }
     } catch (e) {
-        try {
-            const fs = require('fs');
-            fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_ERR] execution error: ${e.message}\n`, 'utf-8');
-        } catch (err) {}
+        appendQuotaDebugLog(`[MAIN_POLL_ERR] execution error: ${e.message}\n`);
         console.error('pollLocalQuota execution error:', e);
     }
 }
@@ -1271,19 +1265,13 @@ function requestGrpc(port, csrf, path, payload) {
         });
 
         req.on('error', (e) => {
-            try {
-                const fs = require('fs');
-                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_REQ_ERR] path=${path} err=${e.message}\n`, 'utf-8');
-            } catch (err) {}
+            appendQuotaDebugLog(`[MAIN_POLL_REQ_ERR] path=${path} err=${e.message}\n`);
             console.error(`requestGrpc error on ${path}:`, e.message);
             resolve(Buffer.alloc(0));
         });
 
         req.on('timeout', () => {
-            try {
-                const fs = require('fs');
-                fs.appendFileSync(getLogPath('mcp_spy.txt'), `[MAIN_POLL_TIMEOUT] path=${path}\n`, 'utf-8');
-            } catch (err) {}
+            appendQuotaDebugLog(`[MAIN_POLL_TIMEOUT] path=${path}\n`);
             req.destroy();
             resolve(Buffer.alloc(0));
         });
