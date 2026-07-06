@@ -2205,38 +2205,71 @@ try {
       const g5h = localStorage.getItem('quota_gemini_5h') || '--';
       const cWeekly = localStorage.getItem('quota_claude_weekly') || '--';
       const c5h = localStorage.getItem('quota_claude_5h') || '--';
-      
+
+      // BUG FIX: 检测当前 UI 里真实选中的模型（以底部模型选择器的文本为准）
+      // 防止后台 Gemini 探针响应污染当前 Claude/GPT 额度显示
       function getCurrentModel() {
         try {
-          const interactives = document.querySelectorAll('button, [role="button"], .select, .trigger, .dropdown, a');
+          // 优先读取底部模型选择器（最准确）
+          const modelSelectors = [
+            '.model-selector', '.model-select', '[data-model]',
+            'button[aria-label*="model" i]', 'button[aria-label*="Model" i]',
+          ];
+          for (const sel of modelSelectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+              const text = el.textContent.trim();
+              const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
+              if (m) return m[1];
+            }
+          }
+          // 次选：遍历底部工具栏的 interactive 元素（但不遍历对话气泡区域）
+          const bottomBar = document.querySelector('.bottom-bar, .input-area, .composer, footer, form');
+          const searchRoot = bottomBar || document;
+          const interactives = searchRoot.querySelectorAll('button, [role="button"], .select, .trigger, .dropdown');
           for (let i = 0; i < interactives.length; i++) {
             const el = interactives[i];
             const text = el.textContent ? el.textContent.trim() : '';
+            if (text.length > 100) continue; // 跳过长文本的对话气泡按钮
             const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
-            if (m) {
-              return m[1];
-            }
+            if (m) return m[1];
           }
         } catch (e) {}
-        return 'Gemini';
+        return 'Gemini'; // 默认兜底
       }
+
 
       const currentModel = getCurrentModel().toLowerCase();
       const isGemini = currentModel.includes('gemini');
+
+      // BUG FIX: 获取各模型 quota 数据的最后写入时间，用于防止"后台探针"污染显示
+      const geminiTs = parseInt(localStorage.getItem('quota_gemini_ts') || '0', 10);
+      const claudeTs = parseInt(localStorage.getItem('quota_claude_ts') || '0', 10);
+      // 当前模型应显示哪个 quota："当前模型的 quota 数据是否比对立模型的更新"
+      // 如果正在用 Claude，但 Gemini 的 ts 比 Claude 更新（后台探针刚触发），不应切换显示
+      const shouldShowGemini = isGemini
+        ? true
+        : geminiTs > claudeTs + 5000; // 如果 Gemini 数据比 Claude 新超过 5 秒才切换（正常不该发生）
 
       const titleEl = root.querySelector('.quota-title');
       const weeklyEl = root.querySelector('.quota-weekly');
       const hourlyEl = root.querySelector('.quota-5h');
       const accountsContainer = root.querySelector('.accounts-container');
 
-      // 增量刷新配额文本数值，而不重绘整个 DOM 树
-      if (isGemini) {
-        if (titleEl.textContent !== 'gemini') {
-          titleEl.textContent = 'gemini';
-          titleEl.style.color = '#3b82f6';
+      // 增量刷新配额文本数值，不重绘整个 DOM 树
+      if (isGemini || shouldShowGemini) {
+        if (!isGemini) {
+          // 当前是 Claude/GPT 但 Gemini 探针数据更新：仅静默存储，不更新标题
+          if (weeklyEl.textContent !== gWeekly && gWeekly !== '--') weeklyEl.textContent = gWeekly;
+          if (hourlyEl.textContent !== g5h && g5h !== '--') hourlyEl.textContent = g5h;
+        } else {
+          if (titleEl.textContent !== 'gemini') {
+            titleEl.textContent = 'gemini';
+            titleEl.style.color = '#3b82f6';
+          }
+          if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
+          if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
         }
-        if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
-        if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
       } else {
         const isGpt = currentModel.includes('gpt');
         const titleText = isGpt ? 'gpt' : 'claude';
@@ -2496,6 +2529,7 @@ try {
               if (weeklyUsed !== null) {
                 const pct = Math.max(0, Math.min(100, Math.round((1 - weeklyUsed) * 100))) + '%';
                 localStorage.setItem("quota_" + type + "_weekly", pct);
+                localStorage.setItem("quota_" + type + "_ts", Date.now()); // BUG FIX: 记录写入时间戳
               }
               if (fiveHourUsed !== null) {
                 const pct = Math.max(0, Math.min(100, Math.round((1 - fiveHourUsed) * 100))) + '%';
