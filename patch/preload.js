@@ -1710,8 +1710,8 @@ try {
         const title = document.createElement('div');
         title.style.fontSize = '12px';
         title.style.fontWeight = '600';
-        title.style.color = 'CanvasText';
-        title.style.opacity = '0.55';
+        title.style.color = '#475569';
+        title.style.opacity = '0.75';
         title.style.marginBottom = '6px';
         title.style.letterSpacing = '1px';
         title.style.textTransform = 'uppercase';
@@ -1724,9 +1724,9 @@ try {
           btn.style.width = '260px';
           btn.style.padding = '10px 16px';
           btn.style.borderRadius = '8px';
-          btn.style.border = '1px solid color-mix(in srgb, CanvasText 10%, transparent)';
-          btn.style.background = 'color-mix(in srgb, CanvasText 4%, transparent)';
-          btn.style.color = 'CanvasText';
+          btn.style.border = '1px solid rgba(0, 0, 0, 0.08)';
+          btn.style.background = 'rgba(0, 0, 0, 0.03)';
+          btn.style.color = '#1e293b';
           btn.style.fontSize = '12.5px';
           btn.style.fontWeight = '500';
           btn.style.cursor = 'pointer';
@@ -1739,16 +1739,16 @@ try {
           btn.textContent = `${acc.name} (${acc.email})`;
           
           btn.onmouseenter = () => {
-            btn.style.background = 'color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 10%, transparent)';
-            btn.style.borderColor = 'color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 45%, transparent)';
-            btn.style.color = 'var(--vscode-focusBorder, #3b82f6)';
+            btn.style.background = 'rgba(59, 130, 246, 0.08)';
+            btn.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+            btn.style.color = '#2563eb';
             btn.style.transform = 'translateY(-1px)';
-            btn.style.boxShadow = '0 4px 12px color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 18%, transparent)';
+            btn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
           };
           btn.onmouseleave = () => {
-            btn.style.background = 'color-mix(in srgb, CanvasText 4%, transparent)';
-            btn.style.borderColor = 'color-mix(in srgb, CanvasText 10%, transparent)';
-            btn.style.color = 'CanvasText';
+            btn.style.background = 'rgba(0, 0, 0, 0.03)';
+            btn.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+            btn.style.color = '#1e293b';
             btn.style.transform = 'translateY(0)';
             btn.style.boxShadow = 'none';
           };
@@ -2088,16 +2088,14 @@ try {
       if (isGemini) {
         if (titleEl.textContent !== 'gemini') {
           titleEl.textContent = 'gemini';
-          titleEl.style.color = 'var(--vscode-focusBorder, color-mix(in srgb, #3b82f6 85%, CanvasText))';
+          titleEl.style.color = '#3b82f6';
         }
         if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
         if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
       } else {
         const isGpt = currentModel.includes('gpt');
         const titleText = isGpt ? 'gpt' : 'claude';
-        const color = isGpt
-          ? 'color-mix(in srgb, #f59e0b 85%, CanvasText)'
-          : 'color-mix(in srgb, #10b981 85%, CanvasText)';
+        const color = isGpt ? '#f59e0b' : '#10b981';
         if (titleEl.textContent !== titleText) {
           titleEl.textContent = titleText;
           titleEl.style.color = color;
@@ -2572,60 +2570,95 @@ try {
       const CURRENT_VERSION = 'v1.1.8';
 
       function injectVersionElement() {
-          if (document.getElementById('antigravity-version-widget')) return;
-          
-          const root = document.documentElement || document.body;
-          if (!root) return;
-          
-          const widget = document.createElement('div');
-          widget.id = 'antigravity-version-widget';
-          
-          // 悬浮在右上角 window controls 按钮左侧 (右侧偏移量调整为 180px 彻底避免遮挡最小化按钮)
-          widget.style.cssText = `
-              position: fixed;
-              top: 8px;
-              right: 180px;
-              z-index: 999999;
-              display: flex;
-              align-items: center;
-              font-size: 11px;
-              font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-              color: var(--vscode-titleBar-activeForeground, rgba(255, 255, 255, 0.7));
-              background: transparent;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
-              cursor: default;
-              user-select: none;
-              white-space: nowrap;
-              height: 22px;
-              box-sizing: border-box;
-              pointer-events: auto;
-              -webkit-app-region: no-drag;
-          `;
-          
-          widget.innerHTML = `
-              <span class="version-label">汉化插件 ${CURRENT_VERSION}</span>
-              <span id="antigravity-patch-update-btn" style="display: none; margin-left: 8px; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; cursor: pointer; transition: all 0.2s;">有新版本</span>
-          `;
-          
-          root.appendChild(widget);
-          
-          const btn = document.getElementById('antigravity-patch-update-btn');
-          if (btn) {
-              btn.onmouseenter = () => {
-                  btn.style.transform = 'scale(1.05)';
-                  btn.style.background = '#bae6fd';
-              };
-              btn.onmouseleave = () => {
-                  btn.style.transform = 'scale(1)';
-                  btn.style.background = '#e0f2fe';
-              };
-              btn.onclick = (e) => {
-                  e.stopPropagation();
-                  handleUpdateClick(btn);
-              };
+          let widget = document.getElementById('antigravity-version-widget');
+          if (!widget) {
+              const root = document.documentElement || document.body;
+              if (!root) return;
+              
+              widget = document.createElement('div');
+              widget.id = 'antigravity-version-widget';
+              
+              // 悬浮在右上角 window controls 按钮左侧 (右侧偏移量调整为 180px 彻底避免遮挡最小化按钮)
+              widget.style.cssText = `
+                  position: fixed;
+                  top: 8px;
+                  right: 180px;
+                  z-index: 999999;
+                  display: flex;
+                  align-items: center;
+                  font-size: 11px;
+                  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+                  background: transparent;
+                  padding: 2px 8px;
+                  border-radius: 4px;
+                  cursor: default;
+                  user-select: none;
+                  white-space: nowrap;
+                  height: 22px;
+                  box-sizing: border-box;
+                  pointer-events: auto;
+                  -webkit-app-region: no-drag;
+                  transition: color 0.3s, border-color 0.3s;
+              `;
+              
+              widget.innerHTML = `
+                  <span class="version-label">汉化插件 ${CURRENT_VERSION}</span>
+                  <span id="antigravity-patch-update-btn" style="display: none; margin-left: 8px; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; cursor: pointer; transition: all 0.2s;">有新版本</span>
+              `;
+              
+              root.appendChild(widget);
+              
+              const btn = document.getElementById('antigravity-patch-update-btn');
+              if (btn) {
+                  btn.onmouseenter = () => {
+                      btn.style.transform = 'scale(1.05)';
+                      btn.style.background = '#bae6fd';
+                  };
+                  btn.onmouseleave = () => {
+                      btn.style.transform = 'scale(1)';
+                      btn.style.background = '#e0f2fe';
+                  };
+                  btn.onclick = (e) => {
+                      e.stopPropagation();
+                      handleUpdateClick(btn);
+                  };
+              }
           }
+          
+          // 动态颜色自适应：获取主面板前景色与背景色，自适应计算高对比度字色与边框色
+          const theme = getNativeThemeColors();
+          let fgColor = '';
+          
+          // 1. 尝试从常见 workbench/titlebar 容器或菜单组件中提取主色
+          const targets = [
+              document.querySelector('.titlebar'),
+              document.querySelector('.window-title'),
+              document.querySelector('.monaco-workbench'),
+              document.querySelector('.menu-item'),
+              document.body
+          ];
+          for (const el of targets) {
+              if (!el) continue;
+              const style = getComputedStyle(el);
+              const val = style.getPropertyValue('--vscode-titleBar-activeForeground').trim();
+              if (val) {
+                  fgColor = val;
+                  break;
+              }
+              const color = style.color;
+              if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+                  fgColor = color;
+                  break;
+              }
+          }
+          
+          // 2. 兜底策略：如果获取不到有效的颜色，或者颜色是纯透明/过淡，直接基于主题明暗判定进行黑白反转
+          if (!fgColor || fgColor.includes('rgba(255, 255, 255, 0.7)') || fgColor === 'transparent') {
+              fgColor = theme.isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(16, 16, 16, 0.85)';
+          }
+          
+          widget.style.color = fgColor;
+          widget.style.border = theme.isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.15)';
       }
       
       let updateUrl = null;
