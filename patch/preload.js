@@ -124,6 +124,13 @@ try {
 
 (function() {
   const dictionary = {
+    // Tooltips
+    "Your quota for this model is running low.": "该模型的配额已不多。",
+    "Select Model Ctrl+/": "选择模型 Ctrl+/",
+    "Install Antigravity IDE to run and edit your workspace scripts.": "安装 Antigravity IDE 以运行和编辑您的工作区脚本。",
+    "Record Audio Ctrl+M": "录音 Ctrl+M",
+    "Select Project Ctrl+;": "选择项目 Ctrl+;",
+
     // Top Bar & Menus
     "File": "文件",
     "Edit": "编辑",
