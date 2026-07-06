@@ -1710,8 +1710,8 @@ try {
         const title = document.createElement('div');
         title.style.fontSize = '12px';
         title.style.fontWeight = '600';
-        title.style.color = '#475569';
-        title.style.opacity = '0.75';
+        title.style.color = 'CanvasText';
+        title.style.opacity = '0.55';
         title.style.marginBottom = '6px';
         title.style.letterSpacing = '1px';
         title.style.textTransform = 'uppercase';
@@ -1724,9 +1724,9 @@ try {
           btn.style.width = '260px';
           btn.style.padding = '10px 16px';
           btn.style.borderRadius = '8px';
-          btn.style.border = '1px solid rgba(0, 0, 0, 0.08)';
-          btn.style.background = 'rgba(0, 0, 0, 0.03)';
-          btn.style.color = '#1e293b';
+          btn.style.border = '1px solid color-mix(in srgb, CanvasText 10%, transparent)';
+          btn.style.background = 'color-mix(in srgb, CanvasText 4%, transparent)';
+          btn.style.color = 'CanvasText';
           btn.style.fontSize = '12.5px';
           btn.style.fontWeight = '500';
           btn.style.cursor = 'pointer';
@@ -1739,16 +1739,16 @@ try {
           btn.textContent = `${acc.name} (${acc.email})`;
           
           btn.onmouseenter = () => {
-            btn.style.background = 'rgba(59, 130, 246, 0.08)';
-            btn.style.borderColor = 'rgba(59, 130, 246, 0.4)';
-            btn.style.color = '#2563eb';
+            btn.style.background = 'color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 10%, transparent)';
+            btn.style.borderColor = 'color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 45%, transparent)';
+            btn.style.color = 'var(--vscode-focusBorder, #3b82f6)';
             btn.style.transform = 'translateY(-1px)';
-            btn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
+            btn.style.boxShadow = '0 4px 12px color-mix(in srgb, var(--vscode-focusBorder, #3b82f6) 18%, transparent)';
           };
           btn.onmouseleave = () => {
-            btn.style.background = 'rgba(0, 0, 0, 0.03)';
-            btn.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-            btn.style.color = '#1e293b';
+            btn.style.background = 'color-mix(in srgb, CanvasText 4%, transparent)';
+            btn.style.borderColor = 'color-mix(in srgb, CanvasText 10%, transparent)';
+            btn.style.color = 'CanvasText';
             btn.style.transform = 'translateY(0)';
             btn.style.boxShadow = 'none';
           };
@@ -2088,14 +2088,16 @@ try {
       if (isGemini) {
         if (titleEl.textContent !== 'gemini') {
           titleEl.textContent = 'gemini';
-          titleEl.style.color = '#3b82f6';
+          titleEl.style.color = 'var(--vscode-focusBorder, color-mix(in srgb, #3b82f6 85%, CanvasText))';
         }
         if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
         if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
       } else {
         const isGpt = currentModel.includes('gpt');
         const titleText = isGpt ? 'gpt' : 'claude';
-        const color = isGpt ? '#f59e0b' : '#10b981';
+        const color = isGpt
+          ? 'color-mix(in srgb, #f59e0b 85%, CanvasText)'
+          : 'color-mix(in srgb, #10b981 85%, CanvasText)';
         if (titleEl.textContent !== titleText) {
           titleEl.textContent = titleText;
           titleEl.style.color = color;
