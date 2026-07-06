@@ -1106,81 +1106,123 @@ conn.close()
 
             // 3. 验证并定位解压后的 patch 文件夹或补丁文件位置 (兼容直接在根目录和子目录结构)
             const unpackedDir = path.join(tempDir, 'unpacked');
-            let patchSourceDir = null;
-            let installScriptSource = path.join(unpackedDir, 'install.ps1');
+            
+            // 4. 定位解包后的 prebuilt 成品文件
+            let prebuiltAsar = null;
+            let prebuiltUnpacked = null;
 
-            if (fs.existsSync(path.join(unpackedDir, 'patch'))) {
-                patchSourceDir = path.join(unpackedDir, 'patch');
-            } else if (fs.existsSync(path.join(unpackedDir, 'preload.js')) && fs.existsSync(path.join(unpackedDir, 'ipcHandlers.js'))) {
-                patchSourceDir = unpackedDir;
+            // 递归查找 app.asar，以防解压出来包裹了一层子文件夹
+            if (fs.existsSync(path.join(unpackedDir, 'app.asar'))) {
+                prebuiltAsar = path.join(unpackedDir, 'app.asar');
+                if (fs.existsSync(path.join(unpackedDir, 'app.asar.unpacked'))) {
+                    prebuiltUnpacked = path.join(unpackedDir, 'app.asar.unpacked');
+                }
             } else {
+                // 扫描一级子文件夹
                 const children = fs.readdirSync(unpackedDir);
                 for (const child of children) {
                     const fullChild = path.join(unpackedDir, child);
                     if (fs.statSync(fullChild).isDirectory()) {
-                        if (fs.existsSync(path.join(fullChild, 'preload.js')) && fs.existsSync(path.join(fullChild, 'ipcHandlers.js'))) {
-                            patchSourceDir = fullChild;
-                            installScriptSource = path.join(fullChild, 'install.ps1');
-                            break;
-                        } else if (fs.existsSync(path.join(fullChild, 'patch'))) {
-                            patchSourceDir = path.join(fullChild, 'patch');
-                            installScriptSource = path.join(fullChild, 'install.ps1');
+                        if (fs.existsSync(path.join(fullChild, 'app.asar'))) {
+                            prebuiltAsar = path.join(fullChild, 'app.asar');
+                            if (fs.existsSync(path.join(fullChild, 'app.asar.unpacked'))) {
+                                prebuiltUnpacked = path.join(fullChild, 'app.asar.unpacked');
+                            }
                             break;
                         }
                     }
                 }
             }
 
-            if (!patchSourceDir || !fs.existsSync(patchSourceDir)) {
-                throw new Error('Patch files not found in downloaded ZIP');
+            if (!prebuiltAsar || !fs.existsSync(prebuiltAsar)) {
+                throw new Error('Downloaded archive does not contain prebuilt app.asar');
             }
 
-            // 4. 同步覆盖本地的开发仓库源码，确保 Git 版本一致
+            // 5. 同步覆盖本地开发仓库源码（若检测到开发仓库存在）
             const userHome = os.homedir();
             const scratchDir = path.join(userHome, '.gemini', 'antigravity', 'scratch');
             fs.mkdirSync(scratchDir, { recursive: true });
             const localRepoDir = path.join(scratchDir, 'Antigravity-Chinese');
+            
             if (fs.existsSync(localRepoDir)) {
-                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${patchSourceDir}\\*' -Destination '${localRepoDir}\\patch' -Recurse -Force"`, { stdio: 'ignore' });
-                if (fs.existsSync(installScriptSource)) {
-                    fs.copyFileSync(installScriptSource, path.join(localRepoDir, 'install.ps1'));
+                // 查找解压包里的 patch/ 和安装脚本位置
+                let srcPatchDir = null;
+                let srcInstallScript = null;
+                let srcRestoreScript = null;
+                let srcAutoHeal = null;
+                let srcReadme = null;
+                
+                const searchPaths = [unpackedDir, path.dirname(prebuiltAsar)];
+                for (const sp of searchPaths) {
+                    if (fs.existsSync(path.join(sp, 'patch'))) {
+                        srcPatchDir = path.join(sp, 'patch');
+                        srcInstallScript = path.join(sp, 'install.ps1');
+                        srcRestoreScript = path.join(sp, 'restore.ps1');
+                        srcAutoHeal = path.join(sp, 'auto_heal.ps1');
+                        srcReadme = path.join(sp, 'README.md');
+                        break;
+                    }
+                }
+                
+                if (srcPatchDir && fs.existsSync(srcPatchDir)) {
+                    execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${srcPatchDir}\\*' -Destination '${localRepoDir}\\patch' -Recurse -Force"`, { stdio: 'ignore' });
+                    if (fs.existsSync(srcInstallScript)) fs.copyFileSync(srcInstallScript, path.join(localRepoDir, 'install.ps1'));
+                    if (fs.existsSync(srcRestoreScript)) fs.copyFileSync(srcRestoreScript, path.join(localRepoDir, 'restore.ps1'));
+                    if (fs.existsSync(srcAutoHeal)) fs.copyFileSync(srcAutoHeal, path.join(localRepoDir, 'auto_heal.ps1'));
+                    if (fs.existsSync(srcReadme)) fs.copyFileSync(srcReadme, path.join(localRepoDir, 'README.md'));
                 }
             }
 
-            // 5. 解包当前运行的 app.asar，注入新补丁并打包为新 app.asar.new
+            // 6. 准备待覆盖的文件到临时缓存区 (app.asar.new & app.asar.new.unpacked)
+            const localNewAsar = path.join(scratchDir, 'app.asar.new');
+            fs.copyFileSync(prebuiltAsar, localNewAsar);
+            
+            const localNewUnpacked = path.join(scratchDir, 'app.asar.new.unpacked');
+            const hasNewUnpacked = prebuiltUnpacked && fs.existsSync(prebuiltUnpacked);
+            if (hasNewUnpacked) {
+                if (fs.existsSync(localNewUnpacked)) {
+                    fs.rmSync(localNewUnpacked, { recursive: true, force: true });
+                }
+                fs.mkdirSync(localNewUnpacked, { recursive: true });
+                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${prebuiltUnpacked}\\*' -Destination '${localNewUnpacked}' -Recurse -Force"`, { stdio: 'ignore' });
+            }
+
+            // 7. 生成重启覆盖批处理脚本 (写在 scratch 目录下，以便它运行后可以安全地物理清理整个 tempDir 临时下载目录)
             const appPath = path.join(userHome, 'AppData', 'Local', 'Programs', 'antigravity');
             const asarPath = path.join(appPath, 'resources', 'app.asar');
-            const localNewAsar = path.join(scratchDir, 'app.asar.new');
-
-            const unpackDir = path.join(tempDir, 'active-unpack');
-            execSync(`npx.cmd -y @electron/asar extract "${asarPath}" "${unpackDir}"`, { stdio: 'ignore' });
-
-            execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${patchSourceDir}\\*' -Destination '${unpackDir}\\dist' -Recurse -Force"`, { stdio: 'ignore' });
-
-            execSync(`npx.cmd -y @electron/asar pack "${unpackDir}" "${localNewAsar}" --unpack-dir "**/chrome-devtools-mcp"`, { stdio: 'ignore' });
-
-            // 6. 生成重启覆盖辅助脚本 (写在 scratch 目录下，以便它运行后可以安全地物理清理整个 tempDir 临时下载目录)
             const restartBatPath = path.join(scratchDir, 'restart.bat');
             
-            const batContent = `@echo off
+            let batContent = `@echo off
 timeout /t 1 /nobreak >nul
 :: 1. 覆盖 app.asar 主程序包
 copy /y "${localNewAsar}" "${asarPath}"
 :: 2. 覆盖 app.asar.unpacked 解包依赖文件夹
-if exist "${localNewAsar}.unpacked" (
-    xcopy /y /e /i /q "${localNewAsar}.unpacked" "${appPath}\\resources\\app.asar.unpacked"
+`;
+            if (hasNewUnpacked) {
+                batContent += `if exist "${localNewUnpacked}" (
+    xcopy /y /e /i /q "${localNewUnpacked}" "${appPath}\\resources\\app.asar.unpacked"
 )
-:: 3. 缓存一份最新版到 scratch，供自愈服务自启动自愈机制使用
+`;
+            }
+            batContent += `:: 3. 缓存一份最新版到 scratch，供自愈服务自启动自愈机制使用
 copy /y "${localNewAsar}" "${path.join(scratchDir, 'app.asar')}"
-if exist "${localNewAsar}.unpacked" (
-    xcopy /y /e /i /q "${localNewAsar}.unpacked" "${path.join(scratchDir, 'app.asar.unpacked')}"
+`;
+            if (hasNewUnpacked) {
+                batContent += `if exist "${localNewUnpacked}" (
+    xcopy /y /e /i /q "${localNewUnpacked}" "${path.join(scratchDir, 'app.asar.unpacked')}"
 )
-:: 4. 清理本地缓存打包生成临时垃圾
+`;
+            }
+            batContent += `:: 4. 清理本地缓存打包生成临时垃圾
 del /f /q "${localNewAsar}"
-if exist "${localNewAsar}.unpacked" (
-    rmdir /s /q "${localNewAsar}.unpacked"
+`;
+            if (hasNewUnpacked) {
+                batContent += `if exist "${localNewUnpacked}" (
+    rmdir /s /q "${localNewUnpacked}"
 )
-:: 5. 彻底删除临时下载解压工作空间
+`;
+            }
+            batContent += `:: 5. 彻底删除临时下载解压工作空间
 rmdir /s /q "${tempDir}"
 :: 6. 重启拉起应用
 start "" "${path.join(appPath, 'Antigravity.exe')}"

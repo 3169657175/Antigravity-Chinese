@@ -1,4 +1,4 @@
-# Antigravity 2.0 Patch Auto-Healer
+﻿# Antigravity 2.0 Patch Auto-Healer
 # Restores the patched app.asar automatically if official updates overwrite it.
 
 $appPath = "$env:LOCALAPPDATA\Programs\antigravity"
@@ -29,6 +29,16 @@ try {
         
         # Overwrite with our cached patched version
         Copy-Item -Path $cachedPatchedAsar -Destination $asarPath -Force
+        
+        # Overwrite app.asar.unpacked if cached
+        $cachedUnpacked = "$env:USERPROFILE\.gemini\antigravity\scratch\app.asar.unpacked"
+        $destUnpacked = "$appPath\resources\app.asar.unpacked"
+        if (Test-Path $cachedUnpacked) {
+            if (Test-Path $destUnpacked) {
+                Remove-Item -Path $destUnpacked -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Copy-Item -Path $cachedUnpacked -Destination "$appPath\resources" -Recurse -Force
+        }
         
         # Restart the app so the user doesn't notice any disruption
         if ($processes) {
