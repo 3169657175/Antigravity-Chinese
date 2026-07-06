@@ -1,10 +1,10 @@
-# Antigravity 2.0 Patch Uninstaller / Restorer
+# Antigravity 2.0 Patch Uninstaller / Restorer (v2)
 # Safely restores the official original app.asar
 
-$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 Patch Restorer"
+$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 Patch Restorer v2"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "         Antigravity 2.0 Patch Restorer       " -ForegroundColor Cyan
+Write-Host "         Antigravity 2.0 Patch Restorer (v2)      " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
