@@ -140,13 +140,13 @@ try {
     "Narrow": "窄",
     "Wide": "宽",
     "Catppuccin": "Catppuccin",
-    "One Light": "One 浅色",
-    "Solarized Light": "Solarized 浅色",
-    "Dracula": "Dracula (德古拉)",
+    "One Light": "One Light",
+    "Solarized Light": "Solarized Light",
+    "Dracula": "Dracula",
     "Monokai": "Monokai",
     "One Dark Pro": "One Dark Pro",
-    "Tokyo Night": "东京之夜 (Tokyo Night)",
-    "Solarized Dark": "Solarized 深色",
+    "Tokyo Night": "Tokyo Night",
+    "Solarized Dark": "Solarized Dark",
 
     // Top Bar & Menus
     "File": "文件",
@@ -448,9 +448,9 @@ try {
     "Always Proceed": "自动继续",
 
     // Themes
-    "One Light": "One 浅色",
-    "Solarized Light": "Solarized 浅色",
-    "One Dark Pro": "One 深色 Pro",
+    "One Light": "One Light",
+    "Solarized Light": "Solarized Light",
+    "One Dark Pro": "One Dark Pro",
     
     // Models
     "Configure AI models and view your quota.": "配置 AI 模型并查看您的配额与可用点数。",
