@@ -130,6 +130,9 @@ try {
     "Install Antigravity IDE to run and edit your workspace scripts.": "安装 Antigravity IDE 以运行和编辑您的工作区脚本。",
     "Record Audio Ctrl+M": "录音 Ctrl+M",
     "Select Project Ctrl+;": "选择项目 Ctrl+;",
+    "Select Model": "选择模型",
+    "Record Audio": "录音",
+    "Select Project": "选择项目",
 
     // Appearance & Themes Settings
     "Conversation Width": "对话宽度",
