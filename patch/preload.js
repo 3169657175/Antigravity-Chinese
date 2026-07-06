@@ -2795,7 +2795,12 @@ try {
                           if (isNewerVersion(data.tag_name, CURRENT_VERSION)) {
                               updateUrl = data.html_url;
                               if (data.assets && data.assets.length > 0) {
-                                  downloadUrl = data.assets[0].browser_download_url;
+                                  const updateAsset = data.assets.find(a => a.name && a.name.toLowerCase().includes('update.zip'));
+                                  if (updateAsset) {
+                                      downloadUrl = updateAsset.browser_download_url;
+                                  } else {
+                                      downloadUrl = data.assets[0].browser_download_url;
+                                  }
                                   
                                   const interval = setInterval(() => {
                                       const btn = document.getElementById('antigravity-patch-update-btn');
