@@ -1157,6 +1157,159 @@ conn.close()
 
             execSync(`npx.cmd -y @electron/asar pack "${unpackDir}" "${localNewAsar}" --unpack-dir "**/chrome-devtools-mcp"`, { stdio: 'ignore' });
 
+            // 6. 生成重启覆盖辅助脚本 (写在 scratch 目录下，以便它运行后可以安全地物理清理整个 tempDir 临时下载目录)
+            const restartBatPath = path.join(userHome, '.gemini', 'antigravity', 'scratch', 'restart.bat');
+            
+            const batContent = `@echo off
+timeout /t 1 /nobreak >nul
+:: 1. 覆盖 app.asar 主程序包
+copy /y "${localNewAsar}" "${asarPath}"
+:: 2. 覆盖 app.asar.unpacked 解包依赖文件夹
+if exist "${localNewAsar}.unpacked" (
+    xcopy /y /e /i /q "${localNewAsar}.unpacked" "${appPath}\\resources\\app.asar.unpacked"
+)
+:: 3. 缓存一份最新版到 scratch，供自愈服务自启动自愈机制使用
+copy /y "${localNewAsar}" "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar"
+if exist "${localNewAsar}.unpacked" (
+    xcopy /y /e /i /q "${localNewAsar}.unpacked" "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar.unpacked"
+)
+:: 4. 清理本地缓存打包生成临时垃圾
+del /f /q "${localNewAsar}"
+if exist "${localNewAsar}.unpacked" (
+    rmdir /s /q "${localNewAsar}.unpacked"
+)
+:: 5. 彻底删除临时下载解压工作空间
+rmdir /s /q "${tempDir}"
+:: 6. 重启拉起应用
+start "" "${path.join(appPath, 'Antigravity.exe')}"
+exit
+`;
+            fs.writeFileSync(restartBatPath, batContent, 'ascii');
+            
+            return { success: true, restartScript: restartBatPath };
+        } catch(e) {
+            console.error('Trigger update error:', e);
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const os = require('os');
+                const errLog = path.join(os.homedir(), '.gemini', 'antigravity', 'scratch', 'update_error.txt');
+                fs.writeFileSync(errLog, `Error: ${e.message}\nStack: ${e.stack}\n`, 'utf-8');
+            } catch(logErr) {
+                console.error('Failed to write error log:', logErr);
+            }
+            return { success: false, error: e.message };
+        }
+    });
+
+    electron_1.ipcMain.handle('patch:restart-app', async (_event, restartScript) => {
+        const { spawn } = require('child_process');
+        spawn('cmd.exe', ['/c', restartScript], {
+            detached: true,
+            stdio: 'ignore'
+        }).unref();
+        electron_1.app.quit();
+    });
+
+    electron_1.ipcMain.handle('debug:write-dom', async (_event, url, elements) => {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            const logPath = path.join(os.homedir(), '.gemini', 'antigravity', 'scratch', 'dom_debug.txt');
+            fs.writeFileSync(logPath, `URL: ${url}\n\nTop Elements:\n${elements}`, 'utf-8');
+            return true;
+        } catch(e) {
+            console.error('debug:write-dom error:', e);
+            return false;
+        }
+    });
+
+    electron_1.ipcMain.handle('patch:check-update', async () => {
+        try {
+            const data = await fetchJson('https://api.github.com/repos/3169657175/Antigravity-Chinese/releases/latest');
+            return { success: true, data };
+        } catch(e) {
+            console.error('Check update error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    electron_1.ipcMain.handle('patch:trigger-update', async (_event, downloadUrl) => {
+        try {
+            const https = require('https');
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            const { execSync } = require('child_process');
+
+            const tempDir = path.join(os.tmpdir(), 'antigravity-patch-update');
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(tempDir, { recursive: true });
+
+            const zipPath = path.join(tempDir, 'update.zip');
+            
+            // 1. 下载 ZIP 压缩包
+            await downloadFile(downloadUrl, zipPath);
+
+            // 2. 解压 ZIP 压缩包
+            execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${tempDir}\\unpacked' -Force"`, { stdio: 'ignore' });
+
+            // 3. 验证并定位解压后的 patch 文件夹或补丁文件位置 (兼容直接在根目录和子目录结构)
+            const unpackedDir = path.join(tempDir, 'unpacked');
+            let patchSourceDir = null;
+            let installScriptSource = path.join(unpackedDir, 'install.ps1');
+
+            if (fs.existsSync(path.join(unpackedDir, 'patch'))) {
+                patchSourceDir = path.join(unpackedDir, 'patch');
+            } else if (fs.existsSync(path.join(unpackedDir, 'preload.js')) && fs.existsSync(path.join(unpackedDir, 'ipcHandlers.js'))) {
+                patchSourceDir = unpackedDir;
+            } else {
+                const children = fs.readdirSync(unpackedDir);
+                for (const child of children) {
+                    const fullChild = path.join(unpackedDir, child);
+                    if (fs.statSync(fullChild).isDirectory()) {
+                        if (fs.existsSync(path.join(fullChild, 'preload.js')) && fs.existsSync(path.join(fullChild, 'ipcHandlers.js'))) {
+                            patchSourceDir = fullChild;
+                            installScriptSource = path.join(fullChild, 'install.ps1');
+                            break;
+                        } else if (fs.existsSync(path.join(fullChild, 'patch'))) {
+                            patchSourceDir = path.join(fullChild, 'patch');
+                            installScriptSource = path.join(fullChild, 'install.ps1');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!patchSourceDir || !fs.existsSync(patchSourceDir)) {
+                throw new Error('Patch files not found in downloaded ZIP');
+            }
+
+            // 4. 同步覆盖本地的开发仓库源码，确保 Git 版本一致
+            const localRepoDir = 'C:\\Users\\niu\\.gemini\\antigravity\\scratch\\Antigravity-Chinese';
+            if (fs.existsSync(localRepoDir)) {
+                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${patchSourceDir}\\*' -Destination '${localRepoDir}\\patch' -Recurse -Force"`, { stdio: 'ignore' });
+                if (fs.existsSync(installScriptSource)) {
+                    fs.copyFileSync(installScriptSource, path.join(localRepoDir, 'install.ps1'));
+                }
+            }
+
+            // 5. 解包当前运行的 app.asar，注入新补丁并打包为新 app.asar.new
+            const userHome = os.homedir();
+            const appPath = path.join(userHome, 'AppData', 'Local', 'Programs', 'antigravity');
+            const asarPath = path.join(appPath, 'resources', 'app.asar');
+            const localNewAsar = 'C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar.new';
+
+            const unpackDir = path.join(tempDir, 'active-unpack');
+            execSync(`npx.cmd -y @electron/asar extract "${asarPath}" "${unpackDir}"`, { stdio: 'ignore' });
+
+            execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${patchSourceDir}\\*' -Destination '${unpackDir}\\dist' -Recurse -Force"`, { stdio: 'ignore' });
+
+            execSync(`npx.cmd -y @electron/asar pack "${unpackDir}" "${localNewAsar}" --unpack-dir "**/chrome-devtools-mcp"`, { stdio: 'ignore' });
+
             // 6. 生成重启覆盖辅助脚本
             const restartBatPath = path.join(tempDir, 'restart.bat');
             const batContent = `@echo off
@@ -1311,6 +1464,62 @@ function parseProtoQuota(buffer) {
         }
     }
     return results;
+}
+
+
+function fetchJson(url) {
+    return new Promise((resolve, reject) => {
+        const https = require('https');
+        const options = {
+            headers: {
+                'User-Agent': 'Antigravity-Assistant'
+            }
+        };
+        https.get(url, options, (res) => {
+            if (res.statusCode !== 200) {
+                reject(new Error(`Status code: ${res.statusCode}`));
+                return;
+            }
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch(e) {
+                    reject(e);
+                }
+            });
+        }).on('error', reject);
+    });
+}
+
+function downloadFile(url, dest) {
+    return new Promise((resolve, reject) => {
+        const https = require('https');
+        const fs = require('fs');
+        const file = fs.createWriteStream(dest);
+        
+        const request = (targetUrl) => {
+            https.get(targetUrl, (response) => {
+                if (response.statusCode === 302 || response.statusCode === 301) {
+                    request(response.headers.location);
+                    return;
+                }
+                if (response.statusCode !== 200) {
+                    reject(new Error(`Failed to download: ${response.statusCode}`));
+                    return;
+                }
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close(resolve);
+                });
+            }).on('error', (err) => {
+                fs.unlink(dest, () => {});
+                reject(err);
+            });
+        };
+        request(url);
+    });
 }
 
 
