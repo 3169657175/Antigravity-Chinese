@@ -12,7 +12,7 @@ if %errorLevel% == 0 (
     exit /b
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restore.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0restore.ps1"
 if %errorLevel% neq 0 (
     echo [!] Restorer script executed with errors.
 )
