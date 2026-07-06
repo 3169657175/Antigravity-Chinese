@@ -1432,7 +1432,7 @@ try {
     return null;
   }
 
-  function getNativeThemeColors() {
+  function getNativeThemeColors(anchor = document.body) {
     const rootStyle = getComputedStyle(document.documentElement);
     const bodyStyle = getComputedStyle(document.body);
     const pick = (...names) => {
@@ -1442,25 +1442,59 @@ try {
       }
       return '';
     };
-    const parseRgb = (value) => {
-      const match = String(value || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+    const parseColor = (value) => {
+      const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+      if (!match) return null;
+      const parts = match[1].split(',').map(v => parseFloat(v.trim()));
+      if (parts.length < 3) return null;
+      if (parts.length >= 4 && parts[3] === 0) return null;
+      return { r: parts[0], g: parts[1], b: parts[2] };
     };
-    const pageBg = pick('--background', '--color-background', '--vscode-editor-background') || bodyStyle.backgroundColor || '#f3f3f3';
-    const pageFg = pick('--foreground', '--color-foreground', '--vscode-foreground') || bodyStyle.color || '#202020';
-    const rgb = parseRgb(pageBg);
-    const isDark = rgb ? ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000) < 128 : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const rgb = (c) => `rgb(${c.r}, ${c.g}, ${c.b})`;
+    const rgba = (c, a) => `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+    const mix = (a, b, t) => ({
+      r: Math.round(a.r + (b.r - a.r) * t),
+      g: Math.round(a.g + (b.g - a.g) * t),
+      b: Math.round(a.b + (b.b - a.b) * t)
+    });
+    const luminance = (c) => {
+      const vals = [c.r, c.g, c.b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return vals[0] * 0.2126 + vals[1] * 0.7152 + vals[2] * 0.0722;
+    };
+    const findBackground = (start) => {
+      let cur = start || document.body;
+      while (cur && cur !== document.documentElement) {
+        const bg = parseColor(getComputedStyle(cur).backgroundColor);
+        if (bg) return bg;
+        cur = cur.parentElement;
+      }
+      return parseColor(pick('--background', '--color-background', '--vscode-editor-background')) ||
+        parseColor(bodyStyle.backgroundColor) ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? { r: 16, g: 16, b: 16 } : { r: 245, g: 245, b: 245 });
+    };
+    const pageBgColor = findBackground(anchor);
+    const isDark = luminance(pageBgColor) < 0.45;
+    const fg = isDark ? { r: 232, g: 236, b: 242 } : { r: 32, g: 35, b: 42 };
+    const muted = isDark ? { r: 170, g: 176, b: 186 } : { r: 88, g: 95, b: 108 };
+    const contrast = isDark ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0 };
+    const surfaceColor = mix(pageBgColor, contrast, isDark ? 0.09 : 0.035);
+    const subtleColor = mix(pageBgColor, contrast, isDark ? 0.14 : 0.055);
+    const hoverColor = mix(pageBgColor, contrast, isDark ? 0.2 : 0.085);
     const accent = pick('--accent', '--primary', '--vscode-focusBorder') || '#3b82f6';
     return {
       isDark,
       accent,
-      surface: pick('--panel-background', '--sidebar-background', '--vscode-sideBar-background') || pageBg || (isDark ? '#1f1f1f' : '#f7f7f7'),
-      foreground: pageFg || (isDark ? '#f2f2f2' : '#1f1f1f'),
-      muted: isDark ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.58)',
-      border: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
-      subtle: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-      subtleHover: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)',
-      overlay: isDark ? 'rgba(0,0,0,0.50)' : 'rgba(0,0,0,0.26)',
+      base: rgb(pageBgColor),
+      surface: rgb(surfaceColor),
+      foreground: rgb(fg),
+      muted: rgb(muted),
+      border: rgba(contrast, isDark ? 0.16 : 0.12),
+      subtle: rgb(subtleColor),
+      subtleHover: rgb(hoverColor),
+      overlay: isDark ? 'rgba(0,0,0,0.56)' : 'rgba(0,0,0,0.26)',
       shadow: isDark ? '0 18px 48px rgba(0,0,0,0.45)' : '0 18px 42px rgba(0,0,0,0.16)'
     };
   }
@@ -1691,6 +1725,7 @@ try {
       
       const container = googleBtn.parentElement;
       if (!container) return;
+      const quickTheme = getNativeThemeColors(container);
       
       const qkContainer = document.createElement('div');
       qkContainer.id = 'antigravity-quick-login-container';
@@ -1710,8 +1745,8 @@ try {
         const title = document.createElement('div');
         title.style.fontSize = '12px';
         title.style.fontWeight = '600';
-        title.style.color = '#475569';
-        title.style.opacity = '0.75';
+        title.style.color = quickTheme.muted;
+        title.style.opacity = '1';
         title.style.marginBottom = '6px';
         title.style.letterSpacing = '1px';
         title.style.textTransform = 'uppercase';
@@ -1724,9 +1759,9 @@ try {
           btn.style.width = '260px';
           btn.style.padding = '10px 16px';
           btn.style.borderRadius = '8px';
-          btn.style.border = '1px solid rgba(0, 0, 0, 0.08)';
-          btn.style.background = 'rgba(0, 0, 0, 0.03)';
-          btn.style.color = '#1e293b';
+          btn.style.border = '1px solid ' + quickTheme.border;
+          btn.style.background = quickTheme.subtle;
+          btn.style.color = quickTheme.foreground;
           btn.style.fontSize = '12.5px';
           btn.style.fontWeight = '500';
           btn.style.cursor = 'pointer';
@@ -1739,16 +1774,16 @@ try {
           btn.textContent = `${acc.name} (${acc.email})`;
           
           btn.onmouseenter = () => {
-            btn.style.background = 'rgba(59, 130, 246, 0.08)';
+            btn.style.background = quickTheme.isDark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(59, 130, 246, 0.08)';
             btn.style.borderColor = 'rgba(59, 130, 246, 0.4)';
-            btn.style.color = '#2563eb';
+            btn.style.color = quickTheme.accent;
             btn.style.transform = 'translateY(-1px)';
-            btn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
+            btn.style.boxShadow = quickTheme.isDark ? '0 4px 14px rgba(0, 0, 0, 0.28)' : '0 4px 12px rgba(59, 130, 246, 0.15)';
           };
           btn.onmouseleave = () => {
-            btn.style.background = 'rgba(0, 0, 0, 0.03)';
-            btn.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-            btn.style.color = '#1e293b';
+            btn.style.background = quickTheme.subtle;
+            btn.style.borderColor = quickTheme.border;
+            btn.style.color = quickTheme.foreground;
             btn.style.transform = 'translateY(0)';
             btn.style.boxShadow = 'none';
           };
@@ -1818,6 +1853,73 @@ try {
       }
       
       if (!settingsBtn) return;
+
+      function readQuotaTheme(anchor) {
+        function parseColor(value) {
+          if (!value || value === 'transparent') return null;
+          const m = value.match(/rgba?\(([^)]+)\)/i);
+          if (!m) return null;
+          const parts = m[1].split(',').map(v => parseFloat(v.trim()));
+          if (parts.length < 3) return null;
+          if (parts.length >= 4 && parts[3] === 0) return null;
+          return { r: parts[0], g: parts[1], b: parts[2] };
+        }
+
+        function findSurfaceColor(start) {
+          let cur = start;
+          while (cur && cur !== document.documentElement) {
+            const bg = parseColor(window.getComputedStyle(cur).backgroundColor);
+            if (bg) return bg;
+            cur = cur.parentElement;
+          }
+          return parseColor(window.getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255 };
+        }
+
+        function mix(a, b, t) {
+          return {
+            r: Math.round(a.r + (b.r - a.r) * t),
+            g: Math.round(a.g + (b.g - a.g) * t),
+            b: Math.round(a.b + (b.b - a.b) * t)
+          };
+        }
+
+        function rgb(c) {
+          return `rgb(${c.r}, ${c.g}, ${c.b})`;
+        }
+
+        function rgba(c, a) {
+          return `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+        }
+
+        function luminance(c) {
+          const vals = [c.r, c.g, c.b].map(v => {
+            v /= 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+          });
+          return vals[0] * 0.2126 + vals[1] * 0.7152 + vals[2] * 0.0722;
+        }
+
+        const surface = findSurfaceColor(anchor);
+        const isDark = luminance(surface) < 0.45;
+        const fg = isDark ? { r: 222, g: 226, b: 232 } : { r: 39, g: 43, b: 51 };
+        const subtle = isDark ? { r: 170, g: 176, b: 186 } : { r: 92, g: 99, b: 112 };
+        const contrast = isDark ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0 };
+        const card = mix(surface, contrast, isDark ? 0.08 : 0.035);
+        const trigger = mix(surface, contrast, isDark ? 0.14 : 0.055);
+        const hover = mix(surface, contrast, isDark ? 0.2 : 0.08);
+        const border = rgba(contrast, isDark ? 0.16 : 0.12);
+        return {
+          fg: rgb(fg),
+          muted: rgb(subtle),
+          surface: rgb(surface),
+          card: rgb(card),
+          trigger: rgb(trigger),
+          hover: rgb(hover),
+          border,
+          menuBg: rgb(card),
+          menuFg: rgb(fg)
+        };
+      }
       
       let widget = document.getElementById('antigravity-quota-widget');
       let root = widget ? widget.shadowRoot : null;
@@ -1837,11 +1939,17 @@ try {
         const style = document.createElement('style');
         style.textContent = `
           :host {
-            color-scheme: light dark;
-            --ag-accent: var(--accent, var(--primary, #3b82f6));
-            --ag-border: color-mix(in srgb, CanvasText 14%, transparent);
-            --ag-subtle: color-mix(in srgb, CanvasText 5%, transparent);
-            --ag-hover: color-mix(in srgb, CanvasText 8%, transparent);
+            color-scheme: normal;
+            --ag-fg: #272b33;
+            --ag-muted-fg: #5c6370;
+            --ag-card-bg-base: #ffffff;
+            --ag-card-bg: #f6f7f8;
+            --ag-trigger-bg: #f0f1f3;
+            --ag-menu-bg: #ffffff;
+            --ag-menu-fg: #272b33;
+            --ag-accent: var(--vscode-textLink-foreground, var(--accent, var(--primary, #3b82f6)));
+            --ag-border: rgba(0, 0, 0, 0.12);
+            --ag-hover: #eceef1;
             --ag-active: color-mix(in srgb, var(--ag-accent) 14%, transparent);
             --ag-danger: #d84848;
           }
@@ -1852,9 +1960,9 @@ try {
             font-size: 11px !important;
             font-family: var(--font-family, sans-serif) !important;
             border: 1px solid var(--ag-border) !important;
-            background: var(--ag-subtle) !important;
-            color: CanvasText !important;
-            opacity: 0.82 !important;
+            background: var(--ag-card-bg) !important;
+            color: var(--ag-fg) !important;
+            opacity: 0.96 !important;
             display: flex !important;
             flex-direction: column !important;
             gap: 4px !important;
@@ -1872,17 +1980,19 @@ try {
             font-size: 12px;
             margin-bottom: 4px;
             letter-spacing: 0.5px;
+            color: var(--ag-accent);
           }
           .weekly-row, .hourly-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            opacity: 0.85;
+            color: var(--ag-muted-fg);
             margin-bottom: 2px;
             overflow: hidden !important;
           }
           .quota-weekly, .quota-5h {
             font-weight: bold;
+            color: var(--ag-fg);
           }
           .accounts-container {
             margin-top: 6px;
@@ -1904,7 +2014,7 @@ try {
           }
           .switcher-title {
             text-transform: uppercase;
-            opacity: 0.6;
+            color: var(--ag-muted-fg);
             letter-spacing: 0.5px;
             user-select: none;
           }
@@ -1924,8 +2034,8 @@ try {
             padding: 4px 8px;
             border-radius: 4px;
             border: 1px solid var(--ag-border);
-            background: var(--ag-subtle);
-            color: inherit;
+            background: var(--ag-trigger-bg);
+            color: var(--ag-fg);
             font-size: 10px;
             cursor: pointer;
             display: flex;
@@ -1951,7 +2061,7 @@ try {
           }
           .arrow-icon {
             font-size: 8px;
-            opacity: 0.6;
+            color: var(--ag-muted-fg);
             margin-left: 4px;
             transition: transform 0.25s;
             pointer-events: none;
@@ -1962,8 +2072,8 @@ try {
             bottom: 26px;
             left: 0;
             right: 0;
-            background: var(--vscode-menu-background, var(--vscode-dropdown-background, Canvas)) !important;
-            color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground, CanvasText)) !important;
+            background: var(--vscode-menu-background, var(--vscode-dropdown-background, var(--ag-menu-bg))) !important;
+            color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground, var(--ag-menu-fg))) !important;
             border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border, var(--ag-border))) !important;
             border-radius: 6px;
             box-shadow: 0 -8px 24px rgba(0,0,0,0.12);
@@ -1986,7 +2096,7 @@ try {
             cursor: pointer;
             border-radius: 4px;
             transition: background 0.1s;
-            color: inherit;
+            color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground, var(--ag-menu-fg)));
           }
           .account-item:hover {
             background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, var(--ag-hover))) !important;
@@ -2055,6 +2165,17 @@ try {
         
         settingsBtn.parentNode.insertBefore(widget, settingsBtn);
       }
+
+      const quotaTheme = readQuotaTheme(settingsBtn);
+      widget.style.setProperty('--ag-fg', quotaTheme.fg);
+      widget.style.setProperty('--ag-muted-fg', quotaTheme.muted);
+      widget.style.setProperty('--ag-card-bg-base', quotaTheme.surface);
+      widget.style.setProperty('--ag-card-bg', quotaTheme.card);
+      widget.style.setProperty('--ag-trigger-bg', quotaTheme.trigger);
+      widget.style.setProperty('--ag-menu-bg', quotaTheme.menuBg);
+      widget.style.setProperty('--ag-menu-fg', quotaTheme.menuFg);
+      widget.style.setProperty('--ag-border', quotaTheme.border);
+      widget.style.setProperty('--ag-hover', quotaTheme.hover);
       
       const gWeekly = localStorage.getItem('quota_gemini_weekly') || '--';
       const g5h = localStorage.getItem('quota_gemini_5h') || '--';
@@ -2567,7 +2688,7 @@ try {
   }
 
   function setupVersionUpdater() {
-      const CURRENT_VERSION = 'v1.1.9';
+      const CURRENT_VERSION = 'v1.2.0';
 
       function injectVersionElement() {
           let widget = document.getElementById('antigravity-version-widget');
