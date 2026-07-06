@@ -1083,6 +1083,8 @@ conn.close()
     });
 
     electron_1.ipcMain.handle('patch:trigger-update', async (_event, downloadUrl) => {
+        const originalNoAsar = process.noAsar;
+        process.noAsar = true;
         try {
             const https = require('https');
             const fs = require('fs');
@@ -1230,8 +1232,10 @@ exit
 `;
             fs.writeFileSync(restartBatPath, batContent.replace(/\r?\n/g, '\r\n'), 'ascii');
             
+            process.noAsar = originalNoAsar;
             return { success: true, restartScript: restartBatPath };
         } catch(e) {
+            process.noAsar = originalNoAsar;
             console.error('Trigger update error:', e);
             try {
                 const fs = require('fs');
