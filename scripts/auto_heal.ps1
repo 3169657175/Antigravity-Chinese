@@ -1,4 +1,4 @@
-﻿# Antigravity 2.0 Patch Auto-Healer
+# Antigravity 2.0 Patch Auto-Healer
 # Restores the patched app.asar automatically if official updates overwrite it.
 
 $appPath = "$env:LOCALAPPDATA\Programs\antigravity"

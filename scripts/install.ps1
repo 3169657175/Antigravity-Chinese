@@ -22,7 +22,7 @@ if (-not (Test-Path $asarPath)) {
 
 Write-Host "[OK] Found client core file: $asarPath" -ForegroundColor Green
 
-# 3. Create backup if it doesn't exist
+# 2. Create backup if it doesn't exist
 if (-not (Test-Path $backupPath)) {
     Write-Host "[+] Creating official app.asar backup..." -ForegroundColor Green
     Copy-Item -Path $asarPath -Destination $backupPath -Force
@@ -31,15 +31,16 @@ if (-not (Test-Path $backupPath)) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$prebuiltAsar = Join-Path $scriptDir "app.asar"
+$repoRoot = Split-Path -Parent $scriptDir
+$prebuiltAsar = Join-Path $repoRoot "app.asar"
 
-# 4. Check if prebuilt package is available (Bypasses Node.js requirement)
+# 3. Check if prebuilt package is available (Bypasses Node.js requirement)
 if (Test-Path $prebuiltAsar) {
     Write-Host "[+] Found prebuilt package, deploying directly..." -ForegroundColor Cyan
     try {
         Copy-Item -Path $prebuiltAsar -Destination $asarPath -Force
         
-        $prebuiltUnpacked = Join-Path $scriptDir "app.asar.unpacked"
+        $prebuiltUnpacked = Join-Path $repoRoot "app.asar.unpacked"
         if (Test-Path $prebuiltUnpacked) {
             Write-Host "[+] Deploying app.asar.unpacked dependencies..." -ForegroundColor Cyan
             $destUnpacked = Join-Path $appPath "resources\app.asar.unpacked"
@@ -54,7 +55,7 @@ if (Test-Path $prebuiltAsar) {
         exit 1
     }
 } else {
-    # 5. Check for node/npx (Compilation fallback)
+    # 4. Check for node/npx (Compilation fallback)
     $npxCheck = Get-Command npx -ErrorAction SilentlyContinue
     if (-not $npxCheck) {
         Write-Host "[X] ERROR: Node.js (npx) is not installed on this system." -ForegroundColor Red
@@ -63,7 +64,7 @@ if (Test-Path $prebuiltAsar) {
         exit 1
     }
 
-    # 6. Extract to temporary folder
+    # 5. Extract to temporary folder
     $tempDir = "$env:TEMP\antigravity-unpack-repo"
     if (Test-Path $tempDir) {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -76,20 +77,14 @@ if (Test-Path $prebuiltAsar) {
         exit 1
     }
 
-    # 7. Apply patch files
+    # 6. Apply patch files recursively to support subdirectories (locales, core)
     Write-Host "[+] Applying Chinese patch..." -ForegroundColor Cyan
-    $patchDir = Join-Path $scriptDir "patch"
+    $patchDir = Join-Path $repoRoot "patch"
 
-    Copy-Item -Path "$patchDir\preload.js" -Destination "$tempDir\dist\preload.js" -Force
-    Copy-Item -Path "$patchDir\ideInstall\wizardPreload.js" -Destination "$tempDir\dist\ideInstall\wizardPreload.js" -Force
-    Copy-Item -Path "$patchDir\menu.js" -Destination "$tempDir\dist\menu.js" -Force
-    Copy-Item -Path "$patchDir\tray.js" -Destination "$tempDir\dist\tray.js" -Force
-    Copy-Item -Path "$patchDir\main.js" -Destination "$tempDir\dist\main.js" -Force
-    Copy-Item -Path "$patchDir\utils.js" -Destination "$tempDir\dist\utils.js" -Force
-    Copy-Item -Path "$patchDir\languageServer.js" -Destination "$tempDir\dist\languageServer.js" -Force
-    Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandlers.js" -Force
+    # Copy all patch contents recursively to dist/ folder inside unpacked asar
+    Copy-Item -Path "$patchDir\*" -Destination "$tempDir\dist\" -Recurse -Force
 
-    # 8. Repack asar
+    # 7. Repack asar
     Write-Host "[+] Repacking app.asar..." -ForegroundColor Cyan
     & npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
     if ($LASTEXITCODE -ne 0) {
@@ -102,7 +97,7 @@ if (Test-Path $prebuiltAsar) {
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# 9. Register Auto-Healer in Startup Folder
+# 8. Register Auto-Healer in Startup Folder
 Write-Host "[+] Registering patch auto-healer..." -ForegroundColor Cyan
 $scratchDir = Join-Path $env:USERPROFILE ".gemini\antigravity\scratch"
 if (-not (Test-Path $scratchDir)) {
@@ -119,9 +114,10 @@ if (Test-Path "$appPath\resources\app.asar.unpacked") {
 }
 
 $startupFile = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\AntigravityPatchAutoHealer.vbs"
+$healScriptPath = Join-Path $scriptDir "auto_heal.ps1"
 $vbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File """ & Chr(34) & "$scriptDir\auto_heal.ps1" & Chr(34) & """", 0, False
+WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File """ & Chr(34) & "$healScriptPath" & Chr(34) & """", 0, False
 "@
 [System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::ASCII)
 
