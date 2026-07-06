@@ -2567,7 +2567,7 @@ try {
   }
 
   function setupVersionUpdater() {
-      const CURRENT_VERSION = 'v1.1.8';
+      const CURRENT_VERSION = 'v1.1.9';
 
       function injectVersionElement() {
           let widget = document.getElementById('antigravity-version-widget');
