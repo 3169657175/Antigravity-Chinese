@@ -2810,7 +2810,7 @@ try {
   }
 
   function setupVersionUpdater() {
-      const CURRENT_VERSION = 'v1.2.1';
+      const CURRENT_VERSION = 'v1.2.2';
 
       function injectVersionElement() {
           let widget = document.getElementById('antigravity-version-widget');
