@@ -131,6 +131,20 @@ try {
     "Record Audio Ctrl+M": "录音 Ctrl+M",
     "Select Project Ctrl+;": "选择项目 Ctrl+;",
 
+    // Appearance & Themes Settings
+    "Conversation Width": "对话宽度",
+    "Configure the maximum width of the conversation panel.": "配置对话面板的最大宽度。",
+    "Narrow": "窄",
+    "Wide": "宽",
+    "Catppuccin": "Catppuccin",
+    "One Light": "One 浅色",
+    "Solarized Light": "Solarized 浅色",
+    "Dracula": "Dracula (德古拉)",
+    "Monokai": "Monokai",
+    "One Dark Pro": "One Dark Pro",
+    "Tokyo Night": "东京之夜 (Tokyo Night)",
+    "Solarized Dark": "Solarized 深色",
+
     // Top Bar & Menus
     "File": "文件",
     "Edit": "编辑",
