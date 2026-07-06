@@ -1,10 +1,10 @@
 # Antigravity 2.0 Chinese Localization & UX Optimization Patch Installer
 # Cross-version safe local asar patching mechanism
 
-$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 汉化优化"
+$Host.UI.RawUI.WindowTitle = "Antigravity 2.0 Chinese Patch Installer"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "      Antigravity 2.0 汉化与免 TUN 优化    " -ForegroundColor Cyan
+Write-Host "      Antigravity 2.0 Chinese Patch Installer    " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -14,28 +14,20 @@ $asarPath = "$appPath\resources\app.asar"
 $backupPath = "$appPath\resources\app.asar.backup"
 
 if (-not (Test-Path $asarPath)) {
-    Write-Host "[X] 错误: 未在默认路径找到 Antigravity 客户端:" -ForegroundColor Red
+    Write-Host "[X] ERROR: Antigravity client not found at default path:" -ForegroundColor Red
     Write-Host "    $asarPath" -ForegroundColor Red
-    Write-Host "    请确认已安装 Antigravity 客户端。" -ForegroundColor Yellow
+    Write-Host "    Please ensure Antigravity client is installed." -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "[OK] 找到客户端核心文件: $asarPath" -ForegroundColor Green
-
-# 2. Check for running processes (Bypassed to prevent killing active AI session)
-# $processes = Get-Process -Name "antigravity" -ErrorAction SilentlyContinue
-# if ($processes) {
-#     Write-Host "[i] 检测到 Antigravity 运行中，正在关闭进程..." -ForegroundColor Yellow
-#     Stop-Process -Name "antigravity" -Force -ErrorAction SilentlyContinue
-#     Start-Sleep -Seconds 2
-# }
+Write-Host "[OK] Found client core file: $asarPath" -ForegroundColor Green
 
 # 3. Create backup if it doesn't exist
 if (-not (Test-Path $backupPath)) {
-    Write-Host "[+] 首次安装，备份官方原版 app.asar 为 app.asar.backup..." -ForegroundColor Green
+    Write-Host "[+] Creating official app.asar backup..." -ForegroundColor Green
     Copy-Item -Path $asarPath -Destination $backupPath -Force
 } else {
-    Write-Host "[*] 备份已存在，直接进行覆盖安装" -ForegroundColor Yellow
+    Write-Host "[*] Backup already exists, proceeding with installation" -ForegroundColor Yellow
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -43,31 +35,31 @@ $prebuiltAsar = Join-Path $scriptDir "app.asar"
 
 # 4. Check if prebuilt package is available (Bypasses Node.js requirement)
 if (Test-Path $prebuiltAsar) {
-    Write-Host "[+] 发现预编译成品包，正在直接覆盖部署..." -ForegroundColor Cyan
+    Write-Host "[+] Found prebuilt package, deploying directly..." -ForegroundColor Cyan
     try {
         Copy-Item -Path $prebuiltAsar -Destination $asarPath -Force
         
         $prebuiltUnpacked = Join-Path $scriptDir "app.asar.unpacked"
         if (Test-Path $prebuiltUnpacked) {
-            Write-Host "[+] 正在部署配套依赖项 app.asar.unpacked..." -ForegroundColor Cyan
+            Write-Host "[+] Deploying app.asar.unpacked dependencies..." -ForegroundColor Cyan
             $destUnpacked = Join-Path $appPath "resources\app.asar.unpacked"
             if (Test-Path $destUnpacked) {
                 Remove-Item -Path $destUnpacked -Recurse -Force -ErrorAction SilentlyContinue
             }
             Copy-Item -Path $prebuiltUnpacked -Destination "$appPath\resources" -Recurse -Force
         }
-        Write-Host "[OK] 预编译成品包部署完成！" -ForegroundColor Green
+        Write-Host "[OK] Prebuilt package deployed successfully!" -ForegroundColor Green
     } catch {
-        Write-Host "[X] 部署预编译包失败，原因为: $_" -ForegroundColor Red
+        Write-Host "[X] Failed to deploy prebuilt package: $_" -ForegroundColor Red
         exit 1
     }
 } else {
     # 5. Check for node/npx (Compilation fallback)
     $npxCheck = Get-Command npx -ErrorAction SilentlyContinue
     if (-not $npxCheck) {
-        Write-Host "[X] 错误: 系统未检测到 Node.js 环境 (npx)。" -ForegroundColor Red
-        Write-Host "    本地动态编译需要 Node.js 支持。" -ForegroundColor Yellow
-        Write-Host "    请前往 https://nodejs.org 安装 Node.js 稳定版后重试。" -ForegroundColor Yellow
+        Write-Host "[X] ERROR: Node.js (npx) is not installed on this system." -ForegroundColor Red
+        Write-Host "    Local compilation requires Node.js." -ForegroundColor Yellow
+        Write-Host "    Please install Node.js from https://nodejs.org and try again." -ForegroundColor Yellow
         exit 1
     }
 
@@ -77,18 +69,17 @@ if (Test-Path $prebuiltAsar) {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    Write-Host "[+] 正在解包 app.asar..." -ForegroundColor Cyan
+    Write-Host "[+] Extracting app.asar..." -ForegroundColor Cyan
     & npx.cmd -y @electron/asar extract $asarPath $tempDir
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[X] 解包失败，可能是文件写保护或权限不足。" -ForegroundColor Red
+        Write-Host "[X] Extraction failed. Check permissions." -ForegroundColor Red
         exit 1
     }
 
     # 7. Apply patch files
-    Write-Host "[+] 正在注入汉化补丁..." -ForegroundColor Cyan
+    Write-Host "[+] Applying Chinese patch..." -ForegroundColor Cyan
     $patchDir = Join-Path $scriptDir "patch"
 
-    # Copy modified files
     Copy-Item -Path "$patchDir\preload.js" -Destination "$tempDir\dist\preload.js" -Force
     Copy-Item -Path "$patchDir\ideInstall\wizardPreload.js" -Destination "$tempDir\dist\ideInstall\wizardPreload.js" -Force
     Copy-Item -Path "$patchDir\menu.js" -Destination "$tempDir\dist\menu.js" -Force
@@ -99,10 +90,10 @@ if (Test-Path $prebuiltAsar) {
     Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandlers.js" -Force
 
     # 8. Repack asar
-    Write-Host "[+] 正在重新打包 app.asar..." -ForegroundColor Cyan
+    Write-Host "[+] Repacking app.asar..." -ForegroundColor Cyan
     & npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[X] 打包失败，正在恢复原始备份..." -ForegroundColor Red
+        Write-Host "[X] Repack failed. Restoring original backup..." -ForegroundColor Red
         Copy-Item -Path $backupPath -Destination $asarPath -Force
         exit 1
     }
@@ -112,7 +103,7 @@ if (Test-Path $prebuiltAsar) {
 }
 
 # 9. Register Auto-Healer in Startup Folder
-Write-Host "[+] 正在配置开机自愈服务..." -ForegroundColor Cyan
+Write-Host "[+] Registering patch auto-healer..." -ForegroundColor Cyan
 $scratchDir = Join-Path $env:USERPROFILE ".gemini\antigravity\scratch"
 if (-not (Test-Path $scratchDir)) {
     New-Item -ItemType Directory -Path $scratchDir -Force | Out-Null
@@ -136,6 +127,6 @@ WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Byp
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "      补丁覆盖安装成功！                    " -ForegroundColor Green
+Write-Host "      Installation completed successfully!                 " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "  新增优化特性已生效，祝你使用愉快！" -ForegroundColor Green
+Write-Host "  Please restart Antigravity client to apply changes." -ForegroundColor Green
