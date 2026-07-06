@@ -98,6 +98,18 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 * `auto_heal.ps1`：防更新覆盖的开机自愈服务脚本
 * `README.md`：本说明文档
 
+---
+
+## 🙏 致谢
+
+本项目在开发过程中参考了以下优秀的开源项目，在此向两位作者表示诚挚的感谢：
+
+* **[BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)**
+  感谢 BigPizzaV3 的开源贡献。本项目右上角版本指示器与更新气泡的 `position: fixed` 悬浮挂载方案，参考了 CodexPlusPlus 的实现思路，使其能够绕开复杂的动态 React DOM 树，以非侵入式的方式稳定挂载在客户端窗口中。
+
+* **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)**
+  感谢 lbjlaq 的先驱工作。本项目在多账号管理、额度看板等功能的设计上受到了 Antigravity-Manager 的启发，并在此基础上进行了深度整合与扩展优化。
+
 
 
 
