@@ -2553,6 +2553,7 @@ try {
       setInterval(injectQuickLogin, 1000);
       setInterval(runGrpcSniff, 30000);
       window.addEventListener('focus', runGrpcSniff);
+      setupVersionUpdater();
     });
   } else {
     startObserver();
@@ -2562,5 +2563,168 @@ try {
     setInterval(injectQuickLogin, 1000);
     setInterval(runGrpcSniff, 30000);
     window.addEventListener('focus', runGrpcSniff);
+    setupVersionUpdater();
   }
+
+  function setupVersionUpdater() {
+      const CURRENT_VERSION = 'v1.1.6';
+
+      function injectVersionElement() {
+          if (document.getElementById('antigravity-version-widget')) return;
+          
+          const root = document.documentElement || document.body;
+          if (!root) return;
+          
+          const widget = document.createElement('div');
+          widget.id = 'antigravity-version-widget';
+          
+          // 悬浮在右上角 window controls 按钮左侧 (右侧偏移量调整为 180px 彻底避免遮挡最小化按钮)
+          widget.style.cssText = `
+              position: fixed;
+              top: 8px;
+              right: 180px;
+              z-index: 999999;
+              display: flex;
+              align-items: center;
+              font-size: 11px;
+              font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+              color: var(--vscode-titleBar-activeForeground, rgba(255, 255, 255, 0.7));
+              background: transparent;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+              cursor: default;
+              user-select: none;
+              white-space: nowrap;
+              height: 22px;
+              box-sizing: border-box;
+              pointer-events: auto;
+              -webkit-app-region: no-drag;
+          `;
+          
+          widget.innerHTML = `
+              <span class="version-label">汉化插件 ${CURRENT_VERSION}</span>
+              <span id="antigravity-patch-update-btn" style="display: none; margin-left: 8px; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; cursor: pointer; transition: all 0.2s;">有新版本</span>
+          `;
+          
+          root.appendChild(widget);
+          
+          const btn = document.getElementById('antigravity-patch-update-btn');
+          if (btn) {
+              btn.onmouseenter = () => {
+                  btn.style.transform = 'scale(1.05)';
+                  btn.style.background = '#bae6fd';
+              };
+              btn.onmouseleave = () => {
+                  btn.style.transform = 'scale(1)';
+                  btn.style.background = '#e0f2fe';
+              };
+              btn.onclick = (e) => {
+                  e.stopPropagation();
+                  handleUpdateClick(btn);
+              };
+          }
+      }
+      
+      let updateUrl = null;
+      let downloadUrl = null;
+      
+      setTimeout(() => {
+          // 调用 IPC 到主进程进行无阻碍 GitHub 升级检测 (绕开渲染进程 CSP 限制)
+          electron_1.ipcRenderer.invoke('patch:check-update')
+              .then(res => {
+                  if (res && res.success && res.data) {
+                      const data = res.data;
+                      if (data.tag_name) {
+                          if (isNewerVersion(data.tag_name, CURRENT_VERSION)) {
+                              updateUrl = data.html_url;
+                              if (data.assets && data.assets.length > 0) {
+                                  downloadUrl = data.assets[0].browser_download_url;
+                                  
+                                  const interval = setInterval(() => {
+                                      const btn = document.getElementById('antigravity-patch-update-btn');
+                                      if (btn) {
+                                          btn.style.display = 'inline-block';
+                                          clearInterval(interval);
+                                      }
+                                  }, 1000);
+                              }
+                          }
+                      }
+                  }
+              })
+              .catch(err => console.error('[preload-update] check failed:', err));
+      }, 5000);
+      
+      function isNewerVersion(latest, current) {
+          const lParts = latest.replace(/^v/, '').split('.').map(Number);
+          const cParts = current.replace(/^v/, '').split('.').map(Number);
+          for (let i = 0; i < Math.max(lParts.length, cParts.length); i++) {
+              const lVal = lParts[i] || 0;
+              const cVal = cParts[i] || 0;
+              if (lVal > cVal) return true;
+              if (lVal < cVal) return false;
+          }
+          return false;
+      }
+      
+      function handleUpdateClick(btn) {
+          if (!downloadUrl) return;
+          btn.style.pointerEvents = 'none';
+          btn.textContent = '正在下载...';
+          btn.style.background = '#fef3c7';
+          btn.style.color = '#d97706';
+          btn.style.borderColor = '#fde68a';
+          
+          electron_1.ipcRenderer.invoke('patch:trigger-update', downloadUrl).then(res => {
+              if (res && res.success) {
+                  btn.textContent = '重启生效';
+                  btn.style.pointerEvents = 'auto';
+                  btn.style.background = '#dcfce7';
+                  btn.style.color = '#15803d';
+                  btn.style.borderColor = '#bbf7d0';
+                  
+                  btn.onmouseenter = () => {
+                      btn.style.transform = 'scale(1.05)';
+                      btn.style.background = '#bbf7d0';
+                  };
+                  btn.onmouseleave = () => {
+                      btn.style.transform = 'scale(1)';
+                      btn.style.background = '#dcfce7';
+                  };
+                  btn.onclick = (e) => {
+                      e.stopPropagation();
+                      btn.style.pointerEvents = 'none';
+                      btn.textContent = '正在重启...';
+                      electron_1.ipcRenderer.invoke('patch:restart-app', res.restartScript);
+                  };
+              } else {
+                  btn.textContent = '更新失败';
+                  btn.style.background = '#fee2e2';
+                  btn.style.color = '#b91c1c';
+                  btn.style.borderColor = '#fca5a5';
+                  setTimeout(() => {
+                      btn.textContent = '有新版本';
+                      btn.style.pointerEvents = 'auto';
+                      btn.style.background = '#e0f2fe';
+                      btn.style.color = '#0369a1';
+                      btn.style.borderColor = '#bae6fd';
+                  }, 5000);
+              }
+          }).catch(err => {
+              console.error('[preload-update] invoke update error:', err);
+              btn.textContent = '网络错误';
+              setTimeout(() => {
+                  btn.textContent = '有新版本';
+                  btn.style.pointerEvents = 'auto';
+                  btn.style.background = '#e0f2fe';
+                  btn.style.color = '#0369a1';
+                  btn.style.borderColor = '#bae6fd';
+              }, 5000);
+          });
+      }
+      
+      setInterval(injectVersionElement, 2000);
+  }
+
 })();
