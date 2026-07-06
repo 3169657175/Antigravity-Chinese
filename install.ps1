@@ -53,14 +53,21 @@ Write-Host "[+] Waiting for file handles to flush..." -ForegroundColor Gray
 Start-Sleep -Seconds 3
 
 # 5. Apply new patch files
-Write-Host "[+] Injecting Chinese v2 patch modules..." -ForegroundColor Cyan
+Write-Host "[+] Compiling sandbox bundle and injecting Chinese v2 patch..." -ForegroundColor Cyan
 $patchDir = Join-Path $scriptDir "patch"
 
-Write-Host "    [DEBUG] Source preload.js size: $((Get-Item "$patchDir\preload.js").Length) bytes" -ForegroundColor Gray
+# Run sandbox bundle generator
+& node.exe "$scriptDir\bundle.js"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Bundle compilation failed!"
+    exit 1
+}
+
+Write-Host "    [DEBUG] Source preload.js size: $((Get-Item "$scriptDir\dist_preload.js").Length) bytes" -ForegroundColor Gray
 
 # Use .NET native file copy for strict verification
 try {
-    [System.IO.File]::Copy("$patchDir\preload.js", "$tempDir\dist\preload.js", $true)
+    [System.IO.File]::Copy("$scriptDir\dist_preload.js", "$tempDir\dist\preload.js", $true)
     [System.IO.File]::Copy("$patchDir\menu.js", "$tempDir\dist\menu.js", $true)
     [System.IO.File]::Copy("$patchDir\tray.js", "$tempDir\dist\tray.js", $true)
     [System.IO.File]::Copy("$patchDir\main.js", "$tempDir\dist\main.js", $true)
@@ -72,23 +79,17 @@ try {
     exit 1
 }
 
-# Copy catalogs
+# Copy catalogs (exclude raw source core/modules since they are now bundled inside preload.js)
 if (Test-Path "$patchDir\ideInstall") {
     Copy-Item -Path "$patchDir\ideInstall" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
 }
 if (Test-Path "$patchDir\locales") {
     Copy-Item -Path "$patchDir\locales" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
 }
-if (Test-Path "$patchDir\core") {
-    Copy-Item -Path "$patchDir\core" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
-}
-if (Test-Path "$patchDir\modules") {
-    Copy-Item -Path "$patchDir\modules" -Destination "$tempDir\dist" -Recurse -Force -ErrorAction Stop
-}
 
 $appliedSize = (Get-Item "$tempDir\dist\preload.js").Length
 Write-Host "    [DEBUG] Applied preload.js size: $appliedSize bytes" -ForegroundColor Gray
-if ($appliedSize -gt 10000) {
+if ($appliedSize -gt 250000) {
     Write-Error "CRITICAL ERROR: preload.js replacement failed! Size: $appliedSize"
     exit 1
 }
@@ -102,6 +103,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+# Clean temp bundle file
+Remove-Item -Path "$scriptDir\dist_preload.js" -Force -ErrorAction SilentlyContinue
 
 # 7. Register Auto-Healer Cache
 Write-Host "[+] Syncing auto-healer offline cache..." -ForegroundColor Cyan

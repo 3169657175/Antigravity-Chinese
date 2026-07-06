@@ -126,4 +126,7 @@ try {
   run(electron_1);
 } catch (e) {
   console.error('Antigravity Chinese Patch Loader failed to start:', e);
+  try {
+    electron_1.ipcRenderer.invoke('mcp:write-log', '[CRITICAL_PRELOAD_ERROR] ' + (e ? e.stack : e) + '\n');
+  } catch (err) {}
 }
