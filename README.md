@@ -13,6 +13,9 @@
 * **智能代码保护**：内置精确的分流过滤引擎，自动跳过 Monaco 编辑器代码区、富文本输入框及日志控制台，**绝对不会破坏任何代码字符**，保证语法高亮与代码格式原汁原味。
 * **极速加载**：启动时优先采用本地缓存词库瞬间渲染，并在后台异步静默拉取合并最新校对，后续无需重复安装补丁。
 
+*菜单与设置项完全中文化：*
+<img width="2099" height="1349" alt="f9a8f4876cb610c8264a5e34b9a8c455" src="https://github.com/user-attachments/assets/3758b0dd-8e85-47a4-bda4-0d921fa5b89f" />
+
 ### 2. 免 TUN 模式代理穿透（✨ 独家首创）
 * **自动环境适配**：补丁会在客户端启动时自动检测 Chromium 的系统代理设置。
 * **进程级代理注入**：智能将代理地址转化为对应的环境变量参数，并以局部作用域形式注入给后台智能体服务进程（`language_server`）。
@@ -29,9 +32,21 @@
 * **闲置自动降频**：检测到闲置时自动降频至 30 秒一次的安全低频轮询，规避高频请求可能触发的谷歌云端限流（429 Too Many Requests）风险。
 * **防瞬闪处理**：首屏加载时自动展示 `--` 占位符以等待底层服务就绪，秒级内平滑切换至真实数值，去除官方的假 100% 刷新闪烁。
 
+*左下角常驻智能配额看板：*
+<img width="2099" height="1349" alt="26c840e071acd86153f818b072cd10d8" src="https://github.com/user-attachments/assets/24b8632f-1640-488e-b430-16027b4db58b" />
+
 ### 5. 多账号极速切换与自动嗅探
 * **登录态自动管理**：当在官方客户端点击“添加账号”并登录成功后，补丁会自动捕捉、纯净化并保存最新的登录凭据。
 * **无缝快捷切换**：左下角常驻多账号下拉菜单，点击即可在一秒内重置系统 Keyring 证书上下文并平滑热重启底层语言服务，实现完全独立的极速账号切换。
+
+*登录界面中文化与一键 Google 快捷登录：*
+<img width="2099" height="1349" alt="f54cb9ea05f7bc8e381248cbf6cc99c1" src="https://github.com/user-attachments/assets/670b81e0-ec00-4d00-9adc-0a5a1f255ebe" />
+
+*多账号侧边栏极速切换下拉框：*
+<img width="2099" height="1349" alt="908854b247c173276bfa27b39c5f9aeb" src="https://github.com/user-attachments/assets/b35ecaaa-3be5-42c2-97c7-770b9ef557f0" />
+
+*保存凭据清除与安全验证弹窗：*
+<img width="2099" height="1349" alt="e36c48ba36a2508121e8e8639140a3cd" src="https://github.com/user-attachments/assets/c159a5d3-e53d-41d1-bbac-2ecf7c3b2176" />
 
 ---
 
@@ -75,11 +90,6 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 * `auto_heal.ps1`：防更新覆盖的开机自愈服务脚本
 * `README.md`：本说明文档
 
-<img width="2099" height="1349" alt="f54cb9ea05f7bc8e381248cbf6cc99c1" src="https://github.com/user-attachments/assets/670b81e0-ec00-4d00-9adc-0a5a1f255ebe" />
-<img width="2099" height="1349" alt="26c840e071acd86153f818b072cd10d8" src="https://github.com/user-attachments/assets/24b8632f-1640-488e-b430-16027b4db58b" />
-<img width="2099" height="1349" alt="908854b247c173276bfa27b39c5f9aeb" src="https://github.com/user-attachments/assets/b35ecaaa-3be5-42c2-97c7-770b9ef557f0" />
-<img width="2099" height="1349" alt="e36c48ba36a2508121e8e8639140a3cd" src="https://github.com/user-attachments/assets/c159a5d3-e53d-41d1-bbac-2ecf7c3b2176" />
-<img width="2099" height="1349" alt="f9a8f4876cb610c8264a5e34b9a8c455" src="https://github.com/user-attachments/assets/3758b0dd-8e85-47a4-bda4-0d921fa5b89f" />
 
 
 
