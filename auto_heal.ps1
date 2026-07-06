@@ -3,7 +3,7 @@
 
 $appPath = "$env:LOCALAPPDATA\Programs\antigravity"
 $asarPath = "$appPath\resources\app.asar"
-$cachedPatchedAsar = "C:\Users\niu\.gemini\antigravity\scratch\app.asar"
+$cachedPatchedAsar = "$env:USERPROFILE\.gemini\antigravity\scratch\app.asar"
 
 if (-not (Test-Path $asarPath)) {
     exit 0

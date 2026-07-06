@@ -1136,7 +1136,10 @@ conn.close()
             }
 
             // 4. 同步覆盖本地的开发仓库源码，确保 Git 版本一致
-            const localRepoDir = 'C:\\Users\\niu\\.gemini\\antigravity\\scratch\\Antigravity-Chinese';
+            const userHome = os.homedir();
+            const scratchDir = path.join(userHome, '.gemini', 'antigravity', 'scratch');
+            fs.mkdirSync(scratchDir, { recursive: true });
+            const localRepoDir = path.join(scratchDir, 'Antigravity-Chinese');
             if (fs.existsSync(localRepoDir)) {
                 execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Copy-Item -Path '${patchSourceDir}\\*' -Destination '${localRepoDir}\\patch' -Recurse -Force"`, { stdio: 'ignore' });
                 if (fs.existsSync(installScriptSource)) {
@@ -1145,10 +1148,9 @@ conn.close()
             }
 
             // 5. 解包当前运行的 app.asar，注入新补丁并打包为新 app.asar.new
-            const userHome = os.homedir();
             const appPath = path.join(userHome, 'AppData', 'Local', 'Programs', 'antigravity');
             const asarPath = path.join(appPath, 'resources', 'app.asar');
-            const localNewAsar = 'C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar.new';
+            const localNewAsar = path.join(scratchDir, 'app.asar.new');
 
             const unpackDir = path.join(tempDir, 'active-unpack');
             execSync(`npx.cmd -y @electron/asar extract "${asarPath}" "${unpackDir}"`, { stdio: 'ignore' });
@@ -1158,7 +1160,7 @@ conn.close()
             execSync(`npx.cmd -y @electron/asar pack "${unpackDir}" "${localNewAsar}" --unpack-dir "**/chrome-devtools-mcp"`, { stdio: 'ignore' });
 
             // 6. 生成重启覆盖辅助脚本 (写在 scratch 目录下，以便它运行后可以安全地物理清理整个 tempDir 临时下载目录)
-            const restartBatPath = path.join(userHome, '.gemini', 'antigravity', 'scratch', 'restart.bat');
+            const restartBatPath = path.join(scratchDir, 'restart.bat');
             
             const batContent = `@echo off
 timeout /t 1 /nobreak >nul
@@ -1169,9 +1171,9 @@ if exist "${localNewAsar}.unpacked" (
     xcopy /y /e /i /q "${localNewAsar}.unpacked" "${appPath}\\resources\\app.asar.unpacked"
 )
 :: 3. 缓存一份最新版到 scratch，供自愈服务自启动自愈机制使用
-copy /y "${localNewAsar}" "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar"
+copy /y "${localNewAsar}" "${path.join(scratchDir, 'app.asar')}"
 if exist "${localNewAsar}.unpacked" (
-    xcopy /y /e /i /q "${localNewAsar}.unpacked" "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\app.asar.unpacked"
+    xcopy /y /e /i /q "${localNewAsar}.unpacked" "${path.join(scratchDir, 'app.asar.unpacked')}"
 )
 :: 4. 清理本地缓存打包生成临时垃圾
 del /f /q "${localNewAsar}"
