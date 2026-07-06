@@ -63,6 +63,13 @@ function translateString(text) {
     isDynamic = true;
   }
 
+  // --- Baseline model quota reset date warning ---
+  const matchBaselineQuota = trimmed.match(/^Your plan's baseline quota will refresh on (\d{4}\/\d{1,2}\/\d{1,2} \d{2}:\d{2}:\d{2})\. To continue using this model now, enable AI Credit overages\.?$/i);
+  if (!isDynamic && matchBaselineQuota) {
+    dynamicMatch = `您的计划基础额度将在 ${matchBaselineQuota[1]} 重置。若要立即继续使用此模型，请启用 AI 超额额度。`;
+    isDynamic = true;
+  }
+
   // --- NEW BUG FIX: Hit 5-hour limit dynamic text ---
   // 提示 1: "You have hit your 5-hour limit, so the weekly limit does not currently apply. Your 5-hour limit will refresh in X hours, Y minutes."
   const matchHit5hWeekly = trimmed.match(/^You have hit your 5-hour limit, so the weekly limit does not currently apply\. Your 5-hour limit will refresh in (\d+) hours?, (\d+) minutes?\.?$/);
