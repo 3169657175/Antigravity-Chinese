@@ -1,10 +1,10 @@
-﻿/**
+/**
  * modules/update-checker.js
  * Antigravity-Chinese v2 - 鑷姩鏇存柊妫€娴嬫ā鍧? * 渚濊禆锛歵heme-adapter.js锛坓etNativeThemeColors锛? * 鎻愪緵锛歴etupVersionUpdater
  */
 
 function setupVersionUpdater() {
-  const CURRENT_VERSION = 'v2.0.0';
+  const CURRENT_VERSION = 'v1.2.2';
 
   function injectVersionElement() {
     let widget = document.getElementById('antigravity-version-widget');
