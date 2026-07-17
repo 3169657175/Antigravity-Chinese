@@ -1340,7 +1340,8 @@ rmdir /s /q "${tempDir}"
 start "" "${path.join(appPath, 'Antigravity.exe')}"
 exit
 `;
-            fs.writeFileSync(restartBatPath, batContent.replace(/\r?\n/g, '\r\n'), 'utf-8');
+            const content = '\uFEFF' + batContent.replace(/\r?\n/g, '\r\n');
+            fs.writeFileSync(restartBatPath, content, 'utf-8');
             
             process.noAsar = originalNoAsar;
             return { success: true, restartScript: restartBatPath };
