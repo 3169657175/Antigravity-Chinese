@@ -88,6 +88,7 @@ if (Test-Path $prebuiltAsar) {
     Copy-Item -Path "$patchDir\utils.js" -Destination "$tempDir\dist\utils.js" -Force
     Copy-Item -Path "$patchDir\languageServer.js" -Destination "$tempDir\dist\languageServer.js" -Force
     Copy-Item -Path "$patchDir\ipcHandlers.js" -Destination "$tempDir\dist\ipcHandlers.js" -Force
+    Copy-Item -Path "$patchDir\accountVault.js" -Destination "$tempDir\dist\accountVault.js" -Force
 
     # 8. Repack asar
     Write-Host "[+] Repacking app.asar..." -ForegroundColor Cyan
@@ -121,7 +122,7 @@ if (Test-Path "$appPath\resources\app.asar.unpacked") {
 $startupFile = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\AntigravityPatchAutoHealer.vbs"
 $vbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File """ & Chr(34) & "$scriptDir\auto_heal.ps1" & Chr(34) & """", 0, False
+WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File " & Chr(34) & "$scriptDir\auto_heal.ps1" & Chr(34), 0, False
 "@
 [System.IO.File]::WriteAllText($startupFile, $vbsContent, [System.Text.Encoding]::ASCII)
 

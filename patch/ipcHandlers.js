@@ -38,6 +38,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerIpcHandlers = registerIpcHandlers;
 const electron_1 = require("electron");
+const accountVault_1 = require("./accountVault");
+
+function isSafeAccountId(accountId) {
+    return typeof accountId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(accountId);
+}
+
+function requireSafeAccountId(accountId) {
+    if (!isSafeAccountId(accountId)) {
+        throw new Error("Invalid account identifier");
+    }
+}
+
+function normalizeAccountEmail(value) {
+    const email = String(value || '').trim().toLowerCase();
+    const knownTldMatch = /^([\w.+-]+@[\w.-]+\.(?:com\.cn|net\.cn|org\.cn|gov\.cn|com|net|org|edu|gov|io|ai|cn|co|me|dev|app|xyz|top|tech|cloud))/i.exec(email);
+    return knownTldMatch ? knownTldMatch[1].toLowerCase() : email;
+}
 
 function getLogPath(filename) {
     try {
@@ -373,11 +390,19 @@ function registerIpcHandlers(storageManager) {
                         const windows = electron_1.BrowserWindow.getAllWindows();
                         for (const win of windows) {
                             if (win.webContents) {
+                                const quotaPayload = JSON.stringify({
+                                    gemini_weekly: quotas.gemini_weekly || '0%',
+                                    gemini_5h: quotas.gemini_5h || '0%',
+                                    claude_weekly: quotas.claude_weekly || '0%',
+                                    claude_5h: quotas.claude_5h || '0%'
+                                });
                                 win.webContents.executeJavaScript(`
-                                    localStorage.setItem("quota_gemini_weekly", "${quotas.gemini_weekly || '0%'}");
-                                    localStorage.setItem("quota_gemini_5h", "${quotas.gemini_5h || '0%'}");
-                                    localStorage.setItem("quota_claude_weekly", "${quotas.claude_weekly || '0%'}");
-                                    localStorage.setItem("quota_claude_5h", "${quotas.claude_5h || '0%'}");
+                                    ((quota) => {
+                                        localStorage.setItem("quota_gemini_weekly", quota.gemini_weekly);
+                                        localStorage.setItem("quota_gemini_5h", quota.gemini_5h);
+                                        localStorage.setItem("quota_claude_weekly", quota.claude_weekly);
+                                        localStorage.setItem("quota_claude_5h", quota.claude_5h);
+                                    })(${quotaPayload});
                                 `).catch(()=>{});
                             }
                         }
@@ -416,8 +441,26 @@ function registerIpcHandlers(storageManager) {
                     throw e;
                 }
             }
+            for (const account of data.accounts || []) {
+                if (!isSafeAccountId(account.id)) continue;
+                const detailPath = path.join(userHome, '.antigravity_tools', 'accounts', `${account.id}.json`);
+                try {
+                    let detail = await readJsonWithRetry(detailPath);
+                    const storedToken = (0, accountVault_1.readAccountToken)(detail, electron_1.safeStorage);
+                    if (storedToken.needsMigration) {
+                        detail = (0, accountVault_1.protectAccountDetail)(
+                            detail,
+                            storedToken.token,
+                            electron_1.safeStorage
+                        );
+                        await writeJsonAtomic(detailPath, detail);
+                    }
+                } catch (migrationError) {
+                    console.error('[ipcHandlers] account migration failed:', account.id, migrationError.message);
+                }
+            }
             return {
-                accounts: (data.accounts || []).map(acc => ({
+                accounts: (data.accounts || []).filter(acc => isSafeAccountId(acc.id)).map(acc => ({
                     id: acc.id,
                     email: acc.email,
                     name: acc.name
@@ -433,6 +476,7 @@ function registerIpcHandlers(storageManager) {
     // Accounts switch handler
     electron_1.ipcMain.handle('accounts:switch', async (_event, accountId) => {
         try {
+            requireSafeAccountId(accountId);
             const os = require('os');
             const path = require('path');
             const fs = require('fs/promises');
@@ -446,17 +490,21 @@ function registerIpcHandlers(storageManager) {
             if (!acc) throw new Error('Account not found in registry');
             
             const detailPath = path.join(userHome, '.antigravity_tools', 'accounts', `${accountId}.json`);
-            const detail = await readJsonWithRetry(detailPath);
-            
-            if (!detail.token) throw new Error('Token structure missing in account details');
+            let detail = await readJsonWithRetry(detailPath);
+            const storedToken = (0, accountVault_1.readAccountToken)(detail, electron_1.safeStorage);
+            const accountToken = storedToken.token;
+            if (storedToken.needsMigration) {
+                detail = (0, accountVault_1.protectAccountDetail)(detail, accountToken, electron_1.safeStorage);
+                await writeJsonAtomic(detailPath, detail);
+            }
             
             // Format to exact Windows credentials format required by native LS
             const credentialObj = {
                 token: {
-                    access_token: detail.token.access_token,
-                    token_type: detail.token.token_type || 'Bearer',
-                    refresh_token: detail.token.refresh_token,
-                    expiry: new Date(detail.token.expiry_timestamp * 1000).toISOString().replace('.000Z', '.000000Z')
+                    access_token: accountToken.access_token,
+                    token_type: accountToken.token_type || 'Bearer',
+                    refresh_token: accountToken.refresh_token,
+                    expiry: new Date(accountToken.expiry_timestamp * 1000).toISOString().replace('.000Z', '.000000Z')
                 },
                 auth_method: 'consumer'
             };
@@ -590,8 +638,13 @@ function registerIpcHandlers(storageManager) {
         } catch(e) {}
     });
 
-    // Accounts sniff handler - highly optimized local gRPC check (2ms)
-    electron_1.ipcMain.handle('accounts:sniff', async () => {
+    // Accounts sniff handler - serialize all renderer requests in the main process.
+    let accountSniffInFlight = null;
+    electron_1.ipcMain.handle('accounts:sniff', () => {
+        if (accountSniffInFlight) {
+            return accountSniffInFlight;
+        }
+        accountSniffInFlight = (async () => {
         try {
             const fs = require('fs');
             const path = require('path');
@@ -637,7 +690,7 @@ function registerIpcHandlers(storageManager) {
                     // 用正则提取首个合法邮箱（截断末尾多余字节如 jm 等 Protobuf 残留）
                     const m = /^([\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/.exec(rawCandidate);
                     if (m) {
-                        email = m[1];
+                        email = normalizeAccountEmail(m[1]);
                         break;
                     }
                 }
@@ -811,10 +864,53 @@ conn.close()
                 return currentKeyring;
             };
 
-            const existingAcc = (dataPool.accounts || []).find(a => a.email.toLowerCase() === email.toLowerCase());
+            email = normalizeAccountEmail(email);
+            let existingAcc = (dataPool.accounts || []).find(a => normalizeAccountEmail(a.email) === email);
+
+            // 防止重复生成新 UUID 文件：若主 registry 丢失，扫描物理 accounts/ 文件夹尝试恢复
+            if (!existingAcc) {
+                const accountsDir = path.join(baseDir, 'accounts');
+                if (fs.existsSync(accountsDir)) {
+                    try {
+                        const files = fs.readdirSync(accountsDir);
+                        for (const file of files) {
+                            if (!file.endsWith('.json')) continue;
+                            try {
+                                const fileContent = fs.readFileSync(path.join(accountsDir, file), 'utf-8');
+                                const detail = JSON.parse(fileContent);
+                                if (detail && detail.email && normalizeAccountEmail(detail.email) === email) {
+                                    const matchedId = path.basename(file, '.json');
+                                    if (isSafeAccountId(matchedId)) {
+                                        log(`Recovered existing offline account from file: ${file} (ID: ${matchedId})`);
+                                        existingAcc = {
+                                            id: matchedId,
+                                            email,
+                                            name: detail.name || email.split('@')[0],
+                                            disabled: false
+                                        };
+                                        dataPool.accounts.push(existingAcc);
+                                        break;
+                                    }
+                                }
+                            } catch (err) {
+                                log(`Error reading physical account file ${file} during recovery: ` + err.message);
+                            }
+                        }
+                    } catch (dirErr) {
+                        log(`Error scanning physical accounts directory: ` + dirErr.message);
+                    }
+                }
+            }
+
             log('Existing account found: ' + (existingAcc ? existingAcc.id : 'none'));
+            if (existingAcc) {
+                requireSafeAccountId(existingAcc.id);
+                existingAcc.email = email;
+                existingAcc.name = email.split('@')[0];
+            }
             
             if (existingAcc && dataPool.current_account_id === existingAcc.id) {
+                await writeJsonAtomic(accountsPath, dataPool);
                 log('Account already current, returning success');
                 return { success: true, email, accountId: existingAcc.id, alreadySaved: true };
             }
@@ -825,18 +921,21 @@ conn.close()
                 if (currentKeyring && currentKeyring.token && currentKeyring.token.access_token) {
                     const detailPath = path.join(baseDir, 'accounts', `${existingAcc.id}.json`);
                     try {
-                        const detail = await readJsonWithRetry(detailPath);
+                        let detail = await readJsonWithRetry(detailPath);
                         
                         // 用新 Token 覆盖旧 Token
                         const token = currentKeyring.token;
-                        detail.token.access_token = token.access_token;
-                        detail.token.refresh_token = token.refresh_token;
-                        detail.token.expires_in = token.expires_in || 3599;
-                        detail.token.expiry_timestamp = token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599;
+                        detail.email = email;
+                        detail.name = email.split('@')[0];
+                        const savedToken = (0, accountVault_1.readAccountToken)(detail, electron_1.safeStorage).token;
+                        savedToken.access_token = token.access_token;
+                        savedToken.refresh_token = token.refresh_token;
+                        savedToken.expires_in = token.expires_in || 3599;
+                        savedToken.expiry_timestamp = token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599;
                         if (token.project_id) {
-                            detail.token.project_id = token.project_id;
+                            savedToken.project_id = token.project_id;
                         }
-                        
+                        detail = (0, accountVault_1.protectAccountDetail)(detail, savedToken, electron_1.safeStorage);
                         await writeJsonAtomic(detailPath, detail);
                         log('Successfully updated token for existing account: ' + email);
                     } catch(e) {
@@ -880,21 +979,10 @@ conn.close()
             };
 
             const token = currentKeyring.token;
-            const newDetail = {
+            let newDetail = {
                 id: accountId,
                 email: email,
                 name: email.split('@')[0],
-                token: {
-                    access_token: token.access_token,
-                    refresh_token: token.refresh_token,
-                    expires_in: token.expires_in || 3599,
-                    expiry_timestamp: token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599,
-                    token_type: token.token_type || 'Bearer',
-                    email: email,
-                    project_id: token.project_id || ('disco-acre-' + crypto.randomBytes(3).toString('hex')),
-                    oauth_client_key: token.oauth_client_key || 'antigravity_enterprise',
-                    is_gcp_tos: false
-                },
                 device_profile: deviceProfile,
                 device_history: [
                     {
@@ -906,6 +994,18 @@ conn.close()
                     }
                 ]
             };
+            const tokenToStore = {
+                access_token: token.access_token,
+                refresh_token: token.refresh_token,
+                expires_in: token.expires_in || 3599,
+                expiry_timestamp: token.expiry_timestamp || Math.floor(Date.now() / 1000) + 3599,
+                token_type: token.token_type || 'Bearer',
+                email: email,
+                project_id: token.project_id || ('disco-acre-' + crypto.randomBytes(3).toString('hex')),
+                oauth_client_key: token.oauth_client_key || 'antigravity_enterprise',
+                is_gcp_tos: false
+            };
+            newDetail = (0, accountVault_1.protectAccountDetail)(newDetail, tokenToStore, electron_1.safeStorage);
 
             await writeJsonAtomic(detailPath, newDetail);
             await writeJsonAtomic(accountsPath, dataPool);
@@ -917,6 +1017,14 @@ conn.close()
             try { log('accounts:sniff exception: ' + e.message); } catch(_) {}
             return { success: false, error: e.message };
         }
+        })();
+        const activeSniff = accountSniffInFlight;
+        activeSniff.finally(() => {
+            if (accountSniffInFlight === activeSniff) {
+                accountSniffInFlight = null;
+            }
+        });
+        return activeSniff;
     });
 
     // Accounts clear keyring and trigger relaunch
@@ -1007,6 +1115,7 @@ conn.close()
     // Accounts delete handler
     electron_1.ipcMain.handle('accounts:delete', async (_event, accountId) => {
         try {
+            requireSafeAccountId(accountId);
             const os = require('os');
             const path = require('path');
             const fs = require('fs/promises');

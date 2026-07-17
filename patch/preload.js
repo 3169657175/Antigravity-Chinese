@@ -124,6 +124,10 @@ try {
 
 (function() {
   const dictionary = {
+    "Project Settings": "项目设置",
+    "New Conversation in Project": "在项目中新建对话",
+    "Pin Conversation": "固定对话",
+    "Archive Conversation": "归档对话",
     "Baseline model quota reached": "已达到基础模型额度限制",
     "See Plans": "查看计划",
     "Enable Overages": "启用超额使用",
@@ -165,6 +169,11 @@ try {
     "New Window": "新窗口",
     "Quit": "退出",
     "Cancel": "取消",
+    "Delete": "删除",
+    "and": "和",
+    "including": "包含",
+    "within it. This action cannot be undone.": "。此操作无法撤销。",
+    "?": " 吗？",
     "Confirm Quit": "确认退出",
     "Are you sure you want to quit?": "您确定要退出吗？",
     "There may be agents or background tasks running.": "可能还有智能体或后台任务正在运行。",
@@ -238,6 +247,14 @@ try {
     "Select a folder": "选择文件夹",
     "Open Folder": "打开文件夹",
     "Create New Project": "创建新项目",
+    "New Project": "新建项目",
+    "Quick Start": "快速开始",
+    "Create a new project. You can add folders to it now or later.": "创建一个新项目，现在或稍后都可以添加文件夹。",
+    "Instantly create a new project and folder to start building.": "立即创建一个新项目和文件夹以开始构建。",
+    "Select Folder(s)": "选择文件夹",
+    "+ Add Folder": "+ 添加文件夹",
+    "Add Folder": "添加文件夹",
+    "Skip": "跳过",
     "Antigravity": "Antigravity",
     "Antigravity 2.0": "Antigravity 2.0",
     "Google DeepMind": "谷歌 DeepMind",
@@ -546,6 +563,20 @@ try {
     "allow": "允许",
     "ask": "询问",
     "deny": "拒绝",
+    "Allow once": "仅允许一次",
+    "Always allow": "始终允许",
+    "Allow": "允许",
+    "Deny": "拒绝",
+    "Dismiss": "关闭",
+    "Run once": "仅执行一次",
+    "Always run": "始终执行",
+    "Don't run": "不执行",
+    "Allow editing": "允许编辑",
+    "Always allow editing": "始终允许编辑",
+    "Deny editing": "拒绝编辑",
+    "Allow command": "允许命令",
+    "Always allow command": "始终允许命令",
+    "Deny command": "拒绝命令",
     "THEME_MODE_LIGHT": "浅色模式",
     "THEME_MODE_DARK": "深色模式",
     "THEME_MODE_INHERIT": "跟随系统",
@@ -778,6 +809,16 @@ try {
     { search: 'Danger Zone', replace: '危险区域' },
     { search: 'Delete Project', replace: '删除项目' },
     { search: 'Permanently delete this project and all of its conversations', replace: '永久删除此项目及其所有的对话记录' },
+    { search: 'Are you sure you want to delete the project', replace: '您确定要删除项目' },
+    { search: 'This will permanently delete', replace: '这将永久删除' },
+    { search: 'within it. This action cannot be undone.', replace: '。此操作无法撤销。' },
+    { search: 'active conversations', replace: '个活跃对话' },
+    { search: 'active conversation', replace: '个活跃对话' },
+    { search: 'archived conversations', replace: '个已归档对话' },
+    { search: 'archived conversation', replace: '个已归档对话' },
+    { search: 'Permanently delete', replace: '永久删除' },
+    { search: 'including', replace: '，包含' },
+    { search: 'within it.', replace: '。' },
     { search: 'Add Context', replace: '添加上下文' },
     { search: 'Media', replace: '媒体文件 (图片/视频)' },
     { search: 'Mentions', replace: '提及项 (@ 符号)' },
@@ -1052,8 +1093,14 @@ try {
     if (/^You have used some of your weekly limit, it will fully refresh in (\d+) days?, (\d+) hours?\.?$/.test(trimmed)) {
       dynamicMatch = trimmed.replace(/You have used some of your weekly limit, it will fully refresh in (\d+) days?, (\d+) hours?\.?/, '您已消耗了部分每周限额，将在 $1 天 $2 小时后完全重置。');
       isDynamic = true;
+    } else if (/^You have used some of your weekly limit, it will fully refresh in (\d+) days?\.?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(/You have used some of your weekly limit, it will fully refresh in (\d+) days?\.?/, '您已消耗了部分每周限额，将在 $1 天后完全重置。');
+      isDynamic = true;
     } else if (/^You have used some of your weekly limit, it will fully refresh in (\d+) hours?\.?$/.test(trimmed)) {
       dynamicMatch = trimmed.replace(/You have used some of your weekly limit, it will fully refresh in (\d+) hours?\.?/, '您已消耗了部分每周限额，将在 $1 小时后完全重置。');
+      isDynamic = true;
+    } else if (/^You have used some of your weekly limit, it will fully refresh in (\d+) minutes?\.?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(/You have used some of your weekly limit, it will fully refresh in (\d+) minutes?\.?/, '您已消耗了部分每周限额，将在 $1 分钟后完全重置。');
       isDynamic = true;
     }
 
@@ -1063,6 +1110,32 @@ try {
       isDynamic = true;
     } else if (/^You have used some of your 5-hour limit, it will fully refresh in (\d+) minutes?\.?$/.test(trimmed)) {
       dynamicMatch = trimmed.replace(/You have used some of your 5-hour limit, it will fully refresh in (\d+) minutes?\.?/, '您已消耗了部分 5 小时限额，将在 $1 分钟后完全重置。');
+      isDynamic = true;
+    }
+    // "Show N breakdown" / "Show N breakdowns"
+    if (/^Show (\d+) breakdowns?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(/Show (\d+) breakdowns?/, '显示 $1 个详细分项');
+      isDynamic = true;
+    }
+
+    // "Hide N breakdown" / "Hide N breakdowns"
+    if (!isDynamic && /^Hide (\d+) breakdowns?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(/Hide (\d+) breakdowns?/, '收起 $1 个详细分项');
+      isDynamic = true;
+    }
+
+    // "X% of the customization budget is available." (dynamic percentage)
+    if (!isDynamic && /^(\d+\.?\d*)% of the customization budget is available\.?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(/^(\d+\.?\d*)% of the customization budget is available\.?$/, '$1% 的自定义额度可用。');
+      isDynamic = true;
+    }
+
+    // "Permanently delete [project] including X active conversation(s) and X archived conversation(s)."
+    if (!isDynamic && /^Permanently delete .+ including \d+ active conversations? and \d+ archived conversations?\.?$/.test(trimmed)) {
+      dynamicMatch = trimmed.replace(
+        /^Permanently delete (.+) including (\d+) active conversations? and (\d+) archived conversations?\.?$/,
+        '永久删除「$1」，包含 $2 个活跃对话和 $3 个已归档对话。'
+      );
       isDynamic = true;
     }
 
@@ -2249,6 +2322,26 @@ try {
           const interactives = document.querySelectorAll('button, [role="button"], .select, .trigger, .dropdown, a');
           for (let i = 0; i < interactives.length; i++) {
             const el = interactives[i];
+
+            // 向上查找父级，排除侧边栏和下拉浮窗的干扰
+            let isSidebar = false;
+            let isDropdownOption = false;
+            let p = el.parentElement;
+            while (p && p.tagName !== 'BODY') {
+              const cl = p.className ? String(p.className).toLowerCase() : '';
+              if (cl.includes('sidebar') || cl.includes('history') || cl.includes('project') || cl.includes('activitybar')) {
+                isSidebar = true;
+                break;
+              }
+              if (cl.includes('dropdown') || cl.includes('menu') || cl.includes('context') || cl.includes('option') || cl.includes('portal')) {
+                isDropdownOption = true;
+                break;
+              }
+              p = p.parentElement;
+            }
+
+            if (isSidebar || isDropdownOption) continue;
+
             const text = el.textContent ? el.textContent.trim() : '';
             const m = text.match(/\b(Gemini|Claude|GPT-OSS|GPT)\b/i);
             if (m) {
@@ -2750,7 +2843,7 @@ try {
   }
 
   function setupVersionUpdater() {
-      const CURRENT_VERSION = 'v1.2.2';
+      const CURRENT_VERSION = 'v1.2.4';
 
       function injectVersionElement() {
           let widget = document.getElementById('antigravity-version-widget');
@@ -2899,7 +2992,9 @@ try {
           btn.style.color = '#d97706';
           btn.style.borderColor = '#fde68a';
           
-          electron_1.ipcRenderer.invoke('patch:trigger-update', downloadUrl).then(res => {
+          // 自动替换为国内高速 CDN 镜像节点以防止直连 GitHub 慢
+          const acceleratedUrl = downloadUrl.replace('https://github.com/', 'https://ghproxy.net/https://github.com/');
+          electron_1.ipcRenderer.invoke('patch:trigger-update', acceleratedUrl).then(res => {
               if (res && res.success) {
                   btn.textContent = '重启生效';
                   btn.style.pointerEvents = 'auto';
