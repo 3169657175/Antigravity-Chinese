@@ -3610,6 +3610,21 @@ if (false) {
           html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
           html.agy-theme-active, html.agy-theme-active body { background: transparent !important; overflow: hidden !important; }
           
+          /* 全局终极封杀任何容器下的滚动条与右下角黑色拉伸小三角，恢复极致纯净边缘 */
+          html.agy-theme-active *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
+          html.agy-theme-active *::-webkit-scrollbar-corner {
+            background: transparent !important;
+            display: none !important;
+          }
+          html.agy-theme-active * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+          }
+          
           /* 核心覆盖：让全局的页面大背景变透明以透出下方的壁纸 */
           html.agy-theme-active [class*="bg-background"],
           html.agy-theme-active [class*="bg-canvas"],
