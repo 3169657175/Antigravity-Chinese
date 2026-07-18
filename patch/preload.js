@@ -3620,19 +3620,69 @@ if (false) {
           }
           
           /* 精准适配客户端左右侧边栏毛玻璃磨砂 */
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2 aside,
+          html.agy-theme-active-v2 [class*="sidebar"],
+          html.agy-theme-active [data-agy-surface="sidebar"],
           html.agy-theme-active aside,
-          html.agy-theme-active [class*="sidebar"],
-          html.agy-theme-active [class*="SideBar"],
-          html.agy-theme-active [class*="left-panel"],
-          html.agy-theme-active .sidebar {
-            background-color: rgba(10, 14, 20, 0.45) !important;
-            backdrop-filter: blur(20px) saturate(1.2) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-            transition: background 0.3s ease;
+          html.agy-theme-active [class*="sidebar"] {
+            color: var(--agy-text) !important;
+            background: linear-gradient(155deg,
+              color-mix(in srgb, var(--agy-warm) 74%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 68%, transparent) 46%,
+              color-mix(in srgb, var(--agy-sidebar) 70%, transparent) 100%) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            
+            /* 霓虹发光光晕精准定位在最左侧外界边框 */
+            border-left: 2.5px solid var(--agy-accent) !important;
+            box-shadow: -10px 0 30px color-mix(in srgb, var(--agy-shadow) 42%, transparent) !important;
+            
+            backdrop-filter: blur(24px) saturate(1.12);
+            transition: background .28s ease, backdrop-filter .28s ease, box-shadow .28s ease, border-color .28s ease;
           }
-          
-          /* 主工作区设为透明以透出背景 */
-          html.agy-theme-active main,
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="new-chat"] aside,
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [class*="sidebar"],
+          html.agy-theme-active[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="new-chat"] aside {
+            background: linear-gradient(90deg,
+              color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
+              color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
+            border-left: 2.5px solid var(--agy-accent) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
+              -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
+            backdrop-filter: blur(2px) saturate(.96);
+          }
+          html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="conversation"] aside,
+          html.agy-theme-active-v2[data-agy-view="conversation"] [class*="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="review"] aside,
+          html.agy-theme-active-v2[data-agy-view="review"] [class*="sidebar"],
+          html.agy-theme-active[data-agy-view="conversation"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="review"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="conversation"] aside,
+          html.agy-theme-active[data-agy-view="review"] aside {
+            background: linear-gradient(90deg,
+              color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
+              color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
+            border-left: 2.5px solid var(--agy-accent) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
+              -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
+            backdrop-filter: blur(2px) saturate(.96);
+          }
+          html.agy-theme-active-v2 [data-agy-surface="main"],
+          html.agy-theme-active [data-agy-surface="main"] {
+            color: var(--agy-text) !important;
+            transition: background .25s ease, box-shadow .25s ease;
+          }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="main"],
+          html.agy-theme-active[data-agy-view="new-chat"] [data-agy-surface="main"] { background: transparent !important; }
+          html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="main"],
           html.agy-theme-active [class*="main-content"],
           html.agy-theme-active [class*="chat-container"],
           html.agy-theme-active [class*="workbench-container"] {
@@ -3939,8 +3989,11 @@ if (false) {
           html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.12); }
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2 aside,
+          html.agy-theme-active-v2 [class*="sidebar"],
           html.agy-theme-active [data-agy-surface="sidebar"],
-          html.agy-theme-active aside {
+          html.agy-theme-active aside,
+          html.agy-theme-active [class*="sidebar"] {
             color: var(--agy-text) !important;
             background: linear-gradient(155deg,
               color-mix(in srgb, var(--agy-warm) 74%, transparent) 0%,
@@ -3956,6 +4009,8 @@ if (false) {
             transition: background .28s ease, backdrop-filter .28s ease, box-shadow .28s ease, border-color .28s ease;
           }
           html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="new-chat"] aside,
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [class*="sidebar"],
           html.agy-theme-active[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
           html.agy-theme-active[data-agy-view="new-chat"] aside {
             background: linear-gradient(90deg,
@@ -3969,7 +4024,11 @@ if (false) {
             backdrop-filter: blur(2px) saturate(.96);
           }
           html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="conversation"] aside,
+          html.agy-theme-active-v2[data-agy-view="conversation"] [class*="sidebar"],
           html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="review"] aside,
+          html.agy-theme-active-v2[data-agy-view="review"] [class*="sidebar"],
           html.agy-theme-active[data-agy-view="conversation"] [data-agy-surface="sidebar"],
           html.agy-theme-active[data-agy-view="review"] [data-agy-surface="sidebar"],
           html.agy-theme-active[data-agy-view="conversation"] aside,
@@ -4382,13 +4441,12 @@ if (false) {
         }
         let sidebar = sidebarCandidates.sort((a, b) => a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
         if (!sidebar) {
-            /* 极致兜底：如果按钮推演失败，直接根据 aside 或 sidebar 关键字寻找可见大容器 */
+            /* 极致兜底：如果按钮推演失败，直接根据 aside 或 sidebar 关键字寻找可见大容器，并取消死板的宽高校验 */
             sidebar = document.querySelector('aside') || 
                       Array.from(document.querySelectorAll('div')).find(el => {
-                          const rect = el.getBoundingClientRect();
                           const className = String(el.className || '').toLowerCase();
-                          return (className.includes('sidebar') || className.includes('left-panel') || className.includes('sidebarcandidates')) && 
-                                 rect.width >= 210 && rect.width <= 280 && rect.height > innerHeight * 0.72 && visible(el);
+                          const id = String(el.id || '').toLowerCase();
+                          return (className.includes('sidebar') || className.includes('left-panel') || className.includes('sidebarcandidates') || id.includes('sidebar')) && visible(el);
                       });
         }
         mark(sidebar, 'surface', 'sidebar');
@@ -4457,11 +4515,23 @@ if (false) {
             activeCandidates.forEach(el => el.setAttribute('data-agy-active', 'true'));
         }
 
-        /* 2. 动态抓取免费额度文本以及进度条指示器进行主题美化 */
-        Array.from(document.querySelectorAll('#root *')).forEach(element => {
+        /* 2. 动态抓取免费额度卡片、文本以及进度条指示器进行主题美化（支持 body 内任意位置挂载） */
+        Array.from(document.querySelectorAll('body *')).forEach(element => {
             const text = compactText(element);
             if (text.includes('每周额度') || text.includes('5H额度') || text.includes('免费额度') || text.includes('额度：')) {
                 mark(element, 'component', 'quota-item');
+                
+                // 向上寻找最近的一个符合卡片特征的容器作为额度卡片进行标记
+                const card = ancestorMatching(element, el => {
+                    const rect = el.getBoundingClientRect();
+                    const className = String(el.className || '').toLowerCase();
+                    return rect.width > 120 && rect.width < 320 && 
+                           (className.includes('border') || className.includes('rounded') || className.includes('bg-') || className.includes('card'));
+                }, 5);
+                if (card) {
+                    mark(card, 'component', 'quota-card');
+                }
+
                 const parent = element.parentElement;
                 if (parent) {
                     const progress = parent.querySelector('[role="progressbar"], [class*="progress"], [class*="Progress"]');
