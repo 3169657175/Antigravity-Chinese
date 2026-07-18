@@ -1509,25 +1509,8 @@ try {
   function recordTranslationAudit(original, translated, element, attribute = 'textContent') {
     const text = normalizeAuditText(original);
     if (!isLikelyUntranslatedUiText(text) || isAuditExcludedElement(element)) return;
-
-    // --- 查表阻断：如果在 dictionary 主字典里已经存在该词条的汉化配置，则直接判定为已汉化，不录入漏译 ---
-    const lowerText = text.toLowerCase();
-    const hasExactDict = (typeof dictionary !== 'undefined') && (
-      dictionary[text] !== undefined ||
-      dictionary[lowerText] !== undefined ||
-      Object.keys(dictionary).some(key => key.toLowerCase() === lowerText)
-    );
-    const hasSubstring = (typeof substringReplacements !== 'undefined') && substringReplacements.some(rule => {
-      return rule && rule.search && text.includes(rule.search);
-    });
-
-    if (hasExactDict || hasSubstring) {
-      translationAuditState.translated.add(lowerText);
-      return;
-    }
-
     if (normalizeAuditText(translated) !== text && /[一-鿿]/.test(translated)) {
-      translationAuditState.translated.add(lowerText);
+      translationAuditState.translated.add(text.toLowerCase());
       return;
     }
 
@@ -3625,22 +3608,7 @@ if (false) {
             --agy-theme-overlay-dark: 0.74 !important;
           }
           html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
-          html.agy-theme-active, html.agy-theme-active body { background: transparent !important; overflow: hidden !important; }
-          
-          /* 全局终极封杀任何容器下的滚动条与右下角黑色拉伸小三角，恢复极致纯净边缘 */
-          html.agy-theme-active *::-webkit-scrollbar {
-            display: none !important;
-            width: 0 !important;
-            height: 0 !important;
-          }
-          html.agy-theme-active *::-webkit-scrollbar-corner {
-            background: transparent !important;
-            display: none !important;
-          }
-          html.agy-theme-active * {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-          }
+          html.agy-theme-active, html.agy-theme-active body { background: transparent !important; }
           
           /* 核心覆盖：让全局的页面大背景变透明以透出下方的壁纸 */
           html.agy-theme-active [class*="bg-background"],
@@ -3651,36 +3619,16 @@ if (false) {
             background-color: transparent !important;
           }
           
-          /* 精准适配客户端左右侧边栏毛玻璃磨砂（混合当前激活皮肤的独有主题色以自适应透光） */
+          /* 精准适配客户端左右侧边栏毛玻璃磨砂 */
           html.agy-theme-active aside,
           html.agy-theme-active [class*="sidebar"],
           html.agy-theme-active [class*="SideBar"],
           html.agy-theme-active [class*="left-panel"],
           html.agy-theme-active .sidebar {
-            background-color: color-mix(in srgb, var(--agy-theme-accent, #76d8e8) 12%, rgba(10, 14, 20, 0.38)) !important;
-            backdrop-filter: blur(25px) saturate(1.2) !important;
+            background-color: rgba(10, 14, 20, 0.45) !important;
+            backdrop-filter: blur(20px) saturate(1.2) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
             transition: background 0.3s ease;
-          }
-          
-          /* 核心覆盖：彻底将侧边栏内各个独立的按钮、列表子块背景设为透明，释放毛玻璃透图 */
-          html.agy-theme-active aside [class*="bg-"],
-          html.agy-theme-active [class*="sidebar"] [class*="bg-"],
-          html.agy-theme-active [class*="SideBar"] [class*="bg-"],
-          html.agy-theme-active .sidebar [class*="bg-"],
-          html.agy-theme-active aside button,
-          html.agy-theme-active [class*="sidebar"] button {
-            background-color: transparent !important;
-          }
-          
-          /* 顶栏磨砂深度重塑，完美自适应渐变 */
-          html.agy-theme-active header,
-          html.agy-theme-active [class*="titlebar"],
-          html.agy-theme-active [class*="header-"],
-          html.agy-theme-active [class*="top-panel"] {
-            background-color: color-mix(in srgb, var(--agy-theme-accent, #76d8e8) 8%, rgba(10, 14, 20, 0.45)) !important;
-            backdrop-filter: blur(20px) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
           }
           
           /* 主工作区设为透明以透出背景 */
@@ -3892,34 +3840,34 @@ if (false) {
     const themeIpc = electron_1.ipcRenderer;
     const catalog = [
         {
-            id: 'doraemon', name: '哆啦A梦', accent: '#238bc1', accentSoft: '#d8f2fb',
-            app: '#edf8f8', sidebar: 'rgba(233,247,247,.91)', content: 'rgba(248,252,250,.90)',
+            id: 'doraemon', name: '哆啦A梦', accent: '#3ba5fc', accentSoft: '#d8f2fb',
+            warm: '#fff1c7', app: '#edf8f8', sidebar: 'rgba(233,247,247,.91)', content: 'rgba(248,252,250,.90)',
             dialog: 'rgba(250,253,252,.985)', input: 'rgba(255,255,255,.965)', text: '#17313a',
-            muted: '#526d73', border: 'rgba(35,139,193,.20)', shadow: 'rgba(21,81,103,.18)', position: 'center center'
+            muted: '#526d73', border: 'rgba(59,165,252,.20)', shadow: 'rgba(21,81,103,.18)', position: 'center center'
         },
         {
-            id: 'shinchan', name: '蜡笔小新', accent: '#e85e5b', accentSoft: '#fff0d0',
-            app: '#f3f9ec', sidebar: 'rgba(243,249,235,.90)', content: 'rgba(250,253,246,.90)',
+            id: 'shinchan', name: '蜡笔小新', accent: '#fbd160', accentSoft: '#fff0d0',
+            warm: '#ffe6a8', app: '#f3f9ec', sidebar: 'rgba(243,249,235,.90)', content: 'rgba(250,253,246,.90)',
             dialog: 'rgba(253,254,250,.985)', input: 'rgba(255,255,252,.965)', text: '#283b36',
-            muted: '#5f746c', border: 'rgba(80,131,91,.20)', shadow: 'rgba(38,76,56,.17)', position: 'center center'
+            muted: '#5f746c', border: 'rgba(251,209,96,.20)', shadow: 'rgba(38,76,56,.17)', position: 'center center'
         },
         {
-            id: 'line-dog', name: '线条小狗', accent: '#319b73', accentSoft: '#dff6e6',
-            app: '#eef9f4', sidebar: 'rgba(238,249,244,.91)', content: 'rgba(250,253,251,.90)',
+            id: 'line-dog', name: '线条小狗', accent: '#52c49c', accentSoft: '#dff6e6',
+            warm: '#fff3cf', app: '#eef9f4', sidebar: 'rgba(238,249,244,.91)', content: 'rgba(250,253,251,.90)',
             dialog: 'rgba(251,254,252,.988)', input: 'rgba(255,255,255,.97)', text: '#1f3932',
-            muted: '#5a746c', border: 'rgba(49,155,115,.19)', shadow: 'rgba(27,91,69,.16)', position: 'center center'
+            muted: '#5a746c', border: 'rgba(82,196,156,.19)', shadow: 'rgba(27,91,69,.16)', position: 'center center'
         },
         {
-            id: 'one-piece', name: '海贼王', accent: '#d07726', accentSoft: '#fff0cf',
-            app: '#fbf3e5', sidebar: 'rgba(250,241,223,.91)', content: 'rgba(255,251,243,.91)',
+            id: 'one-piece', name: '海贼王', accent: '#fca240', accentSoft: '#fff0cf',
+            warm: '#ffe0a0', app: '#fbf3e5', sidebar: 'rgba(250,241,223,.91)', content: 'rgba(255,251,243,.91)',
             dialog: 'rgba(255,252,247,.988)', input: 'rgba(255,253,249,.97)', text: '#3d3026',
-            muted: '#77665a', border: 'rgba(182,104,32,.22)', shadow: 'rgba(94,54,25,.18)', position: 'center center'
+            muted: '#77665a', border: 'rgba(252,162,64,.22)', shadow: 'rgba(94,54,25,.18)', position: 'center center'
         },
         {
-            id: 'fox-spirit', name: '狐妖小红娘', accent: '#b95564', accentSoft: '#fbe5e7',
-            app: '#faf2f1', sidebar: 'rgba(249,239,238,.92)', content: 'rgba(254,249,248,.91)',
+            id: 'fox-spirit', name: '狐妖小红娘', accent: '#f06c8b', accentSoft: '#fbe5e7',
+            warm: '#ffe4bd', app: '#faf2f1', sidebar: 'rgba(249,239,238,.92)', content: 'rgba(254,249,248,.91)',
             dialog: 'rgba(255,251,250,.99)', input: 'rgba(255,252,251,.97)', text: '#442d32',
-            muted: '#7b6066', border: 'rgba(185,85,100,.21)', shadow: 'rgba(92,42,50,.18)', position: 'center center'
+            muted: '#7b6066', border: 'rgba(240,108,139,.21)', shadow: 'rgba(92,42,50,.18)', position: 'center center'
         }
     ];
     let lastRevision = '';
@@ -3935,6 +3883,7 @@ if (false) {
           :root {
             --agy-accent: #319b73;
             --agy-accent-soft: #dff6e6;
+            --agy-warm: #fff3cf;
             --agy-app: #eef9f4;
             --agy-sidebar: rgba(238,249,244,.91);
             --agy-content: rgba(250,253,251,.945);
@@ -3955,7 +3904,6 @@ if (false) {
             background-size: cover;
             background-position: var(--agy-wallpaper-position);
             background-repeat: no-repeat;
-            transform: scale(1.002);
             transition: opacity .3s ease, filter .3s ease;
           }
           #agy-theme-wallpaper-v2::after {
@@ -3970,23 +3918,53 @@ if (false) {
           html.agy-theme-active-v2,
           html.agy-theme-active-v2 body,
           html.agy-theme-active-v2 [data-agy-surface="app"] { background: transparent !important; }
+          html.agy-theme-active-v2,
+          html.agy-theme-active-v2 body {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            overflow: hidden !important;
+          }
 
           html.agy-theme-active-v2[data-agy-view="new-chat"] #agy-theme-wallpaper-v2 { opacity: .96; filter: saturate(.98) brightness(1.01); }
           html.agy-theme-active-v2[data-agy-view="new-chat"] #agy-theme-wallpaper-v2::after {
             background: linear-gradient(105deg, rgba(249,252,250,.18) 0%, rgba(250,252,251,.03) 48%, rgba(250,252,251,.08) 100%);
           }
-          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2 { opacity: .32; filter: saturate(.70) brightness(1.04); }
-          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.42); }
+          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2 { opacity: .64; filter: saturate(.86) brightness(1.015); }
+          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.10); }
           html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2 { opacity: .07; filter: saturate(.45) brightness(1.08); }
           html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.82); }
-          html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2 { opacity: .15; filter: saturate(.62) brightness(1.05); }
+          html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2 { opacity: .60; filter: saturate(.83) brightness(1.02); }
+          html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.12); }
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] {
             color: var(--agy-text) !important;
-            background: var(--agy-sidebar) !important;
-            border-right: 1px solid var(--agy-border) !important;
-            box-shadow: 10px 0 30px color-mix(in srgb, var(--agy-shadow) 42%, transparent);
-            backdrop-filter: blur(20px) saturate(1.06);
+            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.22)) !important;
+            
+            /* 光晕效果精准定位在左侧最外界边框，适配每个皮肤的主题色 accent */
+            border-left: 2.5px solid var(--agy-accent) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            
+            /* 内阴影向右柔和发光，右侧无外阴影光晕 */
+            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
+            backdrop-filter: blur(25px) saturate(1.2) !important;
+            transition: background .28s ease, backdrop-filter .28s ease, box-shadow .28s ease, border-color .28s ease;
+          }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"] {
+            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.16)) !important;
+            border-left: 2.5px solid var(--agy-accent) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
+            backdrop-filter: blur(20px) saturate(1.15) !important;
+          }
+          html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="sidebar"],
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"] {
+            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.22)) !important;
+            border-left: 2.5px solid var(--agy-accent) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
+            backdrop-filter: blur(25px) saturate(1.2) !important;
           }
           html.agy-theme-active-v2 [data-agy-surface="main"] {
             color: var(--agy-text) !important;
@@ -3995,9 +3973,12 @@ if (false) {
           html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="main"] { background: transparent !important; }
           html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="main"],
           html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="main"] {
-            background: var(--agy-content) !important;
+            background: linear-gradient(105deg,
+              color-mix(in srgb, var(--agy-content) 66%, transparent) 0%,
+              color-mix(in srgb, var(--agy-content) 56%, transparent) 52%,
+              color-mix(in srgb, var(--agy-warm) 44%, transparent) 100%) !important;
             box-shadow: inset 1px 0 0 color-mix(in srgb, var(--agy-border) 65%, transparent);
-            backdrop-filter: blur(17px) saturate(.9);
+            backdrop-filter: blur(1px) saturate(.96);
           }
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-foreground"],
@@ -4014,7 +3995,7 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-card"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-secondary"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"] {
-            background-color: color-mix(in srgb, var(--agy-accent-soft) 62%, white) !important;
+            background-color: color-mix(in srgb, var(--agy-accent) 15%, rgba(255, 255, 255, 0.05)) !important;
           }
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover {
@@ -4024,10 +4005,24 @@ if (false) {
 
           html.agy-theme-active-v2 [data-agy-component="composer"] {
             color: var(--agy-text) !important;
-            background: color-mix(in srgb, var(--agy-input) 97%, var(--agy-accent-soft)) !important;
+            background: color-mix(in srgb, var(--agy-input) 82%, transparent) !important;
             border: 1px solid color-mix(in srgb, var(--agy-accent) 32%, transparent) !important;
             box-shadow: 0 14px 38px color-mix(in srgb, var(--agy-shadow) 72%, transparent), 0 2px 8px rgba(0,0,0,.04) !important;
-            backdrop-filter: blur(18px) saturate(1.04);
+            backdrop-filter: blur(22px) saturate(1.08);
+            transition: background .24s ease, border-color .24s ease, box-shadow .24s ease;
+          }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-component="composer"] {
+            background: linear-gradient(110deg,
+              color-mix(in srgb, var(--agy-input) 76%, transparent) 0%,
+              color-mix(in srgb, var(--agy-input) 72%, transparent) 58%,
+              color-mix(in srgb, var(--agy-warm) 62%, transparent) 100%) !important;
+            border-color: color-mix(in srgb, var(--agy-accent) 48%, transparent) !important;
+            box-shadow: 0 16px 44px color-mix(in srgb, var(--agy-shadow) 60%, transparent), 0 2px 12px rgba(255,255,255,.32) inset !important;
+            backdrop-filter: blur(24px) saturate(1.06);
+          }
+          html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-component="composer"],
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-component="composer"] {
+            background: color-mix(in srgb, var(--agy-input) 86%, transparent) !important;
           }
           html.agy-theme-active-v2 [data-agy-component="composer-inner"] {
             background: transparent !important;
@@ -4256,6 +4251,7 @@ if (false) {
         const values = {
             '--agy-accent': theme.accent,
             '--agy-accent-soft': theme.accentSoft,
+            '--agy-warm': theme.warm,
             '--agy-app': theme.app,
             '--agy-sidebar': theme.sidebar,
             '--agy-content': theme.content,

@@ -86,19 +86,25 @@ function syncAgyThemeAssets() {
     const paths = agyThemePaths();
     fs.mkdirSync(paths.assetsDir, { recursive: true });
     const allowed = new Set(AGY_THEME_CATALOG.map(theme => theme.file));
+    const bundledThemes = AGY_THEME_CATALOG.map(theme => ({
+        theme,
+        bundled: agyThemePath.join(__dirname, 'themes', theme.file)
+    }));
+    if (!bundledThemes.every(item => fs.existsSync(item.bundled))) {
+        console.warn('[AGY Theme] bundled theme set is incomplete; preserving the existing cache');
+        return paths;
+    }
+    for (const { theme, bundled } of bundledThemes) {
+        const destination = agyThemePath.join(paths.assetsDir, theme.file);
+        if (!fs.existsSync(destination) || agyThemeFileHash(bundled) !== agyThemeFileHash(destination)) {
+            fs.copyFileSync(bundled, destination);
+        }
+    }
     for (const entry of fs.readdirSync(paths.assetsDir, { withFileTypes: true })) {
         if (!entry.isFile()) continue;
         const extension = agyThemePath.extname(entry.name).toLowerCase();
         if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(extension) && !allowed.has(entry.name)) {
             fs.unlinkSync(agyThemePath.join(paths.assetsDir, entry.name));
-        }
-    }
-    for (const theme of AGY_THEME_CATALOG) {
-        const bundled = agyThemePath.join(__dirname, 'themes', theme.file);
-        if (!fs.existsSync(bundled)) continue;
-        const destination = agyThemePath.join(paths.assetsDir, theme.file);
-        if (!fs.existsSync(destination) || agyThemeFileHash(bundled) !== agyThemeFileHash(destination)) {
-            fs.copyFileSync(bundled, destination);
         }
     }
     return paths;
