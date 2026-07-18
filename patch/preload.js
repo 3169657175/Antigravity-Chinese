@@ -2297,6 +2297,14 @@ try {
     overlay.onclick = event => { if (event.target === overlay) close(); };
     host.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
 
+    function makeMetaHumanReadable(route) {
+      if (!route) return '当前页面';
+      // 用正则匹配 36 位的 UUID，并缩写为 [对话-后6位]
+      return route.replace(/([a-f0-9]{8})-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-([a-f0-9]{12})/gi, (match, p1, p2) => {
+        return `[对话-${p2.slice(-6)}]`;
+      });
+    }
+
     function render() {
       const query = search.value.trim().toLowerCase();
       const filtered = query ? items.filter(item =>
@@ -2309,7 +2317,7 @@ try {
       list.innerHTML = filtered.map(item => `
         <div class="row">
           <div><div class="source">${escapeTranslationAuditHtml(item.text)}</div>
-          <div class="meta">${escapeTranslationAuditHtml(item.route || '当前页面')} · ${escapeTranslationAuditHtml(item.element || 'element')}.${escapeTranslationAuditHtml(item.attribute || 'textContent')}</div></div>
+          <div class="meta">${escapeTranslationAuditHtml(makeMetaHumanReadable(item.route))} · ${escapeTranslationAuditHtml(item.element || 'element')}.${escapeTranslationAuditHtml(item.attribute || 'textContent')}</div></div>
           <span class="count">出现 ${Number(item.count) || 1} 次</span>
         </div>`).join('');
     }
@@ -2332,8 +2340,41 @@ try {
       const result = await electron_1.ipcRenderer.invoke('translations:get-missing');
       const originalItems = result && Array.isArray(result.items) ? result.items : [];
       
-      // 1. 过滤掉所有在当前版本中【已被汉化补全】的词条
-      items = originalItems.filter(item => !isTextAlreadyTranslated(item.text));
+      // 1. 过滤掉所有在当前版本中【已被汉化补全】的词条，且过滤掉文件物理路径/乱码杂质
+      items = originalItems.filter(item => {
+        if (!item || !item.text) return false;
+        if (isTextAlreadyTranslated(item.text)) return false;
+        
+        const rawText = String(item.text);
+        const lowerText = rawText.toLowerCase();
+        
+        // 排除 URL 编码的文件物理路径（如 c%3A%5CUsers...）
+        if (lowerText.includes('%5c') || lowerText.includes('%3a') || lowerText.includes('%2f')) {
+          try {
+            const decoded = decodeURIComponent(rawText);
+            if (/^[a-zA-Z]:\\/i.test(decoded) || decoded.includes('\\Users\\') || decoded.includes('/Users/')) {
+              return false;
+            }
+          } catch(e) {}
+        }
+        
+        // 排除纯文本物理路径
+        if (/^[a-zA-Z]:\\/i.test(rawText) || rawText.includes('\\Users\\') || rawText.includes('/Users/') || rawText.includes(':\\')) {
+          return false;
+        }
+        
+        // 排除长 UUID / base64 等乱码串
+        if (lowerText.length > 90 || /^[a-f0-9]{32,64}$/i.test(rawText)) {
+          return false;
+        }
+
+        // 排除非界面展示文本的文件名配置（如 body_v124.txt 等）
+        if (lowerText.endsWith('.json') || lowerText.endsWith('.txt') || lowerText.endsWith('.asar')) {
+          return false;
+        }
+        
+        return true;
+      });
 
       // 2. 物理磁盘数据自清洗：如果旧的历史账单里有词条已被我们刚刚翻译了，自动重写存盘剔除它
       if (items.length < originalItems.length) {
@@ -3309,7 +3350,7 @@ try {
   }
 
   function setupVersionUpdater() {
-      const CURRENT_VERSION = 'v1.2.4';
+      const CURRENT_VERSION = 'v1.2.5';
 
       function injectVersionElement() {
           let widget = document.getElementById('antigravity-version-widget');
