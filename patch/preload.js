@@ -3602,12 +3602,21 @@ try {
           html.agy-theme-active.agy-chat-empty #agy-theme-wallpaper::after {
             --agy-theme-overlay-dark: 0.16 !important;
           }
-          /* 存在对话内容时：壁纸显著淡化变暗，凸显主文本 */
+          /* 存在对话内容时：壁纸显著淡化变暗，防止晃眼并凸显主文本 */
           html.agy-theme-active:not(.agy-chat-empty) #agy-theme-wallpaper::after {
             --agy-theme-overlay-dark: 0.74 !important;
           }
           html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
           html.agy-theme-active, html.agy-theme-active body { background: transparent !important; }
+          
+          /* 核心覆盖：让全局的页面大背景变透明以透出下方的壁纸 */
+          html.agy-theme-active [class*="bg-background"],
+          html.agy-theme-active [class*="bg-canvas"],
+          html.agy-theme-active [class*="bg-base"],
+          html.agy-theme-active [class*="bg-slate-"],
+          html.agy-theme-active [class*="bg-zinc-"] {
+            background-color: transparent !important;
+          }
           
           /* 精准适配客户端左右侧边栏毛玻璃磨砂 */
           html.agy-theme-active aside,
@@ -3637,7 +3646,7 @@ try {
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
           }
           
-          /* 弹窗及弹出菜单深度保护防污染隔离 */
+          /* 弹窗及弹出菜单深度保护防污染隔离 (强制还原实体背景色) */
           html.agy-theme-active [role="dialog"],
           html.agy-theme-active [class*="modal"],
           html.agy-theme-active [class*="dialog"],
@@ -3646,12 +3655,24 @@ try {
           html.agy-theme-active .settings-container,
           html.agy-theme-active .settings-panel,
           html.agy-theme-active .dropdown-menu {
-            background-color: rgba(16, 20, 25, 0.96) !important;
+            background-color: rgba(16, 20, 25, 0.97) !important;
             backdrop-filter: blur(25px) !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
             opacity: 1 !important;
           }
+          
+          /* 核心防护：强制将弹层内部的子项以及设置背景保持可见，防止被上面的全局透明类名污染 */
+          html.agy-theme-active [role="dialog"] [class*="bg-background"],
+          html.agy-theme-active [class*="modal"] [class*="bg-background"],
+          html.agy-theme-active [class*="dialog"] [class*="bg-background"],
+          html.agy-theme-active [class*="popup"] [class*="bg-background"],
+          html.agy-theme-active [class*="popover"] [class*="bg-background"],
+          html.agy-theme-active [role="dialog"] [class*="bg-canvas"],
+          html.agy-theme-active [class*="modal"] [class*="bg-canvas"] {
+            background-color: rgba(16, 20, 25, 0.97) !important;
+          }
+          
           html.agy-theme-active [role="dialog"] *,
           html.agy-theme-active [class*="modal"] * {
             text-shadow: none !important;
