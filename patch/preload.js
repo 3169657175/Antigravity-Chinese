@@ -3608,7 +3608,7 @@ if (false) {
             --agy-theme-overlay-dark: 0.74 !important;
           }
           html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
-          html.agy-theme-active, html.agy-theme-active body { background: transparent !important; }
+          html.agy-theme-active, html.agy-theme-active body { background: transparent !important; overflow: hidden !important; }
           
           /* 核心覆盖：让全局的页面大背景变透明以透出下方的壁纸 */
           html.agy-theme-active [class*="bg-background"],
