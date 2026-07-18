@@ -4048,6 +4048,20 @@ if (false) {
             color: var(--agy-text) !important;
           }
 
+          /* 模型选择器解放宽度限制并彻底清除省略号，确保完整看清模型名称 */
+          html.agy-theme-active-v2 [data-agy-component="model-picker"],
+          html.agy-theme-active-v2 [data-agy-component="model-picker"] *,
+          html.agy-theme-active-v2 [class*="model-picker"],
+          html.agy-theme-active-v2 [class*="model-picker"] *,
+          html.agy-theme-active-v2 [class*="ModelPicker"] * {
+            max-width: none !important;
+            width: auto !important;
+            min-width: fit-content !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+          }
+
           html.agy-theme-active-v2 [data-agy-component="composer"] {
             color: var(--agy-text) !important;
             background: color-mix(in srgb, var(--agy-input) 82%, transparent) !important;
@@ -4275,13 +4289,26 @@ if (false) {
         });
         mark(app, 'surface', 'app');
 
-        const newChatButton = Array.from(document.querySelectorAll('button')).find(element => compactText(element) === '新建对话' && element.getBoundingClientRect().x < 260);
+        const newChatButton = Array.from(document.querySelectorAll('button')).find(element => {
+            const text = compactText(element);
+            return (text === '新建对话' || text === 'New Project' || text === 'New chat' || text === '新建项目') && element.getBoundingClientRect().x < 260;
+        });
         const sidebarCandidates = [];
         for (let current = newChatButton; current; current = current.parentElement) {
             const rect = current.getBoundingClientRect();
             if (rect.x <= 2 && rect.width >= 210 && rect.width <= 280 && rect.height > innerHeight * .72) sidebarCandidates.push(current);
         }
-        const sidebar = sidebarCandidates.sort((a, b) => a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
+        let sidebar = sidebarCandidates.sort((a, b) => a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
+        if (!sidebar) {
+            /* 极致兜底：如果按钮推演失败，直接根据 aside 或 sidebar 关键字寻找可见大容器 */
+            sidebar = document.querySelector('aside') || 
+                      Array.from(document.querySelectorAll('div')).find(el => {
+                          const rect = el.getBoundingClientRect();
+                          const className = String(el.className || '').toLowerCase();
+                          return (className.includes('sidebar') || className.includes('left-panel') || className.includes('sidebarcandidates')) && 
+                                 rect.width >= 210 && rect.width <= 280 && rect.height > innerHeight * 0.72 && visible(el);
+                      });
+        }
         mark(sidebar, 'surface', 'sidebar');
 
         const composer = document.getElementById('antigravity.agentSidePanelInputBox');
