@@ -3590,33 +3590,73 @@ try {
         const style = document.createElement('style');
         style.id = 'agy-theme-engine-style';
         style.textContent = `
-          #agy-theme-wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; background-size: cover; background-position: var(--agy-theme-position, center); background-repeat: no-repeat; transition: opacity .28s ease; }
-          #agy-theme-wallpaper::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(7,10,15,calc(var(--agy-theme-overlay, .38) + .08)), rgba(8,11,16,var(--agy-theme-overlay, .38)) 52%, rgba(7,10,15,calc(var(--agy-theme-overlay, .38) + .1))); }
+          #agy-theme-wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; background-size: cover; background-position: var(--agy-theme-position, center); background-repeat: no-repeat; transition: opacity .35s ease; }
+          #agy-theme-wallpaper::after { 
+            content: ''; 
+            position: absolute; 
+            inset: 0; 
+            background: linear-gradient(115deg, rgba(8,10,15,var(--agy-theme-overlay-dark, 0.26)), rgba(9,11,16,var(--agy-theme-overlay-dark, 0.26)) 52%, rgba(8,10,15,var(--agy-theme-overlay-dark, 0.26)));
+            transition: background 0.4s ease;
+          }
+          /* 空会话状态时：壁纸全清，保持高亮 */
+          html.agy-theme-active.agy-chat-empty #agy-theme-wallpaper::after {
+            --agy-theme-overlay-dark: 0.16 !important;
+          }
+          /* 存在对话内容时：壁纸显著淡化变暗，凸显主文本 */
+          html.agy-theme-active:not(.agy-chat-empty) #agy-theme-wallpaper::after {
+            --agy-theme-overlay-dark: 0.74 !important;
+          }
           html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
           html.agy-theme-active, html.agy-theme-active body { background: transparent !important; }
-          html.agy-theme-active .monaco-workbench { position: relative !important; z-index: 1 !important; background: transparent !important; }
-          html.agy-theme-active .monaco-workbench .part.editor,
-          html.agy-theme-active .monaco-workbench .part.editor > .content,
-          html.agy-theme-active .editor-group-container,
-          html.agy-theme-active .editor-instance,
-          html.agy-theme-active .monaco-editor,
-          html.agy-theme-active .monaco-editor .overflow-guard,
-          html.agy-theme-active .monaco-editor-background,
-          html.agy-theme-active .monaco-editor .margin { background-color: rgba(14, 17, 22, .68) !important; }
-          html.agy-theme-active .monaco-workbench .part.sidebar,
-          html.agy-theme-active .monaco-workbench .part.auxiliarybar,
-          html.agy-theme-active .monaco-workbench .part.panel { background-color: rgba(17, 20, 25, .76) !important; backdrop-filter: blur(11px) saturate(.9); }
-          html.agy-theme-active .monaco-workbench .part.activitybar,
-          html.agy-theme-active .monaco-workbench .part.titlebar,
-          html.agy-theme-active .monaco-workbench .part.statusbar { background-color: rgba(13, 16, 20, .86) !important; backdrop-filter: blur(14px); }
-          html.agy-theme-active .monaco-workbench .part.statusbar { border-top: 1px solid color-mix(in srgb, var(--agy-theme-accent) 34%, transparent); }
-          html.agy-theme-active [class~="bg-background"] { background-color: transparent !important; }
-          html.agy-theme-active:has(body.theme-light) #agy-theme-wallpaper::after { background: linear-gradient(115deg, rgba(255,255,255,.24), rgba(255,255,255,.14) 52%, rgba(255,255,255,.28)); }
-          html.agy-theme-active body.theme-light [class~="bg-sidebar"],
-          html.agy-theme-active body.theme-light [class~="bg-muted"] { background-color: rgba(247,248,249,.76) !important; backdrop-filter: blur(13px) saturate(.92); }
-          html.agy-theme-active body.theme-light [class~="bg-card"] { background-color: rgba(255,255,255,.76) !important; backdrop-filter: blur(9px) saturate(.94); }
-          html.agy-theme-active body.theme-light [class~="bg-card-border"] { background-color: rgba(255,255,255,.56) !important; }
-          html.agy-theme-active body.theme-light [class~="border-border"] { border-color: rgba(255,255,255,.42) !important; }
+          
+          /* 精准适配客户端左右侧边栏毛玻璃磨砂 */
+          html.agy-theme-active aside,
+          html.agy-theme-active [class*="sidebar"],
+          html.agy-theme-active [class*="SideBar"],
+          html.agy-theme-active [class*="left-panel"],
+          html.agy-theme-active .sidebar {
+            background-color: rgba(10, 14, 20, 0.45) !important;
+            backdrop-filter: blur(20px) saturate(1.2) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            transition: background 0.3s ease;
+          }
+          
+          /* 主工作区设为透明以透出背景 */
+          html.agy-theme-active main,
+          html.agy-theme-active [class*="main-content"],
+          html.agy-theme-active [class*="chat-container"],
+          html.agy-theme-active [class*="workbench-container"] {
+            background-color: transparent !important;
+          }
+          
+          /* 聊天输入框微透明与磨砂 */
+          html.agy-theme-active [class*="chat-input-container"],
+          html.agy-theme-active [class*="input-area"] {
+            background-color: rgba(16, 20, 26, 0.65) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          }
+          
+          /* 弹窗及弹出菜单深度保护防污染隔离 */
+          html.agy-theme-active [role="dialog"],
+          html.agy-theme-active [class*="modal"],
+          html.agy-theme-active [class*="dialog"],
+          html.agy-theme-active [class*="popup"],
+          html.agy-theme-active [class*="popover"],
+          html.agy-theme-active .settings-container,
+          html.agy-theme-active .settings-panel,
+          html.agy-theme-active .dropdown-menu {
+            background-color: rgba(16, 20, 25, 0.96) !important;
+            backdrop-filter: blur(25px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+            opacity: 1 !important;
+          }
+          html.agy-theme-active [role="dialog"] *,
+          html.agy-theme-active [class*="modal"] * {
+            text-shadow: none !important;
+          }
+          
           #agy-theme-switcher { position: fixed; right: 18px; bottom: 28px; z-index: 2147483000; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; }
           #agy-theme-switcher button { font: inherit; }
           #agy-theme-trigger { width: 38px; height: 38px; border: 1px solid color-mix(in srgb, var(--agy-theme-accent,#76d8e8) 55%, rgba(255,255,255,.2)); border-radius: 12px; color: #f7fbff; background: rgba(17,21,27,.82); box-shadow: 0 8px 26px rgba(0,0,0,.35); backdrop-filter: blur(12px); cursor: pointer; transition: transform .16s ease, background .16s ease; }
@@ -3748,11 +3788,22 @@ try {
         }
     }
 
+    function detectChatState() {
+        if (!document.body) return;
+        // 精准识别是否存在消息泡泡、对话项等代表进入聊天的节点
+        const hasMessages = document.querySelector('[class*="message-bubble"], [class*="chat-bubble"], [class*="message-item"], [class*="talk-bubble"], .bubble, .message') !== null;
+        document.documentElement.classList.toggle('agy-chat-empty', !hasMessages);
+    }
+
     function start() {
         ensureStyle();
         ensureSwitcher();
         refreshTheme();
         setInterval(refreshTheme, 900);
+        
+        // 挂载聊天明暗自适应轮询
+        detectChatState();
+        setInterval(detectChatState, 600);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
