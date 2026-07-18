@@ -4024,8 +4024,10 @@ if (false) {
           }
           html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2 { opacity: .64; filter: saturate(.86) brightness(1.015); }
           html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.10); }
-          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2 { opacity: .07; filter: saturate(.45) brightness(1.08); }
-          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.82); }
+          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2,
+          html.agy-theme-active[data-agy-view="settings"] #agy-theme-wallpaper-v2 { opacity: .65; filter: saturate(.85) brightness(1.02); }
+          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2::after,
+          html.agy-theme-active[data-agy-view="settings"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.18); }
           html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2 { opacity: .60; filter: saturate(.83) brightness(1.02); }
           html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.12); }
 
@@ -4330,21 +4332,56 @@ if (false) {
             box-shadow: 0 0 0 3px color-mix(in srgb, var(--agy-accent) 14%, transparent), 0 16px 42px var(--agy-shadow) !important;
           }
 
-          html.agy-theme-active-v2 [data-agy-component="settings-backdrop"] {
-            background: rgba(26,32,31,.32) !important;
-            backdrop-filter: blur(7px) saturate(.75);
+          html.agy-theme-active-v2 [data-agy-component="settings-backdrop"],
+          html.agy-theme-active [data-agy-component="settings-backdrop"] {
+            background: rgba(10, 14, 20, 0.38) !important;
+            backdrop-filter: blur(8px) saturate(0.85) !important;
           }
-          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] {
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"],
+          html.agy-theme-active [data-agy-component="settings-dialog"] {
             color: var(--agy-text) !important;
-            background: var(--agy-dialog) !important;
-            border: 1px solid color-mix(in srgb, var(--agy-accent) 24%, transparent) !important;
-            box-shadow: 0 30px 90px rgba(18,27,25,.30), 0 4px 14px rgba(18,27,25,.10) !important;
+            background: color-mix(in srgb, var(--agy-dialog) 86%, rgba(255, 255, 255, 0.08)) !important;
+            border: 1.5px solid color-mix(in srgb, var(--agy-accent) 35%, rgba(255, 255, 255, 0.1)) !important;
+            box-shadow: 0 24px 68px color-mix(in srgb, var(--agy-shadow) 50%, transparent) !important;
             opacity: 1 !important;
-            backdrop-filter: none !important;
+            backdrop-filter: blur(28px) saturate(1.1) !important;
+            border-radius: 20px !important;
           }
-          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] {
-            background: color-mix(in srgb, var(--agy-accent-soft) 38%, var(--agy-dialog)) !important;
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"],
+          html.agy-theme-active [data-agy-component="settings-sidebar"] {
+            background-color: color-mix(in srgb, var(--agy-input) 45%, rgba(255, 255, 255, 0.02)) !important;
             border-right: 1px solid var(--agy-border) !important;
+            padding: 12px 8px !important;
+          }
+          
+          /* 设置项卡片本身及 hover/active 定制 */
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] button,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div[role="button"],
+          html.agy-theme-active [data-agy-component="settings-sidebar"] button,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] div[role="button"] {
+            background-color: transparent !important;
+            color: var(--agy-text) !important;
+            border: 1px solid transparent !important;
+            transition: all 0.2s ease !important;
+            border-radius: 8px !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] button:hover,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div[role="button"]:hover,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] button:hover,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] div[role="button"]:hover {
+            background-color: color-mix(in srgb, var(--agy-accent-soft) 82%, transparent) !important;
+            color: var(--agy-text) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] [data-agy-active="true"],
+          html.agy-theme-active [data-agy-component="settings-sidebar"] [data-agy-active="true"] {
+            background-color: var(--agy-accent) !important;
+            color: var(--agy-text) !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--agy-accent) 40%, transparent) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] [data-agy-active="true"] *,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] [data-agy-active="true"] * {
+            color: var(--agy-text) !important;
           }
           html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-background"] { background: var(--agy-dialog) !important; }
           html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-secondary"],
@@ -4520,6 +4557,25 @@ if (false) {
                 return rect.x <= dialogRect.x + 230 && rect.width >= 180 && rect.width <= 240 && rect.height > dialogRect.height * .78;
             });
             mark(settingSidebar, 'component', 'settings-sidebar');
+            if (settingSidebar) {
+                const items = Array.from(settingSidebar.querySelectorAll('div, button, [role="button"]')).filter(el => {
+                    if (el === settingSidebar) return false;
+                    const rect = el.getBoundingClientRect();
+                    return rect.width > 100 && rect.height > 18 && rect.height < 60;
+                });
+                const activeItem = items.find(el => {
+                    if (el.getAttribute?.('aria-selected') === 'true') return true;
+                    if (el.getAttribute?.('data-state') === 'active') return true;
+                    if (el.getAttribute?.('data-active') === 'true') return true;
+                    const className = String(el.className || '');
+                    if (className.includes('bg-secondary') || className.includes('bg-accent') || className.includes('bg-muted')) return true;
+                    return false;
+                });
+                items.forEach(el => el.removeAttribute('data-agy-active'));
+                if (activeItem) {
+                    activeItem.setAttribute('data-agy-active', 'true');
+                }
+            }
         }
 
         document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]').forEach(element => {
