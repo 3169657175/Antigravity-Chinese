@@ -3938,7 +3938,9 @@ if (false) {
           html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2 { opacity: .60; filter: saturate(.83) brightness(1.02); }
           html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.12); }
 
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"],
+          html.agy-theme-active [data-agy-surface="sidebar"],
+          html.agy-theme-active aside {
             color: var(--agy-text) !important;
             background: linear-gradient(155deg,
               color-mix(in srgb, var(--agy-warm) 74%, transparent) 0%,
@@ -3953,40 +3955,46 @@ if (false) {
             backdrop-filter: blur(24px) saturate(1.12);
             transition: background .28s ease, backdrop-filter .28s ease, box-shadow .28s ease, border-color .28s ease;
           }
-          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"] {
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="new-chat"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="new-chat"] aside {
             background: linear-gradient(90deg,
               color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
               color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
               color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
             border-left: 2.5px solid var(--agy-accent) !important;
             border-right: 1px solid var(--agy-border) !important;
-            
-            /* 物理镜像：内阴影改从左侧投射，外阴影改向最左侧屏幕外发光 */
             box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
               -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
             backdrop-filter: blur(2px) saturate(.96);
           }
           html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="sidebar"],
-          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"] {
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="conversation"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="review"] [data-agy-surface="sidebar"],
+          html.agy-theme-active[data-agy-view="conversation"] aside,
+          html.agy-theme-active[data-agy-view="review"] aside {
             background: linear-gradient(90deg,
               color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
               color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
               color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
             border-left: 2.5px solid var(--agy-accent) !important;
             border-right: 1px solid var(--agy-border) !important;
-            
-            /* 物理镜像：内阴影改从左侧投射，外阴影改向最左侧屏幕外发光 */
             box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
               -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
             backdrop-filter: blur(2px) saturate(.96);
           }
-          html.agy-theme-active-v2 [data-agy-surface="main"] {
+          html.agy-theme-active-v2 [data-agy-surface="main"],
+          html.agy-theme-active [data-agy-surface="main"] {
             color: var(--agy-text) !important;
             transition: background .25s ease, box-shadow .25s ease;
           }
-          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="main"] { background: transparent !important; }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="main"],
+          html.agy-theme-active[data-agy-view="new-chat"] [data-agy-surface="main"] { background: transparent !important; }
           html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="main"],
-          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="main"] {
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="main"],
+          html.agy-theme-active[data-agy-view="conversation"] [data-agy-surface="main"],
+          html.agy-theme-active[data-agy-view="review"] [data-agy-surface="main"] {
             background: linear-gradient(105deg,
               color-mix(in srgb, var(--agy-content) 66%, transparent) 0%,
               color-mix(in srgb, var(--agy-content) 56%, transparent) 52%,
@@ -3998,17 +4006,30 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-foreground"],
           html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-foreground"],
           html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-foreground"],
-          html.agy-theme-active-v2 [data-agy-component="popover"] [class~="text-foreground"] { color: var(--agy-text) !important; }
+          html.agy-theme-active-v2 [data-agy-component="popover"] [class~="text-foreground"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class~="text-foreground"],
+          html.agy-theme-active aside [class~="text-foreground"],
+          html.agy-theme-active [data-agy-surface="main"] [class~="text-foreground"] { color: var(--agy-text) !important; }
+          
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-secondary-foreground"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-muted-foreground"],
           html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-secondary-foreground"],
           html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-muted-foreground"],
           html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-secondary-foreground"],
-          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-muted-foreground"] { color: var(--agy-muted) !important; }
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-muted-foreground"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class~="text-secondary-foreground"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class~="text-muted-foreground"],
+          html.agy-theme-active aside [class~="text-secondary-foreground"],
+          html.agy-theme-active aside [class~="text-muted-foreground"],
+          html.agy-theme-active [data-agy-surface="main"] [class~="text-secondary-foreground"] { color: var(--agy-muted) !important; }
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-card"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-secondary"],
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"] {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class~="bg-card"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class~="bg-secondary"],
+          html.agy-theme-active aside [class~="bg-card"],
+          html.agy-theme-active aside [class~="bg-secondary"] {
             background-color: color-mix(in srgb, var(--agy-accent-soft) 62%, white) !important;
           }
           
@@ -4018,7 +4039,13 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"],
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-active="true"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-state="active"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-agy-active="true"],
+          html.agy-theme-active [data-agy-surface="sidebar"] a[class*="active"],
+          html.agy-theme-active aside [data-agy-active="true"],
+          html.agy-theme-active aside a[class*="active"] {
             background-color: var(--agy-accent) !important;
             color: var(--agy-text) !important;
             font-weight: 600 !important;
@@ -4029,7 +4056,10 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"] *,
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] * {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] *,
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-agy-active="true"] *,
+          html.agy-theme-active [data-agy-surface="sidebar"] a[class*="active"] *,
+          html.agy-theme-active aside [data-agy-active="true"] * {
             color: var(--agy-text) !important;
           }
 
@@ -4037,7 +4067,11 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="card"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="Card"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="profile"],
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="account"] {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="account"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class*="card"],
+          html.agy-theme-active [data-agy-surface="sidebar"] [class*="profile"],
+          html.agy-theme-active aside [class*="card"],
+          html.agy-theme-active aside [class*="profile"] {
             background-color: color-mix(in srgb, var(--agy-input) 32%, rgba(255, 255, 255, 0.04)) !important;
             border: 1.5px solid color-mix(in srgb, var(--agy-accent) 42%, rgba(255, 255, 255, 0.08)) !important;
             box-shadow: 0 8px 24px color-mix(in srgb, var(--agy-shadow) 20%, transparent) !important;
@@ -4045,10 +4079,12 @@ if (false) {
           }
 
           /* 免费额度进度条及数值的主题皮肤定制 */
-          html.agy-theme-active-v2 [data-agy-component="quota-item"] {
+          html.agy-theme-active-v2 [data-agy-component="quota-item"],
+          html.agy-theme-active [data-agy-component="quota-item"] {
             color: var(--agy-text) !important;
           }
-          html.agy-theme-active-v2 [data-agy-component="quota-progress"] {
+          html.agy-theme-active-v2 [data-agy-component="quota-progress"],
+          html.agy-theme-active [data-agy-component="quota-progress"] {
             background-color: color-mix(in srgb, var(--agy-accent) 15%, rgba(255, 255, 255, 0.08)) !important;
             height: 6px !important;
             border-radius: 9999px !important;
@@ -4056,13 +4092,40 @@ if (false) {
           }
           html.agy-theme-active-v2 [data-agy-component="quota-progress-indicator"],
           html.agy-theme-active-v2 [data-agy-component="quota-progress"] [class*="indicator"],
-          html.agy-theme-active-v2 [data-agy-component="quota-progress"] div {
+          html.agy-theme-active-v2 [data-agy-component="quota-progress"] div,
+          html.agy-theme-active [data-agy-component="quota-progress-indicator"],
+          html.agy-theme-active [data-agy-component="quota-progress"] div {
             background-color: var(--agy-accent) !important;
             box-shadow: 0 0 8px var(--agy-accent) !important;
           }
 
+          /* 鼠标 hover 对话卡片时右侧显示的 3 个快捷操作小按钮的自适应呼吸高亮定制 */
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] a button,
+          html.agy-theme-active [data-agy-surface="sidebar"] a button,
+          html.agy-theme-active aside a button,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"] button,
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-agy-active="true"] button {
+            color: var(--agy-text) !important;
+            opacity: 0.65 !important;
+            background: transparent !important;
+            transition: all 0.2s ease !important;
+            border-radius: 6px !important;
+          }
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] a button:hover,
+          html.agy-theme-active [data-agy-surface="sidebar"] a button:hover,
+          html.agy-theme-active aside a button:hover,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"] button:hover,
+          html.agy-theme-active [data-agy-surface="sidebar"] [data-agy-active="true"] button:hover {
+            opacity: 1 !important;
+            background-color: color-mix(in srgb, var(--agy-accent) 45%, rgba(255,255,255,0.15)) !important;
+            box-shadow: 0 2px 8px color-mix(in srgb, var(--agy-accent) 60%, transparent) !important;
+            transform: scale(1.1) !important;
+          }
+
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
-          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover {
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover,
+          html.agy-theme-active [data-agy-surface="sidebar"] button:hover,
+          html.agy-theme-active aside button:hover {
             background-color: color-mix(in srgb, var(--agy-accent-soft) 78%, transparent) !important;
             color: var(--agy-text) !important;
           }
