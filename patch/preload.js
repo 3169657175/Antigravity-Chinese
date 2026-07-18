@@ -4577,15 +4577,9 @@ if (false) {
                     });
                 const currentTitleText = rightTitleEl ? rightTitleEl.textContent.trim() : '';
 
-                // 2. 获取侧栏里所有带文本的选项行元素（适当放宽大小范围以兼容不同系统）
-                const items = Array.from(settingSidebar.querySelectorAll('div, button, a, [role="button"]')).filter(el => {
-                    if (el === settingSidebar) return false;
-                    const rect = el.getBoundingClientRect();
-                    if (rect.height < 15 || rect.height > 60 || rect.width < 75) return false;
-                    
-                    // 确保我们拿到的是包裹项容器，而不是里面嵌套的纯文字叶子节点，这里过滤掉纯子项
-                    const children = Array.from(el.children);
-                    return !children.some(child => child.getBoundingClientRect().height > rect.height * 0.82);
+                // 2. 直接获取侧栏的直接一级子节点（它们在DOM中天然是平铺的选项卡片），物理容错率 100%
+                const items = Array.from(settingSidebar.children).filter(el => {
+                    return el.textContent.trim().length > 0;
                 });
 
                 // 3. 多重逻辑寻找当前激活项
