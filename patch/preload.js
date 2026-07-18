@@ -4356,25 +4356,34 @@ if (false) {
           
           /* 设置项卡片本身及 hover/active 定制 */
           html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] button,
-          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div[role="button"],
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] a,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] [class*="bg-"],
           html.agy-theme-active [data-agy-component="settings-sidebar"] button,
-          html.agy-theme-active [data-agy-component="settings-sidebar"] div[role="button"] {
+          html.agy-theme-active [data-agy-component="settings-sidebar"] div,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] a,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] [class*="bg-"] {
             background-color: transparent !important;
+            background: transparent !important;
             color: var(--agy-text) !important;
             border: 1px solid transparent !important;
             transition: all 0.2s ease !important;
             border-radius: 8px !important;
+            box-shadow: none !important;
           }
           html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] button:hover,
-          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div[role="button"]:hover,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] div:hover,
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] a:hover,
           html.agy-theme-active [data-agy-component="settings-sidebar"] button:hover,
-          html.agy-theme-active [data-agy-component="settings-sidebar"] div[role="button"]:hover {
+          html.agy-theme-active [data-agy-component="settings-sidebar"] div:hover,
+          html.agy-theme-active [data-agy-component="settings-sidebar"] a:hover {
             background-color: color-mix(in srgb, var(--agy-accent-soft) 82%, transparent) !important;
             color: var(--agy-text) !important;
           }
           html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] [data-agy-active="true"],
           html.agy-theme-active [data-agy-component="settings-sidebar"] [data-agy-active="true"] {
             background-color: var(--agy-accent) !important;
+            background: var(--agy-accent) !important;
             color: var(--agy-text) !important;
             font-weight: 600 !important;
             box-shadow: 0 4px 12px color-mix(in srgb, var(--agy-accent) 40%, transparent) !important;
@@ -4558,19 +4567,48 @@ if (false) {
             });
             mark(settingSidebar, 'component', 'settings-sidebar');
             if (settingSidebar) {
-                const items = Array.from(settingSidebar.querySelectorAll('div, button, [role="button"]')).filter(el => {
+                // 1. 获取右侧区域当前可见的大标题，作为当前激活面板的参考
+                const rightTitleEl = Array.from(settingsDialog.querySelectorAll('h2, h1, [class*="title"], [class*="header"]'))
+                    .filter(visible)
+                    .find(el => {
+                        if (settingSidebar.contains(el)) return false;
+                        const txt = el.textContent.trim();
+                        return txt.length > 1 && txt.length < 15;
+                    });
+                const currentTitleText = rightTitleEl ? rightTitleEl.textContent.trim() : '';
+
+                // 2. 获取侧栏里所有带文本的选项行元素（适当放宽大小范围以兼容不同系统）
+                const items = Array.from(settingSidebar.querySelectorAll('div, button, a, [role="button"]')).filter(el => {
                     if (el === settingSidebar) return false;
                     const rect = el.getBoundingClientRect();
-                    return rect.width > 100 && rect.height > 18 && rect.height < 60;
+                    if (rect.height < 15 || rect.height > 60 || rect.width < 75) return false;
+                    
+                    // 确保我们拿到的是包裹项容器，而不是里面嵌套的纯文字叶子节点，这里过滤掉纯子项
+                    const children = Array.from(el.children);
+                    return !children.some(child => child.getBoundingClientRect().height > rect.height * 0.82);
                 });
-                const activeItem = items.find(el => {
-                    if (el.getAttribute?.('aria-selected') === 'true') return true;
-                    if (el.getAttribute?.('data-state') === 'active') return true;
-                    if (el.getAttribute?.('data-active') === 'true') return true;
-                    const className = String(el.className || '');
-                    if (className.includes('bg-secondary') || className.includes('bg-accent') || className.includes('bg-muted')) return true;
-                    return false;
-                });
+
+                // 3. 多重逻辑寻找当前激活项
+                let activeItem = null;
+                
+                // 方案 A：右侧标题匹配法（无敌文本联动）
+                if (currentTitleText) {
+                    activeItem = items.find(el => el.textContent.trim().includes(currentTitleText) || currentTitleText.includes(el.textContent.trim()));
+                }
+                
+                // 方案 B：类名与状态兜底检测
+                if (!activeItem) {
+                    activeItem = items.find(el => {
+                        if (el.getAttribute?.('aria-selected') === 'true') return true;
+                        if (el.getAttribute?.('data-state') === 'active') return true;
+                        if (el.getAttribute?.('data-active') === 'true') return true;
+                        const className = String(el.className || '');
+                        if (className.includes('bg-secondary') || className.includes('bg-accent') || className.includes('bg-muted')) return true;
+                        return false;
+                    });
+                }
+
+                // 4. 清除并重新打标
                 items.forEach(el => el.removeAttribute('data-agy-active'));
                 if (activeItem) {
                     activeItem.setAttribute('data-agy-active', 'true');
