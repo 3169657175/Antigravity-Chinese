@@ -4378,19 +4378,16 @@ if (false) {
         });
 
         /* 1. 动态查找并强力标注侧边栏当前激活/选中的对话项目链接 */
+        /* 1. 动态查找并强力标注侧边栏当前激活/选中的对话项目链接（严格限定为 a 链接以防误染） */
         if (sidebar) {
-            const activeCandidates = Array.from(sidebar.querySelectorAll('a, button, [role="button"], div')).filter(el => {
+            const activeCandidates = Array.from(sidebar.querySelectorAll('a')).filter(el => {
                 const href = el.getAttribute?.('href') || '';
-                if (href && location.hash && href.includes(location.hash)) return true;
-                if (href && location.pathname && href.includes(location.pathname) && href !== '/' && href !== '#') return true;
+                if (!href || href === '#' || href === '/') return false;
+                // 精准匹配当前正在打开的会话 hash 路由
+                if (location.hash && location.hash.length > 2 && href.includes(location.hash)) return true;
                 if (el.getAttribute?.('aria-current') === 'page') return true;
                 if (el.getAttribute?.('data-state') === 'active') return true;
                 if (el.getAttribute?.('data-active') === 'true') return true;
-                if (el.getAttribute?.('aria-selected') === 'true') return true;
-                const className = String(el.className || '');
-                if (className.includes('bg-secondary') || className.includes('bg-accent') || className.includes('bg-muted')) {
-                    return el !== sidebar;
-                }
                 return false;
             });
             sidebar.querySelectorAll('[data-agy-active]').forEach(el => el.removeAttribute('data-agy-active'));
