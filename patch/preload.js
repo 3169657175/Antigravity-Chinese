@@ -4011,6 +4011,37 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"] {
             background-color: color-mix(in srgb, var(--agy-accent-soft) 62%, white) !important;
           }
+          
+          /* 侧边栏当前激活态/选中态对话卡片的专属定制高亮 */
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-active="true"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-state="active"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] {
+            background-color: var(--agy-accent) !important;
+            color: var(--agy-text) !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 14px color-mix(in srgb, var(--agy-accent) 45%, transparent) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-active="true"] *,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-state="active"] *,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"] *,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"] *,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] * {
+            color: var(--agy-text) !important;
+          }
+
+          /* 账号每周限额面板卡片的专属定制磨砂与描边 */
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="card"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="Card"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="profile"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class*="account"] {
+            background-color: color-mix(in srgb, var(--agy-input) 32%, rgba(255, 255, 255, 0.04)) !important;
+            border: 1.5px solid color-mix(in srgb, var(--agy-accent) 42%, rgba(255, 255, 255, 0.08)) !important;
+            box-shadow: 0 8px 24px color-mix(in srgb, var(--agy-shadow) 20%, transparent) !important;
+            backdrop-filter: blur(16px) !important;
+          }
+
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover {
             background-color: color-mix(in srgb, var(--agy-accent-soft) 78%, transparent) !important;
@@ -4021,9 +4052,55 @@ if (false) {
             color: var(--agy-text) !important;
             background: color-mix(in srgb, var(--agy-input) 82%, transparent) !important;
             border: 1px solid color-mix(in srgb, var(--agy-accent) 32%, transparent) !important;
+            
+            /* 输入框左侧霓虹流光 */
+            border-left: 3px solid var(--agy-accent) !important;
+            
             box-shadow: 0 14px 38px color-mix(in srgb, var(--agy-shadow) 72%, transparent), 0 2px 8px rgba(0,0,0,.04) !important;
             backdrop-filter: blur(22px) saturate(1.08);
             transition: background .24s ease, border-color .24s ease, box-shadow .24s ease;
+          }
+          
+          /* 输入框最右侧发送/停止按钮圆形自适应定制 */
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[type="submit"],
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[class*="bg-primary"],
+          html.agy-theme-active-v2 [data-agy-component="composer"] [class*="composer-send-button"],
+          html.agy-theme-active-v2 [data-agy-component="composer"] button:last-child {
+            background-color: var(--agy-accent) !important;
+            color: var(--agy-text) !important;
+            border-radius: 9999px !important;
+            width: 32px !important;
+            height: 32px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 4px 10px color-mix(in srgb, var(--agy-accent) 50%, transparent) !important;
+            transition: all 0.2s ease !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[type="submit"] *,
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[class*="bg-primary"] *,
+          html.agy-theme-active-v2 [data-agy-component="composer"] [class*="composer-send-button"] *,
+          html.agy-theme-active-v2 [data-agy-component="composer"] button:last-child * {
+            color: var(--agy-text) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[type="submit"]:hover,
+          html.agy-theme-active-v2 [data-agy-component="composer"] button[class*="bg-primary"]:hover,
+          html.agy-theme-active-v2 [data-agy-component="composer"] button:last-child:hover {
+            transform: scale(1.08) !important;
+            background-color: var(--agy-accent) !important;
+            box-shadow: 0 6px 14px color-mix(in srgb, var(--agy-accent) 65%, transparent) !important;
+          }
+
+          /* 模型列表下拉弹出窗的高档描边定制 */
+          html.agy-theme-active-v2 [data-agy-component="popover"],
+          html.agy-theme-active-v2 [data-agy-component="dropdown"],
+          html.agy-theme-active-v2 [class*="model-picker-menu"],
+          html.agy-theme-active-v2 .dropdown-menu {
+            background-color: color-mix(in srgb, var(--agy-input) 88%, rgba(10, 14, 20, 0.96)) !important;
+            border: 1.5px solid var(--agy-accent) !important;
+            box-shadow: 0 12px 32px color-mix(in srgb, var(--agy-shadow) 52%, transparent) !important;
+            backdrop-filter: blur(20px) !important;
           }
           html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-component="composer"] {
             background: linear-gradient(110deg,
