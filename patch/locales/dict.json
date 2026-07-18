@@ -719,5 +719,17 @@
     "Greeting and Workspace Setup": "问候与工作区设置",
     "Searching Xiaohongshu For Antigravity": "在小红shu上搜寻 Antigravity",
     "Select Environment": "选择环境",
-    "Configure tab completion, suggestions, and navigation behavior.": "配置 Tab 补全、建议及导航行为。"
+    "Configure tab completion, suggestions, and navigation behavior.": "配置 Tab 补全、建议及导航行为。",
+    "Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of tokens. Thus, limits will last longer with shorter tasks or using more cost-effective models. The 5-hour limit smooths out aggregate demand to fairly distribute global capacity across all users, while your weekly limit is tied directly to your individual tier.": "在每个组内，模型共享每周限额和 5 小时限额。额度消耗与 Token 消耗成本成正比。因此，任务较短或使用更具性价比的模型时，限额持续时间会更长。5 小时限额旨在平滑总体需求，以便在所有用户之间公平分配全局容量，而您的每周限额则直接与您的个人等级挂钩。",
+    "Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the 标记. Thus, limits will last longer with shorter tasks or using more cost-effective models. The 5-hour limit smooths out aggregate demand to fairly distribute global capacity across all users, while your weekly limit is tied directly to your individual tier.": "在每个组内，模型共享每周限额和 5 小时限额。额度消耗与标记消耗成本成正比。因此，任务较短或使用更具性价比的模型时，限额持续时间会更长。5 小时限额旨在平滑总体需求，以便在所有用户之间公平分配全局容量，而您的每周限额则直接与您的个人等级挂钩。",
+    "% of the customization budget is available.": "的自定义额度可用。",
+    "Permanently delete": "永久删除",
+    "Add Folder": "添加文件夹",
+    "Allow/deny specific terminal commands.": "允许或拒绝特定的终端命令。",
+    "Allow/deny agent write access to specific files or directories.": "允许或拒绝智能体写入特定的文件或目录。",
+    "Allow/deny agent read access to specific files or directories.": "允许或拒绝智能体读取特定的文件或目录。",
+    "File Writes": "文件写入权限",
+    "File Reads": "文件读取权限",
+    "New Project": "新建项目",
+    "Quick Start": "快速开始"
 }

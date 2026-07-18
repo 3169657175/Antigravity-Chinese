@@ -406,5 +406,17 @@
     {
         "search": " tokens",
         "replace": " 标记"
+    },
+    {
+        "search": "archived conversations",
+        "replace": "个已归档对话"
+    },
+    {
+        "search": "active conversation",
+        "replace": "个活跃对话"
+    },
+    {
+        "search": "active conversations",
+        "replace": "个活跃对话"
     }
 ]
