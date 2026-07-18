@@ -3634,16 +3634,36 @@ if (false) {
             background-color: transparent !important;
           }
           
-          /* 精准适配客户端左右侧边栏毛玻璃磨砂 */
+          /* 精准适配客户端左右侧边栏毛玻璃磨砂（混合当前激活皮肤的独有主题色以自适应透光） */
           html.agy-theme-active aside,
           html.agy-theme-active [class*="sidebar"],
           html.agy-theme-active [class*="SideBar"],
           html.agy-theme-active [class*="left-panel"],
           html.agy-theme-active .sidebar {
-            background-color: rgba(10, 14, 20, 0.45) !important;
-            backdrop-filter: blur(20px) saturate(1.2) !important;
+            background-color: color-mix(in srgb, var(--agy-theme-accent, #76d8e8) 12%, rgba(10, 14, 20, 0.38)) !important;
+            backdrop-filter: blur(25px) saturate(1.2) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
             transition: background 0.3s ease;
+          }
+          
+          /* 核心覆盖：彻底将侧边栏内各个独立的按钮、列表子块背景设为透明，释放毛玻璃透图 */
+          html.agy-theme-active aside [class*="bg-"],
+          html.agy-theme-active [class*="sidebar"] [class*="bg-"],
+          html.agy-theme-active [class*="SideBar"] [class*="bg-"],
+          html.agy-theme-active .sidebar [class*="bg-"],
+          html.agy-theme-active aside button,
+          html.agy-theme-active [class*="sidebar"] button {
+            background-color: transparent !important;
+          }
+          
+          /* 顶栏磨砂深度重塑，完美自适应渐变 */
+          html.agy-theme-active header,
+          html.agy-theme-active [class*="titlebar"],
+          html.agy-theme-active [class*="header-"],
+          html.agy-theme-active [class*="top-panel"] {
+            background-color: color-mix(in srgb, var(--agy-theme-accent, #76d8e8) 8%, rgba(10, 14, 20, 0.45)) !important;
+            backdrop-filter: blur(20px) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
           }
           
           /* 主工作区设为透明以透出背景 */
