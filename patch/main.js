@@ -56,11 +56,11 @@ const ideInstall_1 = require("./ideInstall");
 const agyThemePath = require("path");
 const agyThemeOs = require("os");
 const AGY_THEME_CATALOG = [
-    { id: 'doraemon', name: '哆啦A梦', file: 'doraemon.jpg', accent: '#38a8e8', overlay: 0.38, position: 'center center' },
-    { id: 'shinchan', name: '蜡笔小新', file: 'shinchan.jpg', accent: '#f3bf45', overlay: 0.34, position: 'center center' },
-    { id: 'line-dog', name: '线条小狗', file: 'line-dog.jpg', accent: '#72cf78', overlay: 0.28, position: 'center center' },
-    { id: 'one-piece', name: '海贼王', file: 'one-piece.jpg', accent: '#e9a63a', overlay: 0.44, position: 'center center' },
-    { id: 'fox-spirit', name: '狐妖小红娘', file: 'fox-spirit.jpg', accent: '#d98b86', overlay: 0.30, position: 'center center' }
+    { id: 'doraemon', name: '哆啦A梦', file: '哆啦A梦.png', accent: '#238bc1', overlay: 0.18, position: 'center center' },
+    { id: 'shinchan', name: '蜡笔小新', file: '蜡笔小新.jpg', accent: '#e85e5b', overlay: 0.16, position: 'center center' },
+    { id: 'line-dog', name: '线条小狗', file: '线条小狗.png', accent: '#319b73', overlay: 0.14, position: 'center center' },
+    { id: 'one-piece', name: '海贼王', file: '海贼王.jpg', accent: '#d07726', overlay: 0.20, position: 'center center' },
+    { id: 'fox-spirit', name: '狐妖小红娘', file: '狐妖小红娘.png', accent: '#b95564', overlay: 0.18, position: 'center center' }
 ];
 function agyThemePaths() {
     const appData = process.env.APPDATA || agyThemePath.join(agyThemeOs.homedir(), 'AppData', 'Roaming');
@@ -70,14 +70,38 @@ function agyThemePaths() {
 function findAgyThemeFile(file) {
     const paths = agyThemePaths();
     return [
-        agyThemePath.join(paths.assetsDir, file),
+        agyThemePath.join(__dirname, 'themes', file),
         agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', file),
         agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', 'themes', file),
-        agyThemePath.join(__dirname, 'themes', file)
+        agyThemePath.join(paths.assetsDir, file)
     ].find(candidate => {
         try { return fs.existsSync(candidate); }
         catch (_) { return false; }
     }) || '';
+}
+function agyThemeFileHash(file) {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+function syncAgyThemeAssets() {
+    const paths = agyThemePaths();
+    fs.mkdirSync(paths.assetsDir, { recursive: true });
+    const allowed = new Set(AGY_THEME_CATALOG.map(theme => theme.file));
+    for (const entry of fs.readdirSync(paths.assetsDir, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        const extension = agyThemePath.extname(entry.name).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(extension) && !allowed.has(entry.name)) {
+            fs.unlinkSync(agyThemePath.join(paths.assetsDir, entry.name));
+        }
+    }
+    for (const theme of AGY_THEME_CATALOG) {
+        const bundled = agyThemePath.join(__dirname, 'themes', theme.file);
+        if (!fs.existsSync(bundled)) continue;
+        const destination = agyThemePath.join(paths.assetsDir, theme.file);
+        if (!fs.existsSync(destination) || agyThemeFileHash(bundled) !== agyThemeFileHash(destination)) {
+            fs.copyFileSync(bundled, destination);
+        }
+    }
+    return paths;
 }
 function readAgyThemeConfig() {
     const paths = agyThemePaths();
@@ -112,12 +136,12 @@ function loadAgyThemePayload(previousRevision = '') {
     }
     return { ...config, imagePath, imageDataUrl, revision, unchanged: false };
 }
+syncAgyThemeAssets();
 electron_1.ipcMain.handle('agy-theme:get', (_event, previousRevision) => loadAgyThemePayload(String(previousRevision || '')));
 electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
     const theme = AGY_THEME_CATALOG.find(item => item.id === themeId);
     if (!theme) throw new Error('未知主题');
-    const paths = agyThemePaths();
-    fs.mkdirSync(paths.assetsDir, { recursive: true });
+    const paths = syncAgyThemeAssets();
     const source = findAgyThemeFile(theme.file);
     if (!source) throw new Error(`找不到主题图片：${theme.file}`);
     const stablePath = agyThemePath.join(paths.assetsDir, theme.file);

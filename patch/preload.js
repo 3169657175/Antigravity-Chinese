@@ -3516,6 +3516,7 @@ try {
 // ==========================================================
 // Antigravity Theme Engine - persistent, hot-reloadable skin layer
 // ==========================================================
+if (false) {
 (function AntigravityThemeEngine() {
     const themeIpc = electron_1.ipcRenderer;
     const catalog = [
@@ -3825,6 +3826,518 @@ try {
         // 挂载聊天明暗自适应轮询
         detectChatState();
         setInterval(detectChatState, 600);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+    else start();
+})();
+}
+
+// ==========================================================
+// Antigravity Theme Engine V2 - state aware semantic theming
+// ==========================================================
+(function AntigravityThemeEngineV2() {
+    const themeIpc = electron_1.ipcRenderer;
+    const catalog = [
+        {
+            id: 'doraemon', name: '哆啦A梦', accent: '#238bc1', accentSoft: '#d8f2fb',
+            app: '#edf8f8', sidebar: 'rgba(233,247,247,.91)', content: 'rgba(248,252,250,.90)',
+            dialog: 'rgba(250,253,252,.985)', input: 'rgba(255,255,255,.965)', text: '#17313a',
+            muted: '#526d73', border: 'rgba(35,139,193,.20)', shadow: 'rgba(21,81,103,.18)', position: 'center center'
+        },
+        {
+            id: 'shinchan', name: '蜡笔小新', accent: '#e85e5b', accentSoft: '#fff0d0',
+            app: '#f3f9ec', sidebar: 'rgba(243,249,235,.90)', content: 'rgba(250,253,246,.90)',
+            dialog: 'rgba(253,254,250,.985)', input: 'rgba(255,255,252,.965)', text: '#283b36',
+            muted: '#5f746c', border: 'rgba(80,131,91,.20)', shadow: 'rgba(38,76,56,.17)', position: 'center center'
+        },
+        {
+            id: 'line-dog', name: '线条小狗', accent: '#319b73', accentSoft: '#dff6e6',
+            app: '#eef9f4', sidebar: 'rgba(238,249,244,.91)', content: 'rgba(250,253,251,.90)',
+            dialog: 'rgba(251,254,252,.988)', input: 'rgba(255,255,255,.97)', text: '#1f3932',
+            muted: '#5a746c', border: 'rgba(49,155,115,.19)', shadow: 'rgba(27,91,69,.16)', position: 'center center'
+        },
+        {
+            id: 'one-piece', name: '海贼王', accent: '#d07726', accentSoft: '#fff0cf',
+            app: '#fbf3e5', sidebar: 'rgba(250,241,223,.91)', content: 'rgba(255,251,243,.91)',
+            dialog: 'rgba(255,252,247,.988)', input: 'rgba(255,253,249,.97)', text: '#3d3026',
+            muted: '#77665a', border: 'rgba(182,104,32,.22)', shadow: 'rgba(94,54,25,.18)', position: 'center center'
+        },
+        {
+            id: 'fox-spirit', name: '狐妖小红娘', accent: '#b95564', accentSoft: '#fbe5e7',
+            app: '#faf2f1', sidebar: 'rgba(249,239,238,.92)', content: 'rgba(254,249,248,.91)',
+            dialog: 'rgba(255,251,250,.99)', input: 'rgba(255,252,251,.97)', text: '#442d32',
+            muted: '#7b6066', border: 'rgba(185,85,100,.21)', shadow: 'rgba(92,42,50,.18)', position: 'center center'
+        }
+    ];
+    let lastRevision = '';
+    let activeImageKey = '';
+    let semanticTimer = 0;
+    let observer = null;
+
+    function ensureStyle() {
+        if (document.getElementById('agy-theme-engine-v2-style')) return;
+        const style = document.createElement('style');
+        style.id = 'agy-theme-engine-v2-style';
+        style.textContent = `
+          :root {
+            --agy-accent: #319b73;
+            --agy-accent-soft: #dff6e6;
+            --agy-app: #eef9f4;
+            --agy-sidebar: rgba(238,249,244,.91);
+            --agy-content: rgba(250,253,251,.945);
+            --agy-dialog: rgba(251,254,252,.988);
+            --agy-input: rgba(255,255,255,.97);
+            --agy-text: #1f3932;
+            --agy-muted: #5a746c;
+            --agy-border: rgba(49,155,115,.19);
+            --agy-shadow: rgba(27,91,69,.16);
+            --agy-wallpaper-position: center center;
+          }
+          #agy-theme-wallpaper-v2 {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0;
+            background-size: cover;
+            background-position: var(--agy-wallpaper-position);
+            background-repeat: no-repeat;
+            transform: scale(1.002);
+            transition: opacity .3s ease, filter .3s ease;
+          }
+          #agy-theme-wallpaper-v2::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(105deg, rgba(246,250,248,.22) 0%, rgba(248,251,249,.08) 48%, rgba(250,252,250,.14) 100%);
+            transition: background .3s ease;
+          }
+          html.agy-theme-active-v2 #root { position: relative; z-index: 1; }
+          html.agy-theme-active-v2 #agy-theme-wallpaper-v2 { opacity: 1; }
+          html.agy-theme-active-v2,
+          html.agy-theme-active-v2 body,
+          html.agy-theme-active-v2 [data-agy-surface="app"] { background: transparent !important; }
+
+          html.agy-theme-active-v2[data-agy-view="new-chat"] #agy-theme-wallpaper-v2 { opacity: .96; filter: saturate(.98) brightness(1.01); }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] #agy-theme-wallpaper-v2::after {
+            background: linear-gradient(105deg, rgba(249,252,250,.18) 0%, rgba(250,252,251,.03) 48%, rgba(250,252,251,.08) 100%);
+          }
+          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2 { opacity: .32; filter: saturate(.70) brightness(1.04); }
+          html.agy-theme-active-v2[data-agy-view="conversation"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.42); }
+          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2 { opacity: .07; filter: saturate(.45) brightness(1.08); }
+          html.agy-theme-active-v2[data-agy-view="settings"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.82); }
+          html.agy-theme-active-v2[data-agy-view="review"] #agy-theme-wallpaper-v2 { opacity: .15; filter: saturate(.62) brightness(1.05); }
+
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] {
+            color: var(--agy-text) !important;
+            background: var(--agy-sidebar) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            box-shadow: 10px 0 30px color-mix(in srgb, var(--agy-shadow) 42%, transparent);
+            backdrop-filter: blur(20px) saturate(1.06);
+          }
+          html.agy-theme-active-v2 [data-agy-surface="main"] {
+            color: var(--agy-text) !important;
+            transition: background .25s ease, box-shadow .25s ease;
+          }
+          html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="main"] { background: transparent !important; }
+          html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="main"],
+          html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="main"] {
+            background: var(--agy-content) !important;
+            box-shadow: inset 1px 0 0 color-mix(in srgb, var(--agy-border) 65%, transparent);
+            backdrop-filter: blur(17px) saturate(.9);
+          }
+
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-foreground"],
+          html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-foreground"],
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-foreground"],
+          html.agy-theme-active-v2 [data-agy-component="popover"] [class~="text-foreground"] { color: var(--agy-text) !important; }
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-secondary-foreground"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="text-muted-foreground"],
+          html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-secondary-foreground"],
+          html.agy-theme-active-v2 [data-agy-surface="main"] [class~="text-muted-foreground"],
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-secondary-foreground"],
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="text-muted-foreground"] { color: var(--agy-muted) !important; }
+
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-card"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-secondary"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"] {
+            background-color: color-mix(in srgb, var(--agy-accent-soft) 62%, white) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover {
+            background-color: color-mix(in srgb, var(--agy-accent-soft) 78%, transparent) !important;
+            color: var(--agy-text) !important;
+          }
+
+          html.agy-theme-active-v2 [data-agy-component="composer"] {
+            color: var(--agy-text) !important;
+            background: color-mix(in srgb, var(--agy-input) 97%, var(--agy-accent-soft)) !important;
+            border: 1px solid color-mix(in srgb, var(--agy-accent) 32%, transparent) !important;
+            box-shadow: 0 14px 38px color-mix(in srgb, var(--agy-shadow) 72%, transparent), 0 2px 8px rgba(0,0,0,.04) !important;
+            backdrop-filter: blur(18px) saturate(1.04);
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer-inner"] {
+            background: transparent !important;
+            color: var(--agy-text) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer"] button,
+          html.agy-theme-active-v2 [data-agy-component="model-picker"] {
+            color: var(--agy-muted) !important;
+            background: transparent !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer"] button:hover,
+          html.agy-theme-active-v2 [data-agy-component="model-picker"]:hover {
+            color: var(--agy-text) !important;
+            background: var(--agy-accent-soft) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="composer"]:focus-within {
+            border-color: color-mix(in srgb, var(--agy-accent) 65%, transparent) !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--agy-accent) 14%, transparent), 0 16px 42px var(--agy-shadow) !important;
+          }
+
+          html.agy-theme-active-v2 [data-agy-component="settings-backdrop"] {
+            background: rgba(26,32,31,.32) !important;
+            backdrop-filter: blur(7px) saturate(.75);
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] {
+            color: var(--agy-text) !important;
+            background: var(--agy-dialog) !important;
+            border: 1px solid color-mix(in srgb, var(--agy-accent) 24%, transparent) !important;
+            box-shadow: 0 30px 90px rgba(18,27,25,.30), 0 4px 14px rgba(18,27,25,.10) !important;
+            opacity: 1 !important;
+            backdrop-filter: none !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-sidebar"] {
+            background: color-mix(in srgb, var(--agy-accent-soft) 38%, var(--agy-dialog)) !important;
+            border-right: 1px solid var(--agy-border) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-background"] { background: var(--agy-dialog) !important; }
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-secondary"],
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-card"],
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] [class~="bg-muted"] {
+            color: var(--agy-text) !important;
+            background: color-mix(in srgb, var(--agy-accent-soft) 48%, white) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="settings-dialog"] button:hover {
+            color: var(--agy-text) !important;
+            background-color: color-mix(in srgb, var(--agy-accent-soft) 74%, white) !important;
+          }
+
+          html.agy-theme-active-v2 [data-agy-component="popover"] {
+            color: var(--agy-text) !important;
+            background: var(--agy-dialog) !important;
+            border: 1px solid var(--agy-border) !important;
+            box-shadow: 0 18px 48px var(--agy-shadow), 0 3px 10px rgba(0,0,0,.08) !important;
+            opacity: 1 !important;
+            backdrop-filter: none !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="popover"] [class~="bg-secondary"],
+          html.agy-theme-active-v2 [data-agy-component="popover"] button:hover,
+          html.agy-theme-active-v2 [data-agy-component="popover"] [role="option"]:hover {
+            color: var(--agy-text) !important;
+            background: var(--agy-accent-soft) !important;
+          }
+
+          html.agy-theme-active-v2 [data-agy-component="agent-message"] {
+            color: var(--agy-text) !important;
+            background: color-mix(in srgb, var(--agy-dialog) 74%, transparent);
+            border: 1px solid color-mix(in srgb, var(--agy-border) 66%, transparent);
+            border-radius: 16px;
+            padding: 8px 10px;
+            box-shadow: 0 5px 18px color-mix(in srgb, var(--agy-shadow) 32%, transparent);
+          }
+          html.agy-theme-active-v2 [data-agy-component="semantic-card"] {
+            color: var(--agy-text) !important;
+            background: color-mix(in srgb, var(--agy-dialog) 94%, var(--agy-accent-soft)) !important;
+            border-color: var(--agy-border) !important;
+            box-shadow: 0 6px 20px color-mix(in srgb, var(--agy-shadow) 28%, transparent);
+          }
+          html.agy-theme-active-v2 [data-agy-component="review-card"] {
+            border-left: 3px solid var(--agy-accent) !important;
+            background: color-mix(in srgb, var(--agy-accent-soft) 42%, var(--agy-dialog)) !important;
+          }
+
+          html.agy-theme-active-v2 *:focus-visible {
+            outline: 2px solid color-mix(in srgb, var(--agy-accent) 74%, white) !important;
+            outline-offset: 2px !important;
+          }
+          html.agy-theme-active-v2 [class~="border-border"] { border-color: var(--agy-border) !important; }
+          html.agy-theme-active-v2 ::selection { background: color-mix(in srgb, var(--agy-accent) 28%, transparent); }
+
+          #agy-theme-switcher-v2 { position: fixed; right: 18px; bottom: 24px; z-index: 2147483000; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; }
+          #agy-theme-switcher-v2 button { font: inherit; }
+          #agy-theme-trigger-v2 { width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--agy-accent) 46%, white); border-radius: 14px; color: var(--agy-text); background: var(--agy-dialog); box-shadow: 0 10px 30px var(--agy-shadow); cursor: pointer; transition: transform .16s ease, background .16s ease; }
+          #agy-theme-trigger-v2:hover { transform: translateY(-2px) rotate(-3deg); background: var(--agy-accent-soft); }
+          #agy-theme-menu-v2 { display: none; position: absolute; right: 0; bottom: 52px; width: 226px; padding: 10px; border: 1px solid var(--agy-border); border-radius: 16px; color: var(--agy-text); background: var(--agy-dialog); box-shadow: 0 22px 58px var(--agy-shadow); }
+          #agy-theme-switcher-v2.open #agy-theme-menu-v2 { display: block; animation: agyThemeV2In .16s ease-out; }
+          #agy-theme-menu-v2 strong { display: block; padding: 5px 8px 9px; font-size: 12px; }
+          .agy-theme-v2-choice { display: flex; align-items: center; width: 100%; gap: 9px; padding: 9px; border: 0; border-radius: 10px; color: var(--agy-muted); background: transparent; cursor: pointer; text-align: left; font-size: 12px; }
+          .agy-theme-v2-choice:hover, .agy-theme-v2-choice.active { color: var(--agy-text); background: var(--agy-accent-soft); }
+          .agy-theme-v2-swatch { width: 10px; height: 10px; border-radius: 50%; background: var(--choice-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--choice-accent) 18%, transparent); }
+          .agy-theme-v2-native { margin-top: 5px; border-top: 1px solid var(--agy-border); border-radius: 0 0 10px 10px; }
+          @keyframes agyThemeV2In { from { opacity: 0; transform: translateY(7px) scale(.97); } to { opacity: 1; transform: none; } }
+          @media (prefers-reduced-motion: reduce) { #agy-theme-wallpaper-v2, #agy-theme-switcher-v2 * { transition: none !important; animation: none !important; } }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function ensureWallpaper() {
+        let wallpaper = document.getElementById('agy-theme-wallpaper-v2');
+        if (!wallpaper) {
+            wallpaper = document.createElement('div');
+            wallpaper.id = 'agy-theme-wallpaper-v2';
+            document.body.prepend(wallpaper);
+        }
+        return wallpaper;
+    }
+
+    function visible(element) {
+        if (!element || !element.isConnected) return false;
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    }
+
+    function compactText(element) {
+        return String(element && (element.innerText || element.textContent) || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function mark(element, key, value) {
+        if (!element) return;
+        const attribute = `data-agy-${key}`;
+        if (element.getAttribute(attribute) !== value) element.setAttribute(attribute, value);
+    }
+
+    function ancestorMatching(start, predicate, limit = 18) {
+        let current = start;
+        for (let index = 0; current && index < limit; index += 1, current = current.parentElement) {
+            if (predicate(current)) return current;
+        }
+        return null;
+    }
+
+    function detectView() {
+        const settings = document.querySelector('.settings-modal-container');
+        if (visible(settings)) return 'settings';
+        const reviewText = Array.from(document.querySelectorAll('button')).filter(visible).map(compactText).join(' ');
+        if (/审核|批准|拒绝|Approve|Reject/.test(reviewText) && document.querySelector('[role="article"]')) return 'review';
+        if (/^\/c\//.test(location.pathname) || document.querySelector('[role="article"][aria="Agent response"]')) return 'conversation';
+        return 'new-chat';
+    }
+
+    function annotateSemanticDom() {
+        if (!document.body) return;
+        const view = detectView();
+        if (document.documentElement.dataset.agyView !== view) document.documentElement.dataset.agyView = view;
+
+        const app = Array.from(document.querySelectorAll('#root *')).find(element => {
+            const className = String(element.className || '');
+            return className.includes('h-screen') && className.includes('w-screen') && className.includes('bg-background');
+        });
+        mark(app, 'surface', 'app');
+
+        const newChatButton = Array.from(document.querySelectorAll('button')).find(element => compactText(element) === '新建对话' && element.getBoundingClientRect().x < 260);
+        const sidebarCandidates = [];
+        for (let current = newChatButton; current; current = current.parentElement) {
+            const rect = current.getBoundingClientRect();
+            if (rect.x <= 2 && rect.width >= 210 && rect.width <= 280 && rect.height > innerHeight * .72) sidebarCandidates.push(current);
+        }
+        const sidebar = sidebarCandidates.sort((a, b) => a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
+        mark(sidebar, 'surface', 'sidebar');
+
+        const composer = document.getElementById('antigravity.agentSidePanelInputBox');
+        mark(composer, 'component', 'composer');
+        if (composer) {
+            const inner = Array.from(composer.children).find(child => String(child.className || '').includes('bg-card')) || composer.firstElementChild;
+            mark(inner, 'component', 'composer-inner');
+            const modelPicker = composer.querySelector('[aria-label*="选择模型"], [aria-label*="Select model"]');
+            mark(modelPicker, 'component', 'model-picker');
+            const main = ancestorMatching(composer, element => {
+                const rect = element.getBoundingClientRect();
+                const className = String(element.className || '');
+                return rect.width > innerWidth * .62 && rect.height > innerHeight * .75 && className.includes('flex-1') && className.includes('flex-col') && className.includes('min-w-0');
+            });
+            mark(main, 'surface', 'main');
+            const hero = ancestorMatching(composer, element => String(element.className || '').includes('pt-[30vh]'));
+            mark(hero, 'component', 'new-chat-hero');
+        }
+
+        const backdrop = document.querySelector('.settings-modal-backdrop');
+        const settingsDialog = document.querySelector('.settings-modal-container');
+        mark(backdrop, 'component', 'settings-backdrop');
+        mark(settingsDialog, 'component', 'settings-dialog');
+        if (settingsDialog) {
+            const dialogRect = settingsDialog.getBoundingClientRect();
+            const settingSidebar = Array.from(settingsDialog.querySelectorAll('div')).filter(visible).find(element => {
+                const rect = element.getBoundingClientRect();
+                return rect.x <= dialogRect.x + 230 && rect.width >= 180 && rect.width <= 240 && rect.height > dialogRect.height * .78;
+            });
+            mark(settingSidebar, 'component', 'settings-sidebar');
+        }
+
+        document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]').forEach(element => {
+            if (!settingsDialog || !settingsDialog.contains(element)) mark(element, 'component', 'popover');
+        });
+
+        document.querySelectorAll('[role="article"][aria="Agent response"]').forEach(element => mark(element, 'component', 'agent-message'));
+        document.querySelectorAll('[role="article"] [class*="border"][class*="rounded"]').forEach(element => {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 180 && rect.width < 820 && rect.height > 44) mark(element, 'component', 'semantic-card');
+        });
+        Array.from(document.querySelectorAll('button')).filter(element => /审核|批准|拒绝|Approve|Reject/.test(compactText(element))).forEach(button => {
+            const card = ancestorMatching(button, element => {
+                const rect = element.getBoundingClientRect();
+                return rect.width > 220 && rect.width < 900 && rect.height > 70 && String(element.className || '').includes('border');
+            }, 10);
+            mark(card, 'component', 'review-card');
+        });
+    }
+
+    function scheduleSemanticUpdate() {
+        clearTimeout(semanticTimer);
+        semanticTimer = setTimeout(annotateSemanticDom, 70);
+    }
+
+    function setThemeVariables(theme) {
+        const root = document.documentElement;
+        const values = {
+            '--agy-accent': theme.accent,
+            '--agy-accent-soft': theme.accentSoft,
+            '--agy-app': theme.app,
+            '--agy-sidebar': theme.sidebar,
+            '--agy-content': theme.content,
+            '--agy-dialog': theme.dialog,
+            '--agy-input': theme.input,
+            '--agy-text': theme.text,
+            '--agy-muted': theme.muted,
+            '--agy-border': theme.border,
+            '--agy-shadow': theme.shadow,
+            '--agy-wallpaper-position': theme.position
+        };
+        Object.entries(values).forEach(([name, value]) => root.style.setProperty(name, value));
+    }
+
+    function updateChoiceState(themeId) {
+        document.querySelectorAll('.agy-theme-v2-choice').forEach(button => button.classList.toggle('active', button.dataset.themeId === themeId));
+    }
+
+    function applyConfig(config) {
+        if (!document.body) return;
+        ensureStyle();
+        const wallpaper = ensureWallpaper();
+        if (!config || !config.enabled || config.id === 'native') {
+            document.documentElement.classList.remove('agy-theme-active-v2');
+            document.documentElement.removeAttribute('data-agy-theme');
+            wallpaper.style.backgroundImage = '';
+            activeImageKey = '';
+            updateChoiceState('native');
+            return;
+        }
+        const theme = catalog.find(item => item.id === config.id) || catalog[0];
+        if (!config.imageDataUrl) return;
+        const imageKey = `${config.id}:${config.revision || config.updatedAt || ''}`;
+        if (activeImageKey !== imageKey) {
+            wallpaper.style.backgroundImage = `url("${config.imageDataUrl}")`;
+            activeImageKey = imageKey;
+        }
+        setThemeVariables(theme);
+        document.documentElement.classList.add('agy-theme-active-v2');
+        document.documentElement.dataset.agyTheme = theme.id;
+        updateChoiceState(theme.id);
+        scheduleSemanticUpdate();
+    }
+
+    function ensureSwitcher() {
+        if (document.getElementById('agy-theme-switcher-v2')) return;
+        const switcher = document.createElement('div');
+        switcher.id = 'agy-theme-switcher-v2';
+        const menu = document.createElement('div');
+        menu.id = 'agy-theme-menu-v2';
+        const title = document.createElement('strong');
+        title.textContent = 'Antigravity 主题皮肤';
+        menu.appendChild(title);
+        catalog.forEach(theme => {
+            const button = document.createElement('button');
+            button.className = 'agy-theme-v2-choice';
+            button.dataset.themeId = theme.id;
+            button.style.setProperty('--choice-accent', theme.accent);
+            button.innerHTML = '<span class="agy-theme-v2-swatch"></span><span></span>';
+            button.lastElementChild.textContent = theme.name;
+            button.addEventListener('click', async event => {
+                event.stopPropagation();
+                try {
+                    const config = await themeIpc.invoke('agy-theme:set', theme.id);
+                    lastRevision = config.revision || '';
+                    applyConfig(config);
+                } catch (error) {
+                    console.warn('[AGY Theme V2] switch failed:', error);
+                }
+                switcher.classList.remove('open');
+            });
+            menu.appendChild(button);
+        });
+        const nativeButton = document.createElement('button');
+        nativeButton.className = 'agy-theme-v2-choice agy-theme-v2-native';
+        nativeButton.dataset.themeId = 'native';
+        nativeButton.innerHTML = '<span class="agy-theme-v2-swatch" style="--choice-accent:#9aa4ad"></span><span>恢复原生主题</span>';
+        nativeButton.addEventListener('click', async event => {
+            event.stopPropagation();
+            try {
+                const config = await themeIpc.invoke('agy-theme:disable');
+                lastRevision = config.revision || '';
+                applyConfig(config);
+            } catch (error) {
+                console.warn('[AGY Theme V2] disable failed:', error);
+            }
+            switcher.classList.remove('open');
+        });
+        menu.appendChild(nativeButton);
+        const trigger = document.createElement('button');
+        trigger.id = 'agy-theme-trigger-v2';
+        trigger.type = 'button';
+        trigger.title = '切换主题皮肤';
+        trigger.setAttribute('aria-label', '切换主题皮肤');
+        trigger.textContent = '✦';
+        trigger.addEventListener('click', event => {
+            event.stopPropagation();
+            switcher.classList.toggle('open');
+        });
+        switcher.append(menu, trigger);
+        document.body.appendChild(switcher);
+        document.addEventListener('click', () => switcher.classList.remove('open'));
+    }
+
+    async function refreshTheme() {
+        try {
+            const config = await themeIpc.invoke('agy-theme:get', lastRevision);
+            if (!config || config.unchanged) return;
+            lastRevision = config.revision || '';
+            applyConfig(config);
+        } catch (error) {
+            console.warn('[AGY Theme V2] refresh failed:', error);
+        }
+    }
+
+    function removeLegacyEngine() {
+        document.getElementById('agy-theme-engine-style')?.remove();
+        document.getElementById('agy-theme-wallpaper')?.remove();
+        document.getElementById('agy-theme-switcher')?.remove();
+        document.documentElement.classList.remove('agy-theme-active', 'agy-chat-empty');
+    }
+
+    function start() {
+        removeLegacyEngine();
+        ensureStyle();
+        ensureWallpaper();
+        ensureSwitcher();
+        annotateSemanticDom();
+        refreshTheme();
+        setInterval(refreshTheme, 900);
+        setInterval(annotateSemanticDom, 800);
+        observer = new MutationObserver(scheduleSemanticUpdate);
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('popstate', scheduleSemanticUpdate);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
