@@ -124,6 +124,83 @@ try {
 
 (function() {
   const dictionary = {
+    "Use Global": "使用全局",
+    "Uses global settings when working in this project.": "在此项目中工作时使用全局设置。",
+    "All Workspaces": "全部工作区",
+    "user_global": "用户全局",
+    "Select branch": "选择分支",
+    "Edit project name": "编辑项目名称",
+    "Copy worktree name": "复制工作树名称",
+    "Gemini Models": "Gemini 模型",
+    "Select model, current: Gemini 3.5 Flash (Medium)": "选择模型，当前: Gemini 3.5 Flash (Medium)",
+    "Analyzing Template Loading Function": "正在分析模板加载函数",
+    "Checking Workspace Files": "正在检查工作区文件",
+    "Checking Graduation Thesis PDFs": "正在检查毕业论文 PDF 文件",
+    "Verifying Report Against Code": "正在对照代码验证报告",
+    "Finding Graduation Reports": "正在查找毕业报告",
+    "Reviewing Graduation Defense PPT": "正在审查毕业答辩 PPT",
+    "Browsing Data Audit Website": "正在浏览数据审计网站",
+    "Friendly Greeting And Chat": "友好问候与聊天",
+    "Queue After Turn": "回合结束后入队",
+    "Send Immediately": "立即发送",
+    "Queued Messages": "队列消息",
+    "Configure when follow-up messages are sent.": "配置后续消息的发送时机。",
+    "Google AI Pro": "Google AI 专业版",
+    "Loading token usage...": "正在加载 Token 使用情况...",
+    "Loading workspace customizations...": "正在加载工作区自定义设置...",
+    "No token data available.": "暂无 Token 使用数据。",
+    "You can upgrade to a Google AI Ultra plan to receive higher rate limits.": "您可以升级到 Google AI Ultra 计划以获得更高的速率限制。",
+    "Loading MCP servers...": "正在加载 MCP 服务器...",
+    "Add MCP": "添加 MCP 服务器",
+    "Open MCP Config": "打开 MCP 配置",
+    "Delete server": "删除服务器",
+    "Marketplace Gallery URL": "插件市场目录 URL",
+    "Marketplace Item URL": "插件市场项目 URL",
+    "Changes the base URL for marketplace search results. You must restart Antigravity to use the new marketplace after changing this value.": "更改插件市场搜索结果的基准 URL。更改此值后，您必须重启 Antigravity 才能使用新的插件市场。",
+    "Changes the base URL on each extension page. You must restart Antigravity to use the new marketplace after changing this value.": "更改每个扩展页面的基准 URL。更改此值后，您必须重启 Antigravity 才能使用新的插件市场。",
+    "Editor Settings": "编辑器设置",
+    "Open Editor Settings": "打开编辑器设置",
+    "Configure editor-specific behaviors and shortcuts.": "配置编辑器特定的行为和快捷键。",
+    "To modify editor settings, open Settings within the editor window.": "若要修改编辑器设置，请在编辑器窗口内打开设置。",
+    "Show \"Edit\" and \"Chat\" buttons when selecting text in the editor.": "在编辑器中选择文本时，显示“编辑”和“聊天”按钮。",
+    "Bot Name": "机器人名称",
+    "Avatar URL": "头像 URL",
+    "chat space": "聊天空间",
+    "or join the": "或加入",
+    "For help, visit": "如需帮助，请访问",
+    "Configure a chat bot so you can use Jetski directly from Google Chat.": "配置聊天机器人，以便您可以直接从 Google Chat 中使用 Jetski。",
+    "Jetski Chat": "Jetski 聊天",
+    "CitC Settings": "CitC 开发环境设置",
+    "Manage settings specific to Google CitC workspaces development.": "管理特定于 Google CitC 工作区开发的设置。",
+    "Manage your notification preferences.": "管理您的通知偏好。",
+    "Setup Jetski Chat": "设置 Jetski 聊天",
+    "Google Chrome": "Google Chrome 浏览器",
+    "Google Drive integration not available": "Google 云端硬盘集成不可用",
+    "Configure agent execution, queued message delivery, and permissions.": "配置智能体执行、队列消息投递和权限。",
+    "Show all": "显示全部",
+    "No Project": "无项目",
+    "Try out early-stage features before they ship. These may change or be removed at any time.": "在正式发布前试用早期功能。这些功能可能随时更改或移除。",
+    "when working in this project.": "在此项目中工作时。",
+    "Also includes": "同时包括",
+    "Undo changes up to this point": "撤销更改至此",
+    "Cancel (Ctrl+D)": "取消 (Ctrl+D)",
+    "Agent response": "智能体回复",
+    "User message": "用户消息",
+    "Send message": "发送消息",
+    "Record voice memo": "录制语音备忘录",
+    "Implementation Plan": "实施计划",
+    "Skills Used": "已使用技能",
+    "Bad response": "差评回复",
+    "Good response": "好评回复",
+    "Load older messages": "加载历史消息",
+    "Auxiliary Pane": "辅助窗格",
+    "Typeahead menu": "自动联想菜单",
+    "To use the agent, please login": "使用智能体前，请先登录",
+    "Success, Continuing...": "成功，正在继续...",
+    "Previous": "上一步",
+    "Awaiting Authentication...": "等待认证中...",
+    "Having trouble? Let us know": "遇到困难？联系我们",
+    "There was an unexpected issue setting up your account.": "设置您的账号时发生了意外问题。",
     "Project Settings": "项目设置",
     "New Conversation in Project": "在项目中新建对话",
     "Pin Conversation": "固定对话",
@@ -734,6 +811,12 @@ try {
   const combinedDict = Object.assign({}, coreWords, dictionary);
 
   const substringReplacements = [
+    { search: " tokens", replace: " 标记" },
+    { search: "Load older messages, showing", replace: "加载历史消息，当前显示" },
+    { search: "of", replace: "共" },
+    { search: "See all", replace: "查看全部" },
+    { search: "Worked for", replace: "已工作 " },
+    { search: "Thinking for", replace: "已思考 " },
     { search: 'Plugins are packaged collections of skills and MCPs to help the Agent in Antigravity work with Google developer products. You can always change your choices in Settings.', replace: '插件是包含技能和 MCP 服务封装的资源包，旨在协助 Antigravity 智能体调用 Google 开发者产品。您随时可以在设置中更改选择。' },
     { search: 'Plugins are packaged collections of skills and MCPs to help the Agent', replace: '插件是包含技能和 MCP 服务封装的资源包，旨在协助智能体' },
     { search: 'in Antigravity', replace: '在 Antigravity 中' },
@@ -1308,6 +1391,164 @@ try {
     return false;
   }
 
+  const translationAuditState = {
+    translated: new Set(),
+    missingSeen: new Set(),
+    missing: new Map(),
+    flushTimer: null,
+    flushPromise: null
+  };
+
+  const translationAuditIgnore = new Set([
+    'antigravity', 'google', 'gemini', 'claude', 'openai', 'github', 'gitlab',
+    'firebase', 'chrome', 'chromium', 'electron', 'javascript', 'typescript',
+    'python', 'windows', 'macos', 'linux', 'json', 'yaml', 'html', 'css', 'api',
+    'mcp', 'sdk', 'cli', 'gpt', 'gpt-oss', 'oauth', 'url', 'uri', 'http', 'https'
+  ]);
+
+  const translationAuditSingleWordUi = new Set([
+    'accept', 'account', 'actions', 'add', 'advanced', 'allow', 'appearance', 'apply',
+    'approve', 'back', 'browse', 'cancel', 'clear', 'close', 'confirm', 'connect',
+    'continue', 'copy', 'create', 'delete', 'deny', 'disable', 'download', 'edit',
+    'enable', 'error', 'export', 'failed', 'finish', 'general', 'hide', 'history',
+    'import', 'install', 'language', 'loading', 'manage', 'media', 'model', 'new',
+    'next', 'open', 'permissions', 'previous', 'project', 'refresh', 'reject',
+    'remove', 'rename', 'reset', 'retry', 'run', 'running', 'save', 'search',
+    'select', 'settings', 'share', 'show', 'skip', 'start', 'status', 'stop',
+    'submit', 'success', 'theme', 'tools', 'uninstall', 'update', 'upload', 'view',
+    'warning', 'workspace'
+  ]);
+
+  function normalizeAuditText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isLikelyUntranslatedUiText(value) {
+    const text = normalizeAuditText(value);
+    if (text.length < 2 || text.length > 180) return false;
+    if (/[一-鿿]/.test(text) || !/[A-Za-z]/.test(text)) return false;
+    if (/^(?:https?:\/\/|www\.|file:|data:|blob:)/i.test(text)) return false;
+    if (/\b[A-Z]:\\|(?:^|\s)[./~][\w./\\-]+/.test(text)) return false;
+    if (/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/.test(text)) return false;
+    if (/^[a-f0-9]{24,}$/i.test(text) || /^[A-Za-z0-9+/=_-]{48,}$/.test(text)) return false;
+    if (/^[\w.-]+\.(?:js|ts|tsx|jsx|json|md|css|html|py|ps1|bat|exe|dll)$/i.test(text)) return false;
+    if (/^[{}[\]()<>=_$#@`'"\\/|:;,.+*?!~-]+$/.test(text)) return false;
+
+    const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+    if (words.length === 0 || words.length > 28) return false;
+    if (words.length === 1 && translationAuditIgnore.has(words[0].toLowerCase())) return false;
+    if (words.length === 1 && !translationAuditSingleWordUi.has(words[0].toLowerCase())) return false;
+    return true;
+  }
+
+  function isAuditExcludedElement(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return true;
+    if (element.closest && element.closest(
+      '#antigravity-quota-widget, #antigravity-translation-audit, [data-agy-translation-audit], ' +
+      'input, textarea, [contenteditable="true"], pre, code, .monaco-editor, ' +
+      '.markdown, .markdown-body, .prose, .user-message, .assistant-message, .message-content'
+    )) return true;
+    const root = element.getRootNode && element.getRootNode();
+    return Boolean(root && root.host && (
+      root.host.id === 'antigravity-quota-widget' ||
+      root.host.id === 'antigravity-translation-audit'
+    ));
+  }
+
+  function buildAuditSelector(element) {
+    if (!element || !element.tagName) return '';
+    const parts = [];
+    let current = element;
+    for (let depth = 0; current && current.tagName && depth < 3; depth += 1) {
+      let part = current.tagName.toLowerCase();
+      const role = current.getAttribute && current.getAttribute('role');
+      const testId = current.getAttribute && current.getAttribute('data-testid');
+      if (role && /^[\w-]{1,40}$/.test(role)) part += `[role="${role}"]`;
+      if (testId && /^[\w-]{1,60}$/.test(testId)) part += `[data-testid="${testId}"]`;
+      const classes = current.classList
+        ? Array.from(current.classList).filter(c => /^[A-Za-z_-][\w-]{0,50}$/.test(c)).slice(0, 2)
+        : [];
+      if (classes.length) part += '.' + classes.join('.');
+      parts.unshift(part);
+      current = current.parentElement;
+    }
+    return parts.join(' > ').slice(0, 300);
+  }
+
+  function flushMissingTranslations() {
+    if (translationAuditState.flushPromise || translationAuditState.missing.size === 0) {
+      return translationAuditState.flushPromise || Promise.resolve();
+    }
+    const entries = Array.from(translationAuditState.missing.values());
+    translationAuditState.missing.clear();
+    translationAuditState.flushPromise = electron_1.ipcRenderer
+      .invoke('translations:record-missing', entries)
+      .catch(() => {
+        for (const entry of entries) {
+          const key = `${entry.text.toLowerCase()}\u0000${entry.attribute}`;
+          const existing = translationAuditState.missing.get(key);
+          if (existing) existing.count += entry.count;
+          else translationAuditState.missing.set(key, entry);
+        }
+      })
+      .finally(() => {
+        translationAuditState.flushPromise = null;
+        if (translationAuditState.missing.size > 0) scheduleMissingTranslationFlush();
+      });
+    return translationAuditState.flushPromise;
+  }
+
+  function scheduleMissingTranslationFlush() {
+    if (translationAuditState.flushTimer) return;
+    translationAuditState.flushTimer = setTimeout(() => {
+      translationAuditState.flushTimer = null;
+      flushMissingTranslations();
+    }, 1500);
+  }
+
+  function recordTranslationAudit(original, translated, element, attribute = 'textContent') {
+    const text = normalizeAuditText(original);
+    if (!isLikelyUntranslatedUiText(text) || isAuditExcludedElement(element)) return;
+    if (normalizeAuditText(translated) !== text && /[一-鿿]/.test(translated)) {
+      translationAuditState.translated.add(text.toLowerCase());
+      return;
+    }
+
+    const key = `${text.toLowerCase()}\u0000${attribute}`;
+    translationAuditState.missingSeen.add(key);
+    const now = new Date().toISOString();
+    const existing = translationAuditState.missing.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.lastSeen = now;
+    } else {
+      translationAuditState.missing.set(key, {
+        text,
+        route: `${location.pathname || ''}${location.hash || ''}`.slice(0, 240),
+        element: element && element.tagName ? element.tagName.toLowerCase() : '',
+        attribute,
+        selector: buildAuditSelector(element),
+        count: 1,
+        firstSeen: now,
+        lastSeen: now
+      });
+    }
+    scheduleMissingTranslationFlush();
+  }
+
+  function getTranslationAuditSessionStats() {
+    const translated = translationAuditState.translated.size;
+    const missing = translationAuditState.missingSeen.size;
+    const total = translated + missing;
+    return {
+      translated,
+      missing,
+      coverage: total > 0 ? Math.round((translated / total) * 1000) / 10 : 100
+    };
+  }
+
+  window.addEventListener('beforeunload', () => flushMissingTranslations());
+
   function translateNode(node) {
     if (!node) return;
     if (shouldSkipNode(node)) return;
@@ -1315,6 +1556,7 @@ try {
     if (node.nodeType === Node.TEXT_NODE) {
       const original = node.nodeValue;
       const translated = translateString(original);
+      recordTranslationAudit(original, translated, node.parentElement, 'textContent');
       if (original !== translated) {
         node.nodeValue = translated;
       }
@@ -1324,10 +1566,11 @@ try {
           if (attr === 'value' && (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA')) {
             return;
           }
-          const original = node.getAttribute(attr);
-          if (original && (node.tagName !== 'INPUT' || node.type === 'button' || node.type === 'submit' || attr !== 'value')) {
-            const translated = translateString(original);
-            if (original !== translated) {
+            const original = node.getAttribute(attr);
+            if (original && (node.tagName !== 'INPUT' || node.type === 'button' || node.type === 'submit' || attr !== 'value')) {
+              const translated = translateString(original);
+              recordTranslationAudit(original, translated, node, attr);
+              if (original !== translated) {
               node.setAttribute(attr, translated);
             }
           }
@@ -1372,6 +1615,7 @@ try {
             if (!shouldSkipNode(node)) {
               const original = node.nodeValue;
               const translated = translateString(original);
+              recordTranslationAudit(original, translated, node.parentElement, 'textContent');
               if (original !== translated) {
                 node.nodeValue = translated;
               }
@@ -1386,6 +1630,7 @@ try {
               const original = target.getAttribute(attrName);
               if (original) {
                 const translated = translateString(original);
+                recordTranslationAudit(original, translated, target, attrName);
                 if (original !== translated) {
                   target.setAttribute(attrName, translated);
                 }
@@ -1646,7 +1891,7 @@ try {
       overlay.style.background = theme.overlay;
       overlay.style.backdropFilter = 'blur(6px)';
       overlay.style.webkitBackdropFilter = 'blur(6px)';
-      overlay.style.zIndex = '999999';
+      overlay.style.zIndex = '2147483647';
       overlay.style.display = 'flex';
       overlay.style.alignItems = 'center';
       overlay.style.justifyContent = 'center';
@@ -1942,6 +2187,196 @@ try {
     } catch (e) {
       console.error('[preload] Quick login UI injection failed:', e);
     }
+  }
+
+  function escapeTranslationAuditHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
+  }
+
+  async function showTranslationAuditPanel() {
+    const existing = document.getElementById('antigravity-translation-audit');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    await flushMissingTranslations();
+    const host = document.createElement('div');
+    host.id = 'antigravity-translation-audit';
+    host.setAttribute('data-agy-translation-audit', 'true');
+    document.body.appendChild(host);
+    const root = host.attachShadow({ mode: 'open' });
+    root.innerHTML = `
+      <style>
+        :host { color-scheme: light dark; }
+        .overlay {
+          position: fixed; inset: 0; z-index: 1000000; display: grid; place-items: center;
+          padding: 24px; box-sizing: border-box; background: rgba(0,0,0,.36);
+          font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+        }
+        .dialog {
+          width: min(760px, calc(100vw - 32px)); height: min(680px, calc(100vh - 48px));
+          display: grid; grid-template-rows: auto auto auto 1fr auto; overflow: hidden;
+          border: 1px solid var(--vscode-widget-border, rgba(127,127,127,.28)); border-radius: 8px;
+          background: var(--vscode-editor-background, Canvas); color: var(--vscode-editor-foreground, CanvasText);
+          box-shadow: 0 18px 54px rgba(0,0,0,.28);
+        }
+        .header, .toolbar, .footer { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+        .header { border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,.22)); }
+        .title { min-width: 0; flex: 1; }
+        h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0; }
+        .subtitle { margin-top: 3px; color: var(--vscode-descriptionForeground, GrayText); font-size: 11px; }
+        button, input { font: inherit; letter-spacing: 0; }
+        button {
+          min-height: 30px; border: 1px solid var(--vscode-button-border, rgba(127,127,127,.28)); border-radius: 5px;
+          padding: 5px 10px; cursor: pointer; color: var(--vscode-button-secondaryForeground, CanvasText);
+          background: var(--vscode-button-secondaryBackground, color-mix(in srgb, CanvasText 8%, Canvas));
+        }
+        button:hover { background: var(--vscode-button-secondaryHoverBackground, color-mix(in srgb, CanvasText 14%, Canvas)); }
+        .close { width: 30px; padding: 0; font-size: 20px; line-height: 1; border-color: transparent; background: transparent; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,.18)); }
+        .stat { padding: 11px 16px; border-right: 1px solid var(--vscode-widget-border, rgba(127,127,127,.18)); }
+        .stat:last-child { border-right: 0; }
+        .stat strong { display: block; font-size: 18px; font-weight: 600; }
+        .stat span { color: var(--vscode-descriptionForeground, GrayText); font-size: 11px; }
+        .toolbar { border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,.18)); }
+        .search {
+          flex: 1; min-width: 120px; height: 30px; box-sizing: border-box; padding: 5px 9px;
+          border: 1px solid var(--vscode-input-border, rgba(127,127,127,.28)); border-radius: 5px;
+          background: var(--vscode-input-background, Canvas); color: var(--vscode-input-foreground, CanvasText); outline: none;
+        }
+        .search:focus { border-color: var(--vscode-focusBorder, #3b82f6); }
+        .list { overflow: auto; }
+        .row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--vscode-widget-border, rgba(127,127,127,.13)); }
+        .row:hover { background: var(--vscode-list-hoverBackground, color-mix(in srgb, CanvasText 5%, Canvas)); }
+        .source { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; user-select: text; }
+        .meta { margin-top: 4px; color: var(--vscode-descriptionForeground, GrayText); font-size: 10px; overflow-wrap: anywhere; }
+        .count { align-self: start; color: var(--vscode-descriptionForeground, GrayText); font-size: 11px; white-space: nowrap; }
+        .empty { padding: 48px 20px; color: var(--vscode-descriptionForeground, GrayText); text-align: center; font-size: 12px; }
+        .footer { justify-content: flex-end; border-top: 1px solid var(--vscode-widget-border, rgba(127,127,127,.2)); }
+        .status { flex: 1; min-width: 0; color: var(--vscode-descriptionForeground, GrayText); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .danger { color: var(--vscode-errorForeground, #d84848); }
+        @media (max-width: 560px) {
+          .overlay { padding: 8px; } .dialog { width: 100%; height: calc(100vh - 16px); }
+          .toolbar { flex-wrap: wrap; } .search { flex-basis: 100%; } .stats { grid-template-columns: 1fr 1fr 1fr; }
+          .stat { padding: 9px; } .stat strong { font-size: 15px; }
+        }
+      </style>
+      <div class="overlay">
+        <section class="dialog" role="dialog" aria-modal="true" aria-label="汉化覆盖检查">
+          <header class="header">
+            <div class="title"><h2>汉化覆盖检查</h2><div class="subtitle">自动收集实际界面中尚未翻译的英文</div></div>
+            <button class="close" title="关闭" aria-label="关闭">×</button>
+          </header>
+          <div class="stats">
+            <div class="stat"><strong class="total">--</strong><span>累计漏译</span></div>
+            <div class="stat"><strong class="session">--</strong><span>本次发现</span></div>
+            <div class="stat"><strong class="coverage">--</strong><span>本次覆盖率</span></div>
+          </div>
+          <div class="toolbar">
+            <input class="search" type="search" placeholder="搜索英文、页面或元素">
+            <button class="copy">复制 JSON</button>
+            <button class="export">导出</button>
+            <button class="clear danger">清空</button>
+          </div>
+          <div class="list"><div class="empty">正在读取漏译报告...</div></div>
+          <footer class="footer"><span class="status"></span><button class="refresh">刷新</button></footer>
+        </section>
+      </div>`;
+
+    const overlay = root.querySelector('.overlay');
+    const list = root.querySelector('.list');
+    const search = root.querySelector('.search');
+    const status = root.querySelector('.status');
+    let items = [];
+
+    const close = () => host.remove();
+    root.querySelector('.close').onclick = close;
+    overlay.onclick = event => { if (event.target === overlay) close(); };
+    host.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      const filtered = query ? items.filter(item =>
+        `${item.text} ${item.route} ${item.element} ${item.attribute}`.toLowerCase().includes(query)
+      ) : items;
+      if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty">${items.length ? '没有匹配的漏译' : '暂未发现漏译，继续浏览不同页面即可自动检查'}</div>`;
+        return;
+      }
+      list.innerHTML = filtered.map(item => `
+        <div class="row">
+          <div><div class="source">${escapeTranslationAuditHtml(item.text)}</div>
+          <div class="meta">${escapeTranslationAuditHtml(item.route || '当前页面')} · ${escapeTranslationAuditHtml(item.element || 'element')}.${escapeTranslationAuditHtml(item.attribute || 'textContent')}</div></div>
+          <span class="count">出现 ${Number(item.count) || 1} 次</span>
+        </div>`).join('');
+    }
+
+    // 判定某个文本是否在当前汉化引擎中已被译出（支持精确字典与子串规则Live检测）
+    function isTextAlreadyTranslated(text) {
+      if (!text) return false;
+      const lower = text.toLowerCase().trim();
+      if (combinedDict[text] || dictionary[text] || coreWords[text]) return true;
+      if (combinedDict[lower] || dictionary[lower] || coreWords[lower]) return true;
+      for (const repl of substringReplacements) {
+        if (text.includes(repl.search)) return true;
+      }
+      return false;
+    }
+
+    async function load() {
+      status.textContent = '正在同步...';
+      await flushMissingTranslations();
+      const result = await electron_1.ipcRenderer.invoke('translations:get-missing');
+      const originalItems = result && Array.isArray(result.items) ? result.items : [];
+      
+      // 1. 过滤掉所有在当前版本中【已被汉化补全】的词条
+      items = originalItems.filter(item => !isTextAlreadyTranslated(item.text));
+
+      // 2. 物理磁盘数据自清洗：如果旧的历史账单里有词条已被我们刚刚翻译了，自动重写存盘剔除它
+      if (items.length < originalItems.length) {
+        await electron_1.ipcRenderer.invoke('translations:clear-missing');
+        if (items.length > 0) {
+          await electron_1.ipcRenderer.invoke('translations:record-missing', items);
+        }
+      }
+
+      const sessionStats = getTranslationAuditSessionStats();
+      root.querySelector('.total').textContent = String(items.length);
+      root.querySelector('.session').textContent = String(sessionStats.missing);
+      root.querySelector('.coverage').textContent = `${sessionStats.coverage}%`;
+      const widget = document.getElementById('antigravity-quota-widget');
+      const badge = widget && widget.shadowRoot && widget.shadowRoot.querySelector('.translation-audit-badge');
+      if (badge) badge.textContent = String(items.length);
+      status.textContent = result.path || '';
+      render();
+    }
+
+    search.oninput = render;
+    root.querySelector('.refresh').onclick = load;
+    root.querySelector('.copy').onclick = async () => {
+      const result = await electron_1.ipcRenderer.invoke('translations:copy-missing');
+      status.textContent = result.success ? `已复制 ${result.count} 条漏译` : '复制失败';
+    };
+    root.querySelector('.export').onclick = async () => {
+      const result = await electron_1.ipcRenderer.invoke('translations:export-missing');
+      if (result.success) status.textContent = `已导出到 ${result.path}`;
+    };
+    root.querySelector('.clear').onclick = async () => {
+      const confirmed = await showBeautifulConfirm('清空漏译报告', '确定清空目前自动收集的全部漏译记录吗？', '清空', '取消');
+      if (!confirmed) return;
+      await electron_1.ipcRenderer.invoke('translations:clear-missing');
+      translationAuditState.missing.clear();
+      translationAuditState.missingSeen.clear();
+      await load();
+    };
+
+    search.focus();
+    load().catch(error => {
+      list.innerHTML = `<div class="empty">读取失败：${escapeTranslationAuditHtml(error.message)}</div>`;
+    });
   }
 
   function injectQuotaWidget() {
@@ -2275,6 +2710,21 @@ try {
             background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, var(--ag-hover))) !important;
             color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground, var(--ag-accent))) !important;
           }
+          .translation-audit-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            margin-top: 3px; padding-top: 6px; border-top: 1px solid var(--ag-border);
+          }
+          .translation-audit-btn {
+            display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 2px 0;
+            border: 0; background: transparent; color: var(--ag-muted-fg); font: inherit;
+            font-size: 10px; cursor: pointer;
+          }
+          .translation-audit-btn:hover { color: var(--ag-accent); }
+          .translation-audit-badge {
+            min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--ag-active); color: var(--ag-accent); font-size: 9px; font-weight: 600;
+          }
         `;
         root.appendChild(style);
         
@@ -2291,8 +2741,24 @@ try {
             <span class="quota-5h">--</span>
           </div>
           <div class="accounts-container"></div>
+          <div class="translation-audit-row">
+            <button class="translation-audit-btn" type="button" title="查看自动收集的漏译">
+              <span>汉化覆盖检查</span><span class="translation-audit-badge">0</span>
+            </button>
+          </div>
         `;
         root.appendChild(card);
+
+        const auditBtn = root.querySelector('.translation-audit-btn');
+        auditBtn.onclick = event => {
+          event.stopPropagation();
+          showTranslationAuditPanel();
+        };
+        auditBtn.onmousedown = event => event.stopPropagation();
+        electron_1.ipcRenderer.invoke('translations:get-missing').then(result => {
+          const badge = root.querySelector('.translation-audit-badge');
+          if (badge) badge.textContent = String(result && result.items ? result.items.length : 0);
+        }).catch(() => {});
         
         card.onclick = () => {
           settingsBtn.click();

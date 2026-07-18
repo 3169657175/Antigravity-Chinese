@@ -70,6 +70,38 @@ function getLogPath(filename) {
     }
 }
 
+function getMissingTranslationsPath() {
+    return getLogPath('translation-missing.json');
+}
+
+function normalizeMissingTranslationEntry(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const text = String(entry.text || '').replace(/\s+/g, ' ').trim();
+    if (text.length < 2 || text.length > 240) return null;
+    return {
+        text,
+        route: String(entry.route || '').slice(0, 240),
+        element: String(entry.element || '').slice(0, 40),
+        attribute: String(entry.attribute || 'textContent').slice(0, 40),
+        selector: String(entry.selector || '').slice(0, 300),
+        count: Math.max(1, Math.min(Number(entry.count) || 1, 10000)),
+        firstSeen: String(entry.firstSeen || new Date().toISOString()),
+        lastSeen: String(entry.lastSeen || new Date().toISOString())
+    };
+}
+
+async function readMissingTranslations() {
+    try {
+        const data = await readJsonWithRetry(getMissingTranslationsPath(), 2, 20);
+        return data && Array.isArray(data.items) ? data : { version: 1, items: [] };
+    } catch (e) {
+        if (e && e.code !== 'ENOENT') {
+            console.warn('[translations] Failed to read missing translation report:', e.message);
+        }
+        return { version: 1, items: [] };
+    }
+}
+
 const DEBUG_QUOTA_LOGS = process.env.ANTIGRAVITY_DEBUG_QUOTA === '1';
 function appendQuotaDebugLog(text) {
     if (!DEBUG_QUOTA_LOGS) {
@@ -493,6 +525,9 @@ function registerIpcHandlers(storageManager) {
             let detail = await readJsonWithRetry(detailPath);
             const storedToken = (0, accountVault_1.readAccountToken)(detail, electron_1.safeStorage);
             const accountToken = storedToken.token;
+            if (!accountToken) {
+                throw new Error("该账号的加密登录信息已失效（例如由于系统权限或软件环境变更），请在左下角点击‘添加账号’重新登录。");
+            }
             if (storedToken.needsMigration) {
                 detail = (0, accountVault_1.protectAccountDetail)(detail, accountToken, electron_1.safeStorage);
                 await writeJsonAtomic(detailPath, detail);
@@ -636,6 +671,101 @@ function registerIpcHandlers(storageManager) {
             const fs = require('fs');
             fs.appendFileSync(getLogPath('sniff_combined.log'), '[' + new Date().toISOString() + '] ' + msg + '\n', 'utf-8');
         } catch(e) {}
+    });
+
+    // Missing-translation audit. Renderer writes are batched and serialized to
+    // keep DOM observation from turning into frequent disk I/O.
+    let translationWriteQueue = Promise.resolve();
+    electron_1.ipcMain.handle('translations:record-missing', async (_event, entries) => {
+        const batch = (Array.isArray(entries) ? entries : [])
+            .slice(0, 250)
+            .map(normalizeMissingTranslationEntry)
+            .filter(Boolean);
+        if (batch.length === 0) return { success: true, count: 0 };
+
+        translationWriteQueue = translationWriteQueue.then(async () => {
+            const report = await readMissingTranslations();
+            const byKey = new Map();
+            for (const item of report.items) {
+                const normalized = normalizeMissingTranslationEntry(item);
+                if (!normalized) continue;
+                byKey.set(`${normalized.text.toLowerCase()}\u0000${normalized.attribute}`, normalized);
+            }
+            for (const item of batch) {
+                const key = `${item.text.toLowerCase()}\u0000${item.attribute}`;
+                const existing = byKey.get(key);
+                if (existing) {
+                    existing.count = Math.min(1000000, existing.count + item.count);
+                    existing.lastSeen = item.lastSeen;
+                    existing.route = item.route || existing.route;
+                    existing.element = item.element || existing.element;
+                    existing.selector = item.selector || existing.selector;
+                } else {
+                    byKey.set(key, item);
+                }
+            }
+            const items = Array.from(byKey.values())
+                .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen))
+                .slice(0, 3000);
+            await writeJsonAtomic(getMissingTranslationsPath(), {
+                version: 1,
+                updatedAt: new Date().toISOString(),
+                items
+            });
+            return items.length;
+        }).catch((e) => {
+            console.error('[translations] Failed to persist report:', e);
+            return 0;
+        });
+
+        return { success: true, count: await translationWriteQueue };
+    });
+
+    electron_1.ipcMain.handle('translations:get-missing', async () => {
+        await translationWriteQueue;
+        const report = await readMissingTranslations();
+        return {
+            success: true,
+            path: getMissingTranslationsPath(),
+            updatedAt: report.updatedAt || null,
+            items: report.items
+        };
+    });
+
+    electron_1.ipcMain.handle('translations:clear-missing', async () => {
+        translationWriteQueue = translationWriteQueue.then(() => writeJsonAtomic(
+            getMissingTranslationsPath(),
+            { version: 1, updatedAt: new Date().toISOString(), items: [] }
+        ));
+        await translationWriteQueue;
+        return { success: true };
+    });
+
+    electron_1.ipcMain.handle('translations:copy-missing', async () => {
+        await translationWriteQueue;
+        const report = await readMissingTranslations();
+        electron_1.clipboard.writeText(JSON.stringify({
+            generatedAt: new Date().toISOString(),
+            items: report.items
+        }, null, 2));
+        return { success: true, count: report.items.length };
+    });
+
+    electron_1.ipcMain.handle('translations:export-missing', async () => {
+        await translationWriteQueue;
+        const report = await readMissingTranslations();
+        const result = await electron_1.dialog.showSaveDialog({
+            title: '导出漏译报告',
+            defaultPath: `Antigravity-漏译报告-${new Date().toISOString().slice(0, 10)}.json`,
+            filters: [{ name: 'JSON', extensions: ['json'] }]
+        });
+        if (result.canceled || !result.filePath) return { success: false, canceled: true };
+        await writeJsonAtomic(result.filePath, {
+            generatedAt: new Date().toISOString(),
+            source: 'Antigravity Chinese localization audit',
+            items: report.items
+        });
+        return { success: true, path: result.filePath, count: report.items.length };
     });
 
     // Accounts sniff handler - serialize all renderer requests in the main process.
@@ -1247,6 +1377,44 @@ conn.close()
 
             if (!prebuiltAsar || !fs.existsSync(prebuiltAsar)) {
                 throw new Error('Downloaded archive does not contain prebuilt app.asar');
+            }
+
+            // Never prepare a restart script for an incomplete or mismatched ASAR.
+            // Electron can inspect an archive as a virtual directory only while noAsar is disabled.
+            const requiredPatchFiles = [
+                'dist/main.js',
+                'dist/preload.js',
+                'dist/ipcHandlers.js',
+                'dist/accountVault.js'
+            ];
+            let downloadedPackage;
+            let missingPatchFiles = [];
+            process.noAsar = false;
+            try {
+                downloadedPackage = JSON.parse(fs.readFileSync(path.join(prebuiltAsar, 'package.json'), 'utf8'));
+                missingPatchFiles = requiredPatchFiles.filter(relativePath =>
+                    !fs.existsSync(path.join(prebuiltAsar, ...relativePath.split('/')))
+                );
+            } finally {
+                process.noAsar = true;
+            }
+            if (missingPatchFiles.length > 0) {
+                throw new Error(`Downloaded patch is incomplete: missing ${missingPatchFiles.join(', ')}`);
+            }
+            const normalizeClientVersion = value => {
+                const match = String(value || '').match(/^(\d+)\.(\d+)\.(\d+)/);
+                return match ? match.slice(1, 4).join('.') : '';
+            };
+            const runningClientVersion = normalizeClientVersion(electron_1.app.getVersion());
+            const downloadedClientVersion = normalizeClientVersion(downloadedPackage && downloadedPackage.version);
+            if (!downloadedClientVersion || downloadedClientVersion !== runningClientVersion) {
+                throw new Error(
+                    `Downloaded patch targets client ${downloadedPackage && downloadedPackage.version || 'unknown'}, ` +
+                    `but the running client is ${electron_1.app.getVersion()}`
+                );
+            }
+            if (!prebuiltUnpacked || !fs.existsSync(prebuiltUnpacked)) {
+                throw new Error('Downloaded patch is missing app.asar.unpacked dependencies');
             }
 
             // 5. 同步覆盖本地开发仓库源码（若检测到开发仓库存在）
