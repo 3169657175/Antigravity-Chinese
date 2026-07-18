@@ -1509,8 +1509,25 @@ try {
   function recordTranslationAudit(original, translated, element, attribute = 'textContent') {
     const text = normalizeAuditText(original);
     if (!isLikelyUntranslatedUiText(text) || isAuditExcludedElement(element)) return;
+
+    // --- 查表阻断：如果在 dictionary 主字典里已经存在该词条的汉化配置，则直接判定为已汉化，不录入漏译 ---
+    const lowerText = text.toLowerCase();
+    const hasExactDict = (typeof dictionary !== 'undefined') && (
+      dictionary[text] !== undefined ||
+      dictionary[lowerText] !== undefined ||
+      Object.keys(dictionary).some(key => key.toLowerCase() === lowerText)
+    );
+    const hasSubstring = (typeof substringReplacements !== 'undefined') && substringReplacements.some(rule => {
+      return rule && rule.search && text.includes(rule.search);
+    });
+
+    if (hasExactDict || hasSubstring) {
+      translationAuditState.translated.add(lowerText);
+      return;
+    }
+
     if (normalizeAuditText(translated) !== text && /[一-鿿]/.test(translated)) {
-      translationAuditState.translated.add(text.toLowerCase());
+      translationAuditState.translated.add(lowerText);
       return;
     }
 
