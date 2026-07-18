@@ -3940,31 +3940,45 @@ if (false) {
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] {
             color: var(--agy-text) !important;
-            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.22)) !important;
+            background: linear-gradient(155deg,
+              color-mix(in srgb, var(--agy-warm) 74%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 68%, transparent) 46%,
+              color-mix(in srgb, var(--agy-sidebar) 70%, transparent) 100%) !important;
+            border-right: 1px solid var(--agy-border) !important;
             
-            /* 光晕效果精准定位在左侧最外界边框，适配每个皮肤的主题色 accent */
+            /* 霓虹发光光晕精准定位在最左侧外界边框 */
             border-left: 2.5px solid var(--agy-accent) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: -10px 0 30px color-mix(in srgb, var(--agy-shadow) 42%, transparent) !important;
             
-            /* 内阴影向右柔和发光，右侧无外阴影光晕 */
-            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
-            backdrop-filter: blur(25px) saturate(1.2) !important;
+            backdrop-filter: blur(24px) saturate(1.12);
             transition: background .28s ease, backdrop-filter .28s ease, box-shadow .28s ease, border-color .28s ease;
           }
           html.agy-theme-active-v2[data-agy-view="new-chat"] [data-agy-surface="sidebar"] {
-            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.16)) !important;
+            background: linear-gradient(90deg,
+              color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
+              color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
             border-left: 2.5px solid var(--agy-accent) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
-            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
-            backdrop-filter: blur(20px) saturate(1.15) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            
+            /* 物理镜像：内阴影改从左侧投射，外阴影改向最左侧屏幕外发光 */
+            box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
+              -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
+            backdrop-filter: blur(2px) saturate(.96);
           }
           html.agy-theme-active-v2[data-agy-view="conversation"] [data-agy-surface="sidebar"],
           html.agy-theme-active-v2[data-agy-view="review"] [data-agy-surface="sidebar"] {
-            background: color-mix(in srgb, var(--agy-accent) 12%, rgba(10, 14, 20, 0.22)) !important;
+            background: linear-gradient(90deg,
+              color-mix(in srgb, var(--agy-warm) 18%, transparent) 0%,
+              color-mix(in srgb, var(--agy-accent-soft) 12%, transparent) 70%,
+              color-mix(in srgb, var(--agy-accent) 22%, transparent) 100%) !important;
             border-left: 2.5px solid var(--agy-accent) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-            box-shadow: inset 4px 0 12px -2px var(--agy-accent) !important;
-            backdrop-filter: blur(25px) saturate(1.2) !important;
+            border-right: 1px solid var(--agy-border) !important;
+            
+            /* 物理镜像：内阴影改从左侧投射，外阴影改向最左侧屏幕外发光 */
+            box-shadow: inset 14px 0 24px color-mix(in srgb, var(--agy-accent-soft) 46%, transparent),
+              -8px 0 28px color-mix(in srgb, var(--agy-shadow) 34%, transparent) !important;
+            backdrop-filter: blur(2px) saturate(.96);
           }
           html.agy-theme-active-v2 [data-agy-surface="main"] {
             color: var(--agy-text) !important;
@@ -3995,7 +4009,7 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-card"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-secondary"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [class~="bg-muted"] {
-            background-color: color-mix(in srgb, var(--agy-accent) 15%, rgba(255, 255, 255, 0.05)) !important;
+            background-color: color-mix(in srgb, var(--agy-accent-soft) 62%, white) !important;
           }
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [role="button"]:hover {
