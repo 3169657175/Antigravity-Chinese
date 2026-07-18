@@ -4016,6 +4016,7 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-active="true"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-state="active"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"],
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"],
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] {
             background-color: var(--agy-accent) !important;
@@ -4026,6 +4027,7 @@ if (false) {
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-active="true"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-state="active"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] [aria-selected="true"] *,
+          html.agy-theme-active-v2 [data-agy-surface="sidebar"] [data-agy-active="true"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] a[class*="active"] *,
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button[class*="active"] * {
             color: var(--agy-text) !important;
@@ -4040,6 +4042,23 @@ if (false) {
             border: 1.5px solid color-mix(in srgb, var(--agy-accent) 42%, rgba(255, 255, 255, 0.08)) !important;
             box-shadow: 0 8px 24px color-mix(in srgb, var(--agy-shadow) 20%, transparent) !important;
             backdrop-filter: blur(16px) !important;
+          }
+
+          /* 免费额度进度条及数值的主题皮肤定制 */
+          html.agy-theme-active-v2 [data-agy-component="quota-item"] {
+            color: var(--agy-text) !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="quota-progress"] {
+            background-color: color-mix(in srgb, var(--agy-accent) 15%, rgba(255, 255, 255, 0.08)) !important;
+            height: 6px !important;
+            border-radius: 9999px !important;
+            overflow: hidden !important;
+          }
+          html.agy-theme-active-v2 [data-agy-component="quota-progress-indicator"],
+          html.agy-theme-active-v2 [data-agy-component="quota-progress"] [class*="indicator"],
+          html.agy-theme-active-v2 [data-agy-component="quota-progress"] div {
+            background-color: var(--agy-accent) !important;
+            box-shadow: 0 0 8px var(--agy-accent) !important;
           }
 
           html.agy-theme-active-v2 [data-agy-surface="sidebar"] button:hover,
@@ -4356,6 +4375,43 @@ if (false) {
                 return rect.width > 220 && rect.width < 900 && rect.height > 70 && String(element.className || '').includes('border');
             }, 10);
             mark(card, 'component', 'review-card');
+        });
+
+        /* 1. 动态查找并强力标注侧边栏当前激活/选中的对话项目链接 */
+        if (sidebar) {
+            const activeCandidates = Array.from(sidebar.querySelectorAll('a, button, [role="button"], div')).filter(el => {
+                const href = el.getAttribute?.('href') || '';
+                if (href && location.hash && href.includes(location.hash)) return true;
+                if (href && location.pathname && href.includes(location.pathname) && href !== '/' && href !== '#') return true;
+                if (el.getAttribute?.('aria-current') === 'page') return true;
+                if (el.getAttribute?.('data-state') === 'active') return true;
+                if (el.getAttribute?.('data-active') === 'true') return true;
+                if (el.getAttribute?.('aria-selected') === 'true') return true;
+                const className = String(el.className || '');
+                if (className.includes('bg-secondary') || className.includes('bg-accent') || className.includes('bg-muted')) {
+                    return el !== sidebar;
+                }
+                return false;
+            });
+            sidebar.querySelectorAll('[data-agy-active]').forEach(el => el.removeAttribute('data-agy-active'));
+            activeCandidates.forEach(el => el.setAttribute('data-agy-active', 'true'));
+        }
+
+        /* 2. 动态抓取免费额度文本以及进度条指示器进行主题美化 */
+        Array.from(document.querySelectorAll('#root *')).forEach(element => {
+            const text = compactText(element);
+            if (text.includes('每周额度') || text.includes('5H额度') || text.includes('免费额度') || text.includes('额度：')) {
+                mark(element, 'component', 'quota-item');
+                const parent = element.parentElement;
+                if (parent) {
+                    const progress = parent.querySelector('[role="progressbar"], [class*="progress"], [class*="Progress"]');
+                    if (progress) {
+                        mark(progress, 'component', 'quota-progress');
+                        const indicator = progress.querySelector('div');
+                        if (indicator) mark(indicator, 'component', 'quota-progress-indicator');
+                    }
+                }
+            }
         });
     }
 
