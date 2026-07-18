@@ -53,6 +53,82 @@ const menu_1 = require("./menu");
 const customScheme_1 = require("./customScheme");
 const settingsService_1 = require("./services/settingsService");
 const ideInstall_1 = require("./ideInstall");
+const agyThemePath = require("path");
+const agyThemeOs = require("os");
+const AGY_THEME_CATALOG = [
+    { id: 'doraemon', name: '哆啦A梦', file: 'doraemon.jpg', accent: '#38a8e8', overlay: 0.38, position: 'center center' },
+    { id: 'shinchan', name: '蜡笔小新', file: 'shinchan.jpg', accent: '#f3bf45', overlay: 0.34, position: 'center center' },
+    { id: 'line-dog', name: '线条小狗', file: 'line-dog.jpg', accent: '#72cf78', overlay: 0.28, position: 'center center' },
+    { id: 'one-piece', name: '海贼王', file: 'one-piece.jpg', accent: '#e9a63a', overlay: 0.44, position: 'center center' },
+    { id: 'fox-spirit', name: '狐妖小红娘', file: 'fox-spirit.jpg', accent: '#d98b86', overlay: 0.30, position: 'center center' }
+];
+function agyThemePaths() {
+    const appData = process.env.APPDATA || agyThemePath.join(agyThemeOs.homedir(), 'AppData', 'Roaming');
+    const configDir = agyThemePath.join(appData, 'Antigravity');
+    return { configDir, assetsDir: agyThemePath.join(configDir, 'agy-themes'), configFile: agyThemePath.join(configDir, 'agy-theme.json') };
+}
+function findAgyThemeFile(file) {
+    const paths = agyThemePaths();
+    return [
+        agyThemePath.join(paths.assetsDir, file),
+        agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', file),
+        agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', 'themes', file),
+        agyThemePath.join(__dirname, 'themes', file)
+    ].find(candidate => {
+        try { return fs.existsSync(candidate); }
+        catch (_) { return false; }
+    }) || '';
+}
+function readAgyThemeConfig() {
+    const paths = agyThemePaths();
+    try { return JSON.parse(fs.readFileSync(paths.configFile, 'utf8')); }
+    catch (_) { return { version: 1, enabled: false, id: 'native' }; }
+}
+function writeAgyThemeConfig(config) {
+    const paths = agyThemePaths();
+    fs.mkdirSync(paths.configDir, { recursive: true });
+    const temporary = `${paths.configFile}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(config, null, 2), 'utf8');
+    fs.renameSync(temporary, paths.configFile);
+    return config;
+}
+function loadAgyThemePayload(previousRevision = '') {
+    const paths = agyThemePaths();
+    const config = readAgyThemeConfig();
+    let imagePath = '';
+    if (config.enabled && config.id !== 'native') {
+        const theme = AGY_THEME_CATALOG.find(item => item.id === config.id);
+        imagePath = config.imagePath && fs.existsSync(config.imagePath) ? config.imagePath : (theme ? findAgyThemeFile(theme.file) : '');
+    }
+    const configStamp = fs.existsSync(paths.configFile) ? fs.statSync(paths.configFile).mtimeMs : 0;
+    const imageStats = imagePath && fs.existsSync(imagePath) ? fs.statSync(imagePath) : null;
+    const revision = `${configStamp}:${imageStats ? `${imageStats.mtimeMs}:${imageStats.size}` : 'none'}`;
+    if (previousRevision && previousRevision === revision) return { unchanged: true, revision };
+    let imageDataUrl = '';
+    if (imagePath) {
+        const extension = agyThemePath.extname(imagePath).toLowerCase();
+        const mime = extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg';
+        imageDataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+    }
+    return { ...config, imagePath, imageDataUrl, revision, unchanged: false };
+}
+electron_1.ipcMain.handle('agy-theme:get', (_event, previousRevision) => loadAgyThemePayload(String(previousRevision || '')));
+electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
+    const theme = AGY_THEME_CATALOG.find(item => item.id === themeId);
+    if (!theme) throw new Error('未知主题');
+    const paths = agyThemePaths();
+    fs.mkdirSync(paths.assetsDir, { recursive: true });
+    const source = findAgyThemeFile(theme.file);
+    if (!source) throw new Error(`找不到主题图片：${theme.file}`);
+    const stablePath = agyThemePath.join(paths.assetsDir, theme.file);
+    if (agyThemePath.resolve(source) !== agyThemePath.resolve(stablePath)) fs.copyFileSync(source, stablePath);
+    writeAgyThemeConfig({ version: 1, enabled: true, id: theme.id, name: theme.name, imagePath: stablePath, accent: theme.accent, overlay: theme.overlay, backgroundPosition: theme.position, updatedAt: new Date().toISOString() });
+    return loadAgyThemePayload('');
+});
+electron_1.ipcMain.handle('agy-theme:disable', () => {
+    writeAgyThemeConfig({ version: 1, enabled: false, id: 'native', name: '原生主题', updatedAt: new Date().toISOString() });
+    return loadAgyThemePayload('');
+});
 const gotTheLock = electron_1.app.requestSingleInstanceLock();
 if (!gotTheLock) {
     electron_1.app.quit();

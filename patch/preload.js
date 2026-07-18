@@ -3512,3 +3512,249 @@ try {
   }
 
 })();
+
+// ==========================================================
+// Antigravity Theme Engine - persistent, hot-reloadable skin layer
+// ==========================================================
+(function AntigravityThemeEngine() {
+    const themeIpc = electron_1.ipcRenderer;
+    const catalog = [
+        { id: 'doraemon', name: '哆啦A梦', file: 'doraemon.jpg', accent: '#38a8e8', overlay: 0.38, position: 'center center' },
+        { id: 'shinchan', name: '蜡笔小新', file: 'shinchan.jpg', accent: '#f3bf45', overlay: 0.34, position: 'center center' },
+        { id: 'line-dog', name: '线条小狗', file: 'line-dog.jpg', accent: '#72cf78', overlay: 0.28, position: 'center center' },
+        { id: 'one-piece', name: '海贼王', file: 'one-piece.jpg', accent: '#e9a63a', overlay: 0.44, position: 'center center' },
+        { id: 'fox-spirit', name: '狐妖小红娘', file: 'fox-spirit.jpg', accent: '#d98b86', overlay: 0.30, position: 'center center' }
+    ];
+    let lastRevision = '';
+    let activeImagePath = '';
+
+    function findThemeFile(file) {
+        const candidates = [
+            themePath.join(assetsDir, file),
+            themePath.join(themeOs.homedir(), 'Desktop', 'antigravity换皮', file),
+            themePath.join(themeOs.homedir(), 'Desktop', 'antigravity换皮', 'themes', file),
+            themePath.join(__dirname, 'themes', file)
+        ];
+        return candidates.find(candidate => {
+            try { return themeFs.existsSync(candidate); } catch (_) { return false; }
+        }) || '';
+    }
+
+    function readConfig() {
+        try {
+            const text = themeFs.readFileSync(configFile, 'utf8');
+            lastConfigText = text;
+            return JSON.parse(text);
+        } catch (_) {
+            return { version: 1, enabled: false, id: 'native' };
+        }
+    }
+
+    function writeConfig(theme) {
+        themeFs.mkdirSync(assetsDir, { recursive: true });
+        let imagePath = findThemeFile(theme.file);
+        if (!imagePath) throw new Error(`找不到主题图片：${theme.file}`);
+        const stablePath = themePath.join(assetsDir, theme.file);
+        if (themePath.resolve(imagePath) !== themePath.resolve(stablePath)) {
+            themeFs.copyFileSync(imagePath, stablePath);
+            imagePath = stablePath;
+        }
+        const config = {
+            version: 1,
+            enabled: true,
+            id: theme.id,
+            name: theme.name,
+            imagePath,
+            accent: theme.accent,
+            overlay: theme.overlay,
+            backgroundPosition: theme.position,
+            updatedAt: new Date().toISOString()
+        };
+        const temp = `${configFile}.tmp`;
+        themeFs.writeFileSync(temp, JSON.stringify(config, null, 2), 'utf8');
+        themeFs.renameSync(temp, configFile);
+        lastConfigText = JSON.stringify(config, null, 2);
+        return config;
+    }
+
+    function disableTheme() {
+        themeFs.mkdirSync(configDir, { recursive: true });
+        const config = { version: 1, enabled: false, id: 'native', name: '原生主题', updatedAt: new Date().toISOString() };
+        themeFs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf8');
+        lastConfigText = JSON.stringify(config, null, 2);
+        applyConfig(config);
+    }
+
+    function ensureStyle() {
+        if (document.getElementById('agy-theme-engine-style')) return;
+        const style = document.createElement('style');
+        style.id = 'agy-theme-engine-style';
+        style.textContent = `
+          #agy-theme-wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; background-size: cover; background-position: var(--agy-theme-position, center); background-repeat: no-repeat; transition: opacity .28s ease; }
+          #agy-theme-wallpaper::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(7,10,15,calc(var(--agy-theme-overlay, .38) + .08)), rgba(8,11,16,var(--agy-theme-overlay, .38)) 52%, rgba(7,10,15,calc(var(--agy-theme-overlay, .38) + .1))); }
+          html.agy-theme-active #agy-theme-wallpaper { opacity: 1; }
+          html.agy-theme-active, html.agy-theme-active body { background: transparent !important; }
+          html.agy-theme-active .monaco-workbench { position: relative !important; z-index: 1 !important; background: transparent !important; }
+          html.agy-theme-active .monaco-workbench .part.editor,
+          html.agy-theme-active .monaco-workbench .part.editor > .content,
+          html.agy-theme-active .editor-group-container,
+          html.agy-theme-active .editor-instance,
+          html.agy-theme-active .monaco-editor,
+          html.agy-theme-active .monaco-editor .overflow-guard,
+          html.agy-theme-active .monaco-editor-background,
+          html.agy-theme-active .monaco-editor .margin { background-color: rgba(14, 17, 22, .68) !important; }
+          html.agy-theme-active .monaco-workbench .part.sidebar,
+          html.agy-theme-active .monaco-workbench .part.auxiliarybar,
+          html.agy-theme-active .monaco-workbench .part.panel { background-color: rgba(17, 20, 25, .76) !important; backdrop-filter: blur(11px) saturate(.9); }
+          html.agy-theme-active .monaco-workbench .part.activitybar,
+          html.agy-theme-active .monaco-workbench .part.titlebar,
+          html.agy-theme-active .monaco-workbench .part.statusbar { background-color: rgba(13, 16, 20, .86) !important; backdrop-filter: blur(14px); }
+          html.agy-theme-active .monaco-workbench .part.statusbar { border-top: 1px solid color-mix(in srgb, var(--agy-theme-accent) 34%, transparent); }
+          html.agy-theme-active [class~="bg-background"] { background-color: transparent !important; }
+          html.agy-theme-active:has(body.theme-light) #agy-theme-wallpaper::after { background: linear-gradient(115deg, rgba(255,255,255,.24), rgba(255,255,255,.14) 52%, rgba(255,255,255,.28)); }
+          html.agy-theme-active body.theme-light [class~="bg-sidebar"],
+          html.agy-theme-active body.theme-light [class~="bg-muted"] { background-color: rgba(247,248,249,.76) !important; backdrop-filter: blur(13px) saturate(.92); }
+          html.agy-theme-active body.theme-light [class~="bg-card"] { background-color: rgba(255,255,255,.76) !important; backdrop-filter: blur(9px) saturate(.94); }
+          html.agy-theme-active body.theme-light [class~="bg-card-border"] { background-color: rgba(255,255,255,.56) !important; }
+          html.agy-theme-active body.theme-light [class~="border-border"] { border-color: rgba(255,255,255,.42) !important; }
+          #agy-theme-switcher { position: fixed; right: 18px; bottom: 28px; z-index: 2147483000; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; }
+          #agy-theme-switcher button { font: inherit; }
+          #agy-theme-trigger { width: 38px; height: 38px; border: 1px solid color-mix(in srgb, var(--agy-theme-accent,#76d8e8) 55%, rgba(255,255,255,.2)); border-radius: 12px; color: #f7fbff; background: rgba(17,21,27,.82); box-shadow: 0 8px 26px rgba(0,0,0,.35); backdrop-filter: blur(12px); cursor: pointer; transition: transform .16s ease, background .16s ease; }
+          #agy-theme-trigger:hover { transform: translateY(-2px) rotate(-4deg); background: color-mix(in srgb, var(--agy-theme-accent,#76d8e8) 25%, rgba(17,21,27,.9)); }
+          #agy-theme-menu { display: none; position: absolute; right: 0; bottom: 48px; width: 210px; padding: 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(16,19,24,.94); box-shadow: 0 18px 46px rgba(0,0,0,.46); backdrop-filter: blur(18px); }
+          #agy-theme-switcher.open #agy-theme-menu { display: block; animation: agyThemeIn .16s ease-out; }
+          #agy-theme-menu-title { padding: 5px 8px 9px; color: #f2f6f9; font-size: 12px; font-weight: 700; }
+          .agy-theme-choice { display: flex; align-items: center; width: 100%; padding: 8px 9px; border: 0; border-radius: 8px; color: #c9d2da; background: transparent; cursor: pointer; text-align: left; font-size: 12px; }
+          .agy-theme-choice:hover, .agy-theme-choice.active { color: #fff; background: color-mix(in srgb, var(--choice-accent,#76d8e8) 22%, transparent); }
+          .agy-theme-swatch { width: 9px; height: 9px; margin-right: 9px; border-radius: 50%; background: var(--choice-accent,#76d8e8); box-shadow: 0 0 9px color-mix(in srgb, var(--choice-accent,#76d8e8) 70%, transparent); }
+          .agy-theme-native { margin-top: 5px; border-top: 1px solid rgba(255,255,255,.08) !important; border-radius: 0 0 8px 8px !important; }
+          @keyframes agyThemeIn { from { opacity: 0; transform: translateY(7px) scale(.97); } to { opacity: 1; transform: none; } }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function ensureWallpaper() {
+        let wallpaper = document.getElementById('agy-theme-wallpaper');
+        if (!wallpaper) {
+            wallpaper = document.createElement('div');
+            wallpaper.id = 'agy-theme-wallpaper';
+            document.body.prepend(wallpaper);
+        }
+        return wallpaper;
+    }
+
+    function fileDataUrl(file) {
+        const extension = themePath.extname(file).toLowerCase();
+        const mime = extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg';
+        return `data:${mime};base64,${themeFs.readFileSync(file).toString('base64')}`;
+    }
+
+    function updateChoiceState(themeId) {
+        document.querySelectorAll('.agy-theme-choice').forEach(button => button.classList.toggle('active', button.dataset.themeId === themeId));
+    }
+
+    function applyConfig(config) {
+        if (!document.body) return;
+        ensureStyle();
+        const wallpaper = ensureWallpaper();
+        if (!config || !config.enabled || config.id === 'native') {
+            document.documentElement.classList.remove('agy-theme-active');
+            wallpaper.style.backgroundImage = '';
+            activeImagePath = '';
+            updateChoiceState('native');
+            return;
+        }
+        const theme = catalog.find(item => item.id === config.id);
+        const imagePath = config.imagePath || config.id;
+        if (!config.imageDataUrl) return;
+        try {
+            if (activeImagePath !== `${imagePath}:${config.revision || ''}`) {
+                wallpaper.style.backgroundImage = `url("${config.imageDataUrl}")`;
+                activeImagePath = `${imagePath}:${config.revision || ''}`;
+            }
+            document.documentElement.style.setProperty('--agy-theme-accent', config.accent || theme.accent);
+            document.documentElement.style.setProperty('--agy-theme-overlay', String(config.overlay ?? theme.overlay));
+            document.documentElement.style.setProperty('--agy-theme-position', config.backgroundPosition || theme.position);
+            document.documentElement.classList.add('agy-theme-active');
+            document.documentElement.dataset.agyTheme = config.id;
+            updateChoiceState(config.id);
+        } catch (error) {
+            console.warn('[AGY Theme] apply failed:', error);
+        }
+    }
+
+    function ensureSwitcher() {
+        if (document.getElementById('agy-theme-switcher')) return;
+        const switcher = document.createElement('div');
+        switcher.id = 'agy-theme-switcher';
+        const menu = document.createElement('div');
+        menu.id = 'agy-theme-menu';
+        const title = document.createElement('div');
+        title.id = 'agy-theme-menu-title';
+        title.textContent = 'Antigravity 主题皮肤';
+        menu.appendChild(title);
+        for (const theme of catalog) {
+            const button = document.createElement('button');
+            button.className = 'agy-theme-choice';
+            button.dataset.themeId = theme.id;
+            button.style.setProperty('--choice-accent', theme.accent);
+            button.innerHTML = '<span class="agy-theme-swatch"></span><span></span>';
+            button.lastElementChild.textContent = theme.name;
+            button.addEventListener('click', async event => {
+                event.stopPropagation();
+                try {
+                    const config = await themeIpc.invoke('agy-theme:set', theme.id);
+                    lastRevision = config.revision || '';
+                    applyConfig(config);
+                } catch (error) { console.warn('[AGY Theme] switch failed:', error); }
+                switcher.classList.remove('open');
+            });
+            menu.appendChild(button);
+        }
+        const nativeButton = document.createElement('button');
+        nativeButton.className = 'agy-theme-choice agy-theme-native';
+        nativeButton.dataset.themeId = 'native';
+        nativeButton.innerHTML = '<span class="agy-theme-swatch" style="--choice-accent:#9aa4ad"></span><span>恢复原生主题</span>';
+        nativeButton.addEventListener('click', async event => {
+            event.stopPropagation();
+            try {
+                const config = await themeIpc.invoke('agy-theme:disable');
+                lastRevision = config.revision || '';
+                applyConfig(config);
+            } catch (error) { console.warn('[AGY Theme] disable failed:', error); }
+            switcher.classList.remove('open');
+        });
+        menu.appendChild(nativeButton);
+        const trigger = document.createElement('button');
+        trigger.id = 'agy-theme-trigger';
+        trigger.type = 'button';
+        trigger.title = '切换主题皮肤';
+        trigger.setAttribute('aria-label', '切换主题皮肤');
+        trigger.textContent = '✦';
+        trigger.addEventListener('click', event => { event.stopPropagation(); switcher.classList.toggle('open'); });
+        switcher.append(menu, trigger);
+        document.body.appendChild(switcher);
+        document.addEventListener('click', () => switcher.classList.remove('open'));
+    }
+
+    async function refreshTheme() {
+        try {
+            const config = await themeIpc.invoke('agy-theme:get', lastRevision);
+            if (!config || config.unchanged) return;
+            lastRevision = config.revision || '';
+            applyConfig(config);
+        } catch (error) {
+            console.warn('[AGY Theme] refresh failed:', error);
+        }
+    }
+
+    function start() {
+        ensureStyle();
+        ensureSwitcher();
+        refreshTheme();
+        setInterval(refreshTheme, 900);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+    else start();
+})();
