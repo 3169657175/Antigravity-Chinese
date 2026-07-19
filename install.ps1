@@ -94,6 +94,38 @@ if ($appliedSize -gt 500000) {
     exit 1
 }
 
+# 5.5 计算核心文件的 SHA-256 校验和并写入到解包目录下的 package.json
+Write-Host "[+] Generating SHA-256 integrity checksums..." -ForegroundColor Cyan
+$pkgJsonPath = "$tempDir\package.json"
+if (Test-Path $pkgJsonPath) {
+    $pkg = Get-Content $pkgJsonPath -Raw | ConvertFrom-Json
+    $checksums = @{}
+    $filesToCheck = @("dist/main.js", "dist/preload.js", "dist/ipcHandlers.js", "dist/accountVault.js")
+    
+    foreach ($relFile in $filesToCheck) {
+        $fullFilePath = "$tempDir\$relFile"
+        if (Test-Path $fullFilePath) {
+            # 计算 SHA-256 指纹
+            $hashBytes = [System.Security.Cryptography.HashAlgorithm]::Create("SHA256").ComputeHash([System.IO.File]::ReadAllBytes($fullFilePath))
+            $hashStr = [System.BitConverter]::ToString($hashBytes).Replace("-", "").ToLower()
+            $checksums[$relFile] = $hashStr
+            Write-Host "    [HASH] $relFile -> $hashStr" -ForegroundColor Gray
+        } else {
+            Write-Warning "    [HASH] Missing core file for checksum: $relFile"
+        }
+    }
+    
+    # 强制将哈希指纹注入为 package.json 的元数据
+    $pkg | Add-Member -MemberType NoteProperty -Name "checksums" -Value $checksums -Force
+    # 将更新后的 package.json 重新写入
+    $newJson = $pkg | ConvertTo-Json -Depth 100
+    [System.IO.File]::WriteAllText($pkgJsonPath, $newJson, [System.Text.Encoding]::UTF8)
+    Write-Host "[OK] SHA-256 checksums embedded into package.json!" -ForegroundColor Green
+} else {
+    Write-Error "CRITICAL ERROR: package.json not found in unpacked temp dir!"
+    exit 1
+}
+
 # 6. Repack asar package
 Write-Host "[+] Compiling and repacking app.asar..." -ForegroundColor Cyan
 & npx.cmd -y @electron/asar pack $tempDir $asarPath --unpack-dir "**/chrome-devtools-mcp"
