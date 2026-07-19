@@ -1,4 +1,4 @@
-﻿/**
+/**
  * modules/quota-widget.js
  * Antigravity-Chinese v2 - 棰濆害鏄剧ず缁勪欢
  * 渚濊禆锛歵heme-adapter.js锛坓etNativeThemeColors锛? * 鍖呭惈锛歶pdateStoredQuota, injectQuotaWidget, getCurrentModel
@@ -374,21 +374,10 @@ function injectQuotaWidget() {
       if (addBtn) {
         addBtn.onclick = (e) => {
           e.stopPropagation();
-          addBtn.style.pointerEvents = 'none';
-          addBtn.style.opacity = '0.5';
-          showBeautifulConfirm('鐧诲綍鏂拌处鍙?, '鏄惁瑕佹竻绌哄綋鍓嶇櫥褰曠姸鎬佸苟閲嶅惎瀹㈡埛绔互鐧诲綍鏂拌处鍙凤紵', '纭畾', '鍙栨秷').then(confirmed => {
-            if (confirmed) {
-              electron_1.ipcRenderer.invoke('accounts:clear-keyring');
-            } else {
-              addBtn.style.pointerEvents = 'auto';
-              addBtn.style.opacity = '1';
-            }
-          }).catch(() => {
-            addBtn.style.pointerEvents = 'auto';
-            addBtn.style.opacity = '1';
-          });
+          showAgyAddAccountModal();
         };
         addBtn.onmousedown = (e) => e.stopPropagation();
+      }
       }
     } else if (trigger) {
       // 鏇存柊宸插瓨鍦ㄧ殑 trigger 鏍囩
@@ -421,3 +410,280 @@ function readQuotaTheme(anchor) {
 }
 
 module.exports = { updateStoredQuota, injectQuotaWidget, getCurrentModel };
+
+
+// ==========================================
+// Google OAuth & JSON 导入自定义毛玻璃弹窗组件 (物理追加)
+// ==========================================
+function showAgyAddAccountModal() {
+  // 1. 避免重复弹窗
+  if (document.getElementById('agy-add-account-overlay')) return;
+
+  // 2. 注入弹窗专属样式 (赛博暗黑毛玻璃风格)
+  const styleId = 'agy-add-account-styles';
+  let styleEl = document.getElementById(styleId);
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      .agy-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(5, 7, 10, 0.7);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        display: flex; justify-content: center; align-items: center;
+        z-index: 999999;
+        animation: agyFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .agy-card {
+        background: rgba(18, 20, 26, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 36px 32px;
+        width: 380px;
+        max-width: 90%;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 40px rgba(59,130,246,0.1);
+        text-align: center;
+        color: #f3f4f6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        box-sizing: border-box;
+        animation: agySlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .agy-title {
+        font-size: 18px; font-weight: 700; margin: 0 0 10px 0;
+        background: linear-gradient(to right, #ffffff, #c7d2fe);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      }
+      .agy-desc {
+        font-size: 12px; color: #9ca3af; line-height: 1.5; margin: 0 0 24px 0;
+      }
+      .agy-btn {
+        width: 100%; padding: 12px 16px; border-radius: 8px;
+        font-size: 13px; font-weight: 600; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-sizing: border-box; border: 1px solid transparent;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        margin-bottom: 12px;
+      }
+      .agy-btn-primary {
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+      }
+      .agy-btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(59,130,246,0.35);
+      }
+      .agy-btn-secondary {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.08);
+        color: #e5e7eb;
+      }
+      .agy-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+      .agy-cancel-link {
+        font-size: 12px; color: #9ca3af; cursor: pointer; text-decoration: none;
+        display: inline-block; margin-top: 14px;
+        transition: color 0.15s;
+      }
+      .agy-cancel-link:hover { color: #f3f4f6; }
+      
+      /* Status display */
+      .agy-status-area {
+        margin: 16px 0; font-size: 12px; min-height: 20px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+      }
+      
+      /* Code input panel */
+      .agy-input-panel {
+        display: flex; gap: 8px; width: 100%; box-sizing: border-box;
+      }
+      .agy-input {
+        flex: 1; padding: 8px 12px; border-radius: 6px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #ffffff; font-size: 12px; outline: none;
+      }
+      .agy-input:focus {
+        border-color: #3b82f6;
+      }
+      .agy-submit-btn {
+        padding: 8px 14px; border-radius: 6px; background: #10b981;
+        color: #ffffff; font-size: 12px; font-weight: 600; cursor: pointer;
+        border: none; transition: background 0.15s;
+      }
+      .agy-submit-btn:hover { background: #059669; }
+
+      @keyframes agyFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes agySlideUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+
+  // 3. 动态渲染弹窗 DOM 结构
+  const overlay = document.createElement('div');
+  overlay.id = 'agy-add-account-overlay';
+  overlay.className = 'agy-overlay';
+  
+  overlay.innerHTML = `
+    <div class="agy-card" onclick="event.stopPropagation();">
+      <div class="agy-title">添加新账号</div>
+      <div class="agy-desc">通过 Google 网页一键安全登录授权，或直接选择导入已导出的账号配置文件。</div>
+      
+      <button id="agy-btn-oauth" class="agy-btn agy-btn-primary">
+        <span>🌐</span> Google OAuth 网页登录
+      </button>
+      
+      <button id="agy-btn-json" class="agy-btn agy-btn-secondary">
+        <span>📁</span> 导入 JSON 配置文件
+      </button>
+
+      <div id="agy-status-area" class="agy-status-area"></div>
+      
+      <div>
+        <span id="agy-btn-cancel" class="agy-cancel-link">取消</span>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // 4. 事件绑定与状态流转
+  const btnOauth = overlay.querySelector('#agy-btn-oauth');
+  const btnJson = overlay.querySelector('#agy-btn-json');
+  const btnCancel = overlay.querySelector('#agy-btn-cancel');
+  const statusArea = overlay.querySelector('#agy-status-area');
+
+  const closeModal = () => {
+    if (overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  };
+
+  btnCancel.onclick = closeModal;
+  overlay.onclick = closeModal;
+
+  // A. Google OAuth 网页一键授权
+  btnOauth.onclick = async () => {
+    btnOauth.disabled = true;
+    btnOauth.style.opacity = '0.5';
+    statusArea.innerHTML = '<span style="color:#60a5fa;">正在拉起系统浏览器进行授权...</span>';
+    
+    const oRes = await electron_1.ipcRenderer.invoke('oauth:start-login');
+    if (oRes && oRes.success) {
+      statusArea.innerHTML = `
+        <div style="color:#9ca3af;margin-bottom:8px;line-height:1.4;">请在打开的网页中登录您的 Google 账号以完成授权。</div>
+        <div class="agy-input-panel">
+          <input type="text" id="agy-manual-code" class="agy-input" placeholder="自动拦截失败时可在此粘贴 Code" />
+          <button id="agy-manual-submit" class="agy-submit-btn">提交</button>
+        </div>
+      `;
+
+      const submitBtn = statusArea.querySelector('#agy-manual-submit');
+      const inputCode = statusArea.querySelector('#agy-manual-code');
+      if (submitBtn && inputCode) {
+        submitBtn.onclick = async () => {
+          const codeValue = inputCode.value.trim();
+          if (!codeValue) {
+            alert('请输入有效的 Code！');
+            return;
+          }
+          submitBtn.disabled = true;
+          submitBtn.textContent = '提交中';
+          statusArea.innerHTML = '<span style="color:#00ffcc;font-weight:600;">⚡ 正在兑换 Token 并安全导入...</span>';
+          
+          const aRes = await electron_1.ipcRenderer.invoke('oauth:submit-code', codeValue);
+          if (aRes && aRes.success) {
+            statusArea.innerHTML = '<span style="color:#4ade80;font-weight:600;">✓ 导入成功！正在同步...</span>';
+            setTimeout(async () => {
+              closeModal();
+              // 刷新列表
+              const listRes = await electron_1.ipcRenderer.invoke('accounts:list');
+              window.antigravityAccounts = listRes.accounts || [];
+              window.antigravityCurrentAccount = listRes.currentAccountId || '';
+              injectQuotaWidget();
+            }, 1000);
+          } else {
+            statusArea.innerHTML = `<span style="color:#f43f5e;font-weight:600;">❌ 导入失败: ${aRes?.error || '未知错误'}</span>`;
+            btnOauth.disabled = false;
+            btnOauth.style.opacity = '1';
+          }
+        };
+      }
+    } else {
+      statusArea.innerHTML = `<span style="color:#f43f5e;font-weight:600;">❌ 启动网页登录失败: ${oRes?.error || '未知错误'}</span>`;
+      btnOauth.disabled = false;
+      btnOauth.style.opacity = '1';
+    }
+  };
+
+  // B. 原生 JSON 配置文件导入
+  btnJson.onclick = async () => {
+    btnJson.disabled = true;
+    btnJson.style.opacity = '0.5';
+    statusArea.innerHTML = '<span style="color:#60a5fa;">正在选择文件...</span>';
+    
+    const jRes = await electron_1.ipcRenderer.invoke('accounts:import-json-dialog');
+    if (jRes && jRes.success) {
+      statusArea.innerHTML = '<span style="color:#4ade80;font-weight:600;">✓ 导入成功！正在同步...</span>';
+      setTimeout(async () => {
+        closeModal();
+        const listRes = await electron_1.ipcRenderer.invoke('accounts:list');
+        window.antigravityAccounts = listRes.accounts || [];
+        window.antigravityCurrentAccount = listRes.currentAccountId || '';
+        injectQuotaWidget();
+      }, 1000);
+    } else {
+      statusArea.innerHTML = '';
+      btnJson.disabled = false;
+      btnJson.style.opacity = '1';
+      if (jRes?.error && jRes.error !== '用户取消了选择') {
+        alert('导入失败: ' + jRes.error);
+      }
+    }
+  };
+}
+
+// C. 监听主进程网页登录自动拦截发来的 code 凭据
+if (!window.antigravityOauthListenerAdded) {
+  window.antigravityOauthListenerAdded = true;
+  
+  electron_1.ipcRenderer.on('oauth:code-captured', async (_event, { code }) => {
+    const statusArea = document.getElementById('agy-status-area');
+    if (statusArea) {
+      statusArea.innerHTML = '<span style="color:#00ffcc;font-weight:600;">⚡ 正在兑换 Token 并安全导入...</span>';
+    }
+    
+    const aRes = await electron_1.ipcRenderer.invoke('oauth:submit-code', code);
+    const modalOverlay = document.getElementById('agy-add-account-overlay');
+    if (aRes && aRes.success) {
+      if (statusArea) {
+        statusArea.innerHTML = '<span style="color:#4ade80;font-weight:600;">✓ 导入成功！正在同步...</span>';
+      }
+      setTimeout(async () => {
+        if (modalOverlay) modalOverlay.parentNode.removeChild(modalOverlay);
+        const listRes = await electron_1.ipcRenderer.invoke('accounts:list');
+        window.antigravityAccounts = listRes.accounts || [];
+        window.antigravityCurrentAccount = listRes.currentAccountId || '';
+        injectQuotaWidget();
+      }, 1000);
+    } else {
+      if (statusArea) {
+        statusArea.innerHTML = `<span style="color:#f43f5e;font-weight:600;">❌ 自动导入失败: ${aRes?.error || '未知错误'}</span>`;
+      }
+    }
+  });
+
+  // 监听主进程 accounts:clear-keyring 的拦截重定向通知，触发本模块弹窗
+  electron_1.ipcRenderer.on('accounts:open-add-modal', () => {
+    showAgyAddAccountModal();
+  });
+}

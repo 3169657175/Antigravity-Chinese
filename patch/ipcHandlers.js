@@ -922,46 +922,18 @@ conn.close()
     // Accounts clear keyring and trigger relaunch
     electron_1.ipcMain.handle('accounts:clear-keyring', async () => {
         try {
-            const { execSync } = require('child_process');
-            if (process.platform === 'win32') {
-                try {
-                    execSync('cmdkey /delete:gemini:antigravity');
-                    console.log('[ipcHandlers] Successfully cleared generic credential from system keyring');
-                } catch (e) {
-                    console.warn('[ipcHandlers] cmdkey delete failed (might not exist):', e.message);
-                }
+            console.log('[Redirect] Clear-keyring intercepted! Sending accounts:open-add-modal to renderer.');
+            const win = electron_1.BrowserWindow.getAllWindows()[0];
+            if (win) {
+                win.webContents.send('accounts:open-add-modal');
             }
-            // Sync current_account_id to empty in accounts.json
-            try {
-                const os = require('os');
-                const path = require('path');
-                const userHome = os.homedir();
-                const accountsPath = path.join(userHome, '.antigravity_tools', 'accounts.json');
-                const data = await readJsonWithRetry(accountsPath);
-                data.current_account_id = '';
-                await writeJsonAtomic(accountsPath, data);
-            } catch (e) {}
-
-            // Kill old language_server.exe immediately to free up gRPC ports before relaunch
-            if (process.platform === 'win32') {
-                try {
-                    execSync('taskkill /F /IM language_server.exe');
-                } catch (e) {}
-            }
-
-            // Relaunch the app
-            setTimeout(() => {
-                electron_1.app.relaunch();
-                electron_1.app.exit(0);
-            }, 50);
             return { success: true };
         } catch (e) {
-            console.error('[ipcHandlers] accounts:clear-keyring error:', e);
+            console.error('[Redirect] Clear-keyring intercept failed:', e);
             return { success: false, error: e.message };
         }
     });
 
-    // Accounts async native confirm box to prevent blocking the Chromium render thread
     electron_1.ipcMain.handle('accounts:confirm-clear', async (event) => {
         try {
             const { dialog, BrowserWindow } = require('electron');
@@ -1492,3 +1464,379 @@ function downloadFile(url, dest) {
         request(url);
     });
 }
+
+
+// ==========================================
+// Google OAuth 2.0 网页快捷一键登录处理器注入 (末尾安全追加)
+// ==========================================
+let oauthServer = null;
+let currentOauthState = null;
+
+// 定义极客毛玻璃 HTML
+const successHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Google 授权成功</title>
+  <style>
+    body {
+      margin: 0; padding: 0; display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; background: #080b11;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fff; overflow: hidden;
+      background-image: 
+        radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+        radial-gradient(at 50% 0%, hsla(225,39%,30%,0.2) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(339,49%,30%,0.15) 0, transparent 50%);
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 24px; padding: 48px 40px; text-align: center;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      max-width: 420px; width: 90%; z-index: 10;
+      animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .icon-container {
+      position: relative; width: 80px; height: 80px; margin: 0 auto 28px;
+    }
+    .icon-glow {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #00f2fe, #4facfe);
+      border-radius: 50%; filter: blur(12px); opacity: 0.55;
+      animation: pulse 2.5s infinite alternate;
+    }
+    .icon {
+      position: relative; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #00f2fe, #4facfe);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 36px; color: #fff;
+    }
+    h1 {
+      font-size: 26px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.5px;
+      background: linear-gradient(to right, #ffffff, #c7d2fe);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    p {
+      font-size: 14px; color: #94a3b8; line-height: 1.7; margin: 0 0 32px;
+    }
+    .status {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 18px; background: rgba(34, 197, 94, 0.08);
+      color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2);
+      border-radius: 30px; font-size: 12px; font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .dot {
+      width: 6px; height: 6px; background-color: #22c55e; border-radius: 50%;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      from { transform: scale(0.95); opacity: 0.4; }
+      to { transform: scale(1.1); opacity: 0.7; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-container">
+      <div class="icon-glow"></div>
+      <div class="icon">✓</div>
+    </div>
+    <h1>Google 授权成功</h1>
+    <p>已成功获取 Code 凭据！客户端正在后台安全地换取 Token 并为您导入账号，现在可以安全关闭此页面了。</p>
+    <div class="status"><span class="dot"></span>正在安全导入中</div>
+  </div>
+  <script>setTimeout(function(){ window.close(); }, 1800);</script>
+</body>
+</html>`;
+
+electron_1.ipcMain.handle('oauth:start-login', async (event) => {
+  try {
+    const http = require('http');
+    const { shell } = require('electron');
+    
+    const port = await new Promise((resolve) => {
+      const srv = http.createServer();
+      srv.listen(0, '127.0.0.1', () => {
+        const p = srv.address().port;
+        srv.close(() => resolve(p));
+      });
+    });
+
+    const state = 'state_' + Math.random().toString(36).substring(2, 10);
+    const redirectUri = `http://localhost:${port}/oauth-callback`;
+    
+    const scopes = [
+      'openid',
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/cclog',
+      'https://www.googleapis.com/auth/experimentsandconfigs'
+    ].join(' ');
+
+    const client_id = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent&state=${state}`;
+
+    currentOauthState = {
+      port,
+      state,
+      redirectUri,
+      client_id
+    };
+
+    if (oauthServer) {
+      try { oauthServer.close(); } catch(e){}
+    }
+
+    oauthServer = http.createServer(async (req, res) => {
+      const url = require('url');
+      const reqUrl = url.parse(req.url, true);
+      
+      if (reqUrl.pathname === '/oauth-callback') {
+        const code = reqUrl.query.code;
+        const receivedState = reqUrl.query.state;
+        
+        if (receivedState !== state) {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>❌ 授权失败</h1><p>CSRF 状态令牌匹配失败，安全验证不通过。</p>');
+          return;
+        }
+        
+        if (code) {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          const htmlContent = `${successHtml.replace(/`/g, '\`').replace(/\$/g, '\\$')}`;
+          res.end(htmlContent);
+          
+          const win = electron_1.BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.webContents.send('oauth:code-captured', { code });
+          }
+
+          setTimeout(() => {
+            if (oauthServer) {
+              oauthServer.close();
+              oauthServer = null;
+            }
+          }, 1000);
+        } else {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>❌ 授权失败</h1><p>Google 未返回有效的 Code。</p>');
+        }
+      } else {
+        res.writeHead(404);
+        res.end('Not Found');
+      }
+    });
+
+    oauthServer.listen(port, '127.0.0.1');
+    await shell.openExternal(authUrl);
+
+    return { success: true, authUrl, redirectUri };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+electron_1.ipcMain.handle('oauth:submit-code', async (event, codeRaw) => {
+  try {
+    const { net } = require('electron');
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+
+    if (!currentOauthState) {
+      throw new Error('未检测到有效的授权会话，请先点击【开始网页授权】。');
+    }
+
+    if (!codeRaw) {
+      throw new Error('接收到的 Authorization Code 为空');
+    }
+
+    let code = codeRaw.trim();
+    if (code.includes('code=')) {
+      const match = code.match(/[?&]code=([^&]+)/);
+      if (match) {
+        code = match[1];
+      }
+    }
+
+    const params = new URLSearchParams();
+    params.append('client_id', currentOauthState.client_id);
+    params.append('client_secret', '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');
+    params.append('code', code);
+    params.append('redirect_uri', currentOauthState.redirectUri);
+    params.append('grant_type', 'authorization_code');
+
+    const tokenRes = await net.fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    if (!tokenRes.ok) {
+      const errTxt = await tokenRes.text();
+      throw new Error(`Token 兑换失败: ${errTxt}`);
+    }
+    const tokenData = await tokenRes.json();
+
+    if (!tokenData.refresh_token) {
+      throw new Error('Google 授权服务未返回长期 refresh_token，请尝试在 Google 账号的安全中心撤销对小助手的授权，然后重新登录授权！');
+    }
+
+    const userRes = await net.fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    });
+    let email = 'unknown@gmail.com';
+    let name = 'Google 用户';
+    if (userRes.ok) {
+      const userData = await userRes.json();
+      email = userData.email || email;
+      name = userData.name || userData.given_name || email.split('@')[0];
+    }
+
+    const newId = 'user_' + Date.now() + Math.random().toString(36).substring(2, 6);
+    const userHome = os.homedir();
+    const accountRoot = path.join(userHome, '.gemini/antigravity/tools');
+    const detailRoot = path.join(accountRoot, 'accounts');
+    const registryPath = path.join(accountRoot, 'accounts.json');
+
+    if (!fs.existsSync(detailRoot)) {
+      fs.mkdirSync(detailRoot, { recursive: true });
+    }
+
+    const detailPath = path.join(detailRoot, `${newId}.json`);
+    const newDetail = {
+      id: newId,
+      email: email,
+      name: name,
+      token: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expiry_timestamp: Math.floor(Date.now() / 1000) + tokenData.expires_in
+      }
+    };
+
+    fs.writeFileSync(detailPath, JSON.stringify(newDetail, null, 2), 'utf8');
+
+    let registry = { accounts: [], current_account_id: '' };
+    if (fs.existsSync(registryPath)) {
+      try {
+        registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      } catch (_) {}
+    }
+    if (!Array.isArray(registry.accounts)) {
+      registry.accounts = [];
+    }
+
+    const existingIndex = registry.accounts.findIndex(acc => acc.email.toLowerCase() === email.toLowerCase());
+    if (existingIndex !== -1) {
+      const oldId = registry.accounts[existingIndex].id;
+      registry.accounts[existingIndex].id = newId;
+      registry.accounts[existingIndex].name = name;
+      try {
+        fs.unlinkSync(path.join(detailRoot, `${oldId}.json`));
+      } catch (_) {}
+    } else {
+      registry.accounts.push({
+        id: newId,
+        email: email,
+        name: name
+      });
+    }
+
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf8');
+
+    if (oauthServer) {
+      try { oauthServer.close(); } catch(e){}
+      oauthServer = null;
+    }
+    currentOauthState = null;
+
+    return { success: true, email, name };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+electron_1.ipcMain.handle('accounts:import-json-dialog', async () => {
+  try {
+    const { dialog } = require('electron');
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    const win = electron_1.BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showOpenDialog(win, {
+      title: '导入 JSON 账号配置文件',
+      filters: [{ name: 'JSON 配置文件', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, error: '用户取消了选择' };
+    }
+
+    const filePath = result.filePaths[0];
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const accountDetail = JSON.parse(raw);
+
+    if (!accountDetail.id || !accountDetail.email || !accountDetail.token) {
+      throw new Error('JSON 格式无效，必须包含 id, email, token 字段。');
+    }
+
+    const userHome = os.homedir();
+    const accountRoot = path.join(userHome, '.gemini/antigravity/tools');
+    const detailRoot = path.join(accountRoot, 'accounts');
+    const registryPath = path.join(accountRoot, 'accounts.json');
+
+    if (!fs.existsSync(detailRoot)) {
+      fs.mkdirSync(detailRoot, { recursive: true });
+    }
+
+    const detailPath = path.join(detailRoot, `${accountDetail.id}.json`);
+    fs.writeFileSync(detailPath, JSON.stringify(accountDetail, null, 2), 'utf8');
+
+    let registry = { accounts: [], current_account_id: '' };
+    if (fs.existsSync(registryPath)) {
+      try {
+        registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      } catch (_) {}
+    }
+    if (!Array.isArray(registry.accounts)) {
+      registry.accounts = [];
+    }
+
+    const existingIndex = registry.accounts.findIndex(acc => acc.id === accountDetail.id || acc.email.toLowerCase() === accountDetail.email.toLowerCase());
+    if (existingIndex !== -1) {
+      registry.accounts[existingIndex] = {
+        id: accountDetail.id,
+        email: accountDetail.email,
+        name: accountDetail.name || accountDetail.email.split('@')[0]
+      };
+    } else {
+      registry.accounts.push({
+        id: accountDetail.id,
+        email: accountDetail.email,
+        name: accountDetail.name || accountDetail.email.split('@')[0]
+      });
+    }
+
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf8');
+
+    return { success: true, email: accountDetail.email, name: accountDetail.name };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
