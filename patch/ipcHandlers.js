@@ -1938,7 +1938,7 @@ function loadAgyThemePayload(previousRevision = '') {
     const configStamp = fs.existsSync(paths.configFile) ? fs.statSync(paths.configFile).mtimeMs : 0;
     const imageStats = imagePath && fs.existsSync(imagePath) ? fs.statSync(imagePath) : null;
     
-    const libraryPath = agyThemePath.join(paths.configDir, 'custom-themes.json');
+    const libraryPath = agyThemePath.join(paths.configDir, 'agy-theme-library.json');
     const libraryStamp = fs.existsSync(libraryPath) ? fs.statSync(libraryPath).mtimeMs : 0;
     
     const revision = `${configStamp}:${imageStats ? `${imageStats.mtimeMs}:${imageStats.size}` : 'none'}:${libraryStamp}`;
@@ -2012,7 +2012,7 @@ electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
     let imagePath = '';
     
     if (!theme) {
-        const libraryPath = agyThemePath.join(paths.configDir, 'custom-themes.json');
+        const libraryPath = agyThemePath.join(paths.configDir, 'agy-theme-library.json');
         if (fs.existsSync(libraryPath)) {
             const data = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
             const customs = data.customs || [];
@@ -2028,7 +2028,7 @@ electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
                     position: palette.position,
                     paletteId: palette.id
                 };
-                imagePath = agyThemePath.join(paths.configDir, 'agy-themes-custom', customTheme.imageFile);
+                imagePath = agyThemePath.join(paths.configDir, 'agy-themes', 'custom', customTheme.imageFile);
             }
         }
     } else {
