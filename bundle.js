@@ -47,7 +47,31 @@ let modulesCode = 'const __agy_modules__ = {\n';
 for (const mod of modulesToBundle) {
   const fullPath = path.join(projectDir, mod.file);
   if (fs.existsSync(fullPath)) {
-    const code = fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/g, '');
+    let code = fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/g, '');
+    
+    // 如果是 dictionary 模块，我们对其执行物理 JSON 内联，去除 fs 依赖以适应 Electron 渲染沙盒限制
+    if (mod.name.includes('dictionary')) {
+      const dictContent = fs.readFileSync(path.join(projectDir, 'patch', 'locales', 'dict.json'), 'utf8');
+      const substringContent = fs.readFileSync(path.join(projectDir, 'patch', 'locales', 'substring.json'), 'utf8');
+      code = `
+const dictionary = ${dictContent.trim()};
+const substringReplacements = ${substringContent.trim()};
+const coreWords = {
+  file: '文件', edit: '编辑', view: '视图', help: '帮助', settings: '设置', history: '历史', task: '任务', tasks: '任务',
+  agent: '智能体', agents: '智能体', workspace: '工作区', workspaces: '工作区', terminal: '终端', output: '输出', error: '错误',
+  success: '成功', running: '运行中', pending: '等待中', completed: '已完成', update: '更新', download: '下载', install: '安装'
+};
+const combinedDict = Object.assign({}, coreWords, dictionary);
+
+function escapeRegExp(str) {
+  return String(str).replace(/[.*+?^\${}()|[\\\]\\\\]/g, '\\\\$&');
+}
+
+module.exports = { dictionary, coreWords, combinedDict, substringReplacements, escapeRegExp };
+      `;
+      console.log('[Bundle-Inline] Inlined dict.json and substring.json into dictionary module successfully.');
+    }
+    
     // 将代码包裹为 CommonJS 闭包容器
     modulesCode += `  ${JSON.stringify(mod.name)}: function(module, exports, require, __dirname, __filename) {\n${code}\n  },\n`;
   } else {
