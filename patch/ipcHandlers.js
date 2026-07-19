@@ -1847,7 +1847,6 @@ electron_1.ipcMain.handle('accounts:import-json-dialog', async () => {
 const agyThemePath = require("path");
 const agyThemeOs = require("os");
 const crypto = require("crypto");
-const fs = require("fs");
 
 const AGY_THEME_CATALOG = [
     { id: 'doraemon', name: '哆啦A梦', file: '哆啦A梦.png', accent: '#238bc1', overlay: 0.18, position: 'center center' },
