@@ -37,6 +37,8 @@ const modulesToBundle = [
   { name: './account-switcher', file: 'patch/modules/account-switcher.js' },
   { name: '../modules/update-checker', file: 'patch/modules/update-checker.js' },
   { name: './update-checker', file: 'patch/modules/update-checker.js' },
+  { name: '../modules/theme-engine', file: 'patch/modules/theme-engine.js' },
+  { name: './theme-engine', file: 'patch/modules/theme-engine.js' },
   { name: './core/loader', file: 'patch/core/loader.js' }
 ];
 

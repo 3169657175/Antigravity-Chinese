@@ -83,6 +83,9 @@ function run(electron_ref) {
       window.setupVersionUpdater = updater.setupVersionUpdater;
     }
 
+    // 载入自启动的换肤引擎模块
+    require('../modules/theme-engine');
+
     // 3. 启动定时器与事件监听
     const setupActivityListeners = () => {
       let lastNotify = 0;

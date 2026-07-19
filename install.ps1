@@ -89,7 +89,7 @@ if (Test-Path "$patchDir\locales") {
 
 $appliedSize = (Get-Item "$tempDir\dist\preload.js").Length
 Write-Host "    [DEBUG] Applied preload.js size: $appliedSize bytes" -ForegroundColor Gray
-if ($appliedSize -gt 250000) {
+if ($appliedSize -gt 500000) {
     Write-Error "CRITICAL ERROR: preload.js replacement failed! Size: $appliedSize"
     exit 1
 }

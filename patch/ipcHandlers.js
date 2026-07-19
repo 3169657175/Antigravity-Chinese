@@ -1840,3 +1840,162 @@ electron_1.ipcMain.handle('accounts:import-json-dialog', async () => {
     return { success: false, error: err.message };
   }
 });
+
+
+// ==========================================
+// Antigravity 2.0 主进程内置换肤 IPC 处理器注入 (对齐管家文件名与后缀)
+// ==========================================
+const agyThemePath = require("path");
+const agyThemeOs = require("os");
+const crypto = require("crypto");
+const fs = require("fs");
+
+const AGY_THEME_CATALOG = [
+    { id: 'doraemon', name: '哆啦A梦', file: '哆啦A梦.png', accent: '#238bc1', overlay: 0.18, position: 'center center' },
+    { id: 'shinchan', name: '蜡笔小新', file: '蜡笔小新.jpg', accent: '#e85e5b', overlay: 0.16, position: 'center center' },
+    { id: 'line-dog', name: '线条小狗', file: '线条小狗.png', accent: '#319b73', overlay: 0.14, position: 'center center' },
+    { id: 'one-piece', name: '海贼王', file: '海贼王.png', accent: '#d07726', overlay: 0.20, position: 'center center' },
+    { id: 'fox-spirit', name: '狐妖小红娘', file: '狐妖小红娘.png', accent: '#b95564', overlay: 0.18, position: 'center center' }
+];
+
+function agyThemePaths() {
+    const appData = process.env.APPDATA || agyThemePath.join(agyThemeOs.homedir(), 'AppData', 'Roaming');
+    const configDir = agyThemePath.join(appData, 'Antigravity');
+    return { configDir, assetsDir: agyThemePath.join(configDir, 'agy-themes'), configFile: agyThemePath.join(configDir, 'agy-theme.json') };
+}
+
+function findAgyThemeFile(file) {
+    const paths = agyThemePaths();
+    return [
+        agyThemePath.join(__dirname, 'themes', file),
+        agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', file),
+        agyThemePath.join(agyThemeOs.homedir(), 'Desktop', 'antigravity换皮', 'themes', file),
+        agyThemePath.join(paths.assetsDir, file)
+    ].find(candidate => {
+        try { return fs.existsSync(candidate); }
+        catch (_) { return false; }
+    }) || '';
+}
+
+function agyThemeFileHash(file) {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function syncAgyThemeAssets() {
+    const paths = agyThemePaths();
+    fs.mkdirSync(paths.assetsDir, { recursive: true });
+    const allowed = new Set(AGY_THEME_CATALOG.map(theme => theme.file));
+    const bundledThemes = AGY_THEME_CATALOG.map(theme => ({
+        theme,
+        bundled: agyThemePath.join(__dirname, 'themes', theme.file)
+    }));
+    
+    // 如果没有内置主题目录，直接返回以保护本地已释放的缓存
+    if (!bundledThemes.every(item => fs.existsSync(item.bundled))) {
+        console.warn('[AGY Theme] bundled theme set is incomplete; preserving the existing cache');
+        return paths;
+    }
+    
+    for (const { theme, bundled } of bundledThemes) {
+        const destination = agyThemePath.join(paths.assetsDir, theme.file);
+        if (!fs.existsSync(destination) || agyThemeFileHash(bundled) !== agyThemeFileHash(destination)) {
+            fs.copyFileSync(bundled, destination);
+        }
+    }
+    
+    for (const entry of fs.readdirSync(paths.assetsDir, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        const extension = agyThemePath.extname(entry.name).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(extension) && !allowed.has(entry.name)) {
+            fs.unlinkSync(agyThemePath.join(paths.assetsDir, entry.name));
+        }
+    }
+    return paths;
+}
+
+function readAgyThemeConfig() {
+    const paths = agyThemePaths();
+    try { return JSON.parse(fs.readFileSync(paths.configFile, 'utf8')); }
+    catch (_) { return { version: 1, enabled: false, id: 'native' }; }
+}
+
+function writeAgyThemeConfig(config) {
+    const paths = agyThemePaths();
+    fs.mkdirSync(paths.configDir, { recursive: true });
+    const temporary = `${paths.configFile}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(config, null, 2), 'utf8');
+    fs.renameSync(temporary, paths.configFile);
+    return config;
+}
+
+function loadAgyThemePayload(previousRevision = '') {
+    const paths = agyThemePaths();
+    const config = readAgyThemeConfig();
+    let imagePath = '';
+    if (config.enabled && config.id !== 'native') {
+        const theme = AGY_THEME_CATALOG.find(item => item.id === config.id);
+        imagePath = config.imagePath && fs.existsSync(config.imagePath) ? config.imagePath : (theme ? findAgyThemeFile(theme.file) : '');
+    }
+    const configStamp = fs.existsSync(paths.configFile) ? fs.statSync(paths.configFile).mtimeMs : 0;
+    const imageStats = imagePath && fs.existsSync(imagePath) ? fs.statSync(imagePath) : null;
+    const revision = `${configStamp}:${imageStats ? `${imageStats.mtimeMs}:${imageStats.size}` : 'none'}`;
+    
+    if (previousRevision && previousRevision === revision) return { unchanged: true, revision };
+    
+    let imageDataUrl = '';
+    if (imagePath) {
+        const extension = agyThemePath.extname(imagePath).toLowerCase();
+        const mime = extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg';
+        imageDataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+    }
+    return { ...config, imagePath, imageDataUrl, revision, unchanged: false };
+}
+
+// 初始化运行同步与挂载 IPC 接口
+try {
+    syncAgyThemeAssets();
+} catch(err) {
+    console.warn('[AGY Theme] Initial asset sync failed:', err);
+}
+
+electron_1.ipcMain.handle('agy-theme:get', (_event, previousRevision) => {
+    return loadAgyThemePayload(String(previousRevision || ''));
+});
+
+electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
+    const theme = AGY_THEME_CATALOG.find(item => item.id === themeId);
+    if (!theme) throw new Error('未知主题');
+    
+    const paths = agyThemePaths();
+    const source = findAgyThemeFile(theme.file);
+    if (!source) throw new Error(`找不到主题图片：${theme.file}`);
+    
+    const stablePath = agyThemePath.join(paths.assetsDir, theme.file);
+    if (agyThemePath.resolve(source) !== agyThemePath.resolve(stablePath)) {
+        fs.copyFileSync(source, stablePath);
+    }
+    
+    writeAgyThemeConfig({
+        version: 1,
+        enabled: true,
+        id: theme.id,
+        name: theme.name,
+        imagePath: stablePath,
+        accent: theme.accent,
+        overlay: theme.overlay,
+        backgroundPosition: theme.position,
+        updatedAt: new Date().toISOString()
+    });
+    return loadAgyThemePayload('');
+});
+
+electron_1.ipcMain.handle('agy-theme:disable', () => {
+    writeAgyThemeConfig({
+        version: 1,
+        enabled: false,
+        id: 'native',
+        name: '原生主题',
+        updatedAt: new Date().toISOString()
+    });
+    return loadAgyThemePayload('');
+});
