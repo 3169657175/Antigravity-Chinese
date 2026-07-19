@@ -1576,7 +1576,6 @@ electron_1.ipcMain.handle('oauth:start-login', async (event) => {
 
     const state = 'state_' + Math.random().toString(36).substring(2, 10);
     const redirectUri = `http://localhost:${port}/oauth-callback`;
-    
     const scopes = [
       'openid',
       'https://www.googleapis.com/auth/cloud-platform',
@@ -1938,9 +1937,53 @@ function loadAgyThemePayload(previousRevision = '') {
     }
     const configStamp = fs.existsSync(paths.configFile) ? fs.statSync(paths.configFile).mtimeMs : 0;
     const imageStats = imagePath && fs.existsSync(imagePath) ? fs.statSync(imagePath) : null;
-    const revision = `${configStamp}:${imageStats ? `${imageStats.mtimeMs}:${imageStats.size}` : 'none'}`;
     
-    if (previousRevision && previousRevision === revision) return { unchanged: true, revision };
+    const libraryPath = agyThemePath.join(paths.configDir, 'custom-themes.json');
+    const libraryStamp = fs.existsSync(libraryPath) ? fs.statSync(libraryPath).mtimeMs : 0;
+    
+    const revision = `${configStamp}:${imageStats ? `${imageStats.mtimeMs}:${imageStats.size}` : 'none'}:${libraryStamp}`;
+    
+    let themes = [];
+    try {
+        const library = { overrides: {}, customs: [] };
+        if (fs.existsSync(libraryPath)) {
+            const data = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
+            if (data && typeof data === 'object') {
+                library.overrides = data.overrides || {};
+                library.customs = data.customs || [];
+            }
+        }
+        
+        AGY_THEME_CATALOG.forEach(t => {
+            themes.push({
+                id: t.id,
+                name: t.name,
+                accent: t.accent,
+                overlay: t.overlay,
+                position: t.position,
+                kind: 'builtin'
+            });
+        });
+        
+        library.customs.forEach(c => {
+            const palette = AGY_THEME_CATALOG.find(t => t.id === c.paletteId) || AGY_THEME_CATALOG[0];
+            themes.push({
+                id: c.id,
+                name: c.name,
+                accent: palette.accent,
+                overlay: palette.overlay,
+                position: palette.position,
+                kind: 'custom',
+                paletteId: palette.id
+            });
+        });
+    } catch(e) {
+        console.warn('Read custom library in client failed:', e);
+    }
+    
+    if (previousRevision && previousRevision === revision) {
+        return { unchanged: true, revision, themes };
+    }
     
     let imageDataUrl = '';
     if (imagePath) {
@@ -1948,7 +1991,7 @@ function loadAgyThemePayload(previousRevision = '') {
         const mime = extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg';
         imageDataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
     }
-    return { ...config, imagePath, imageDataUrl, revision, unchanged: false };
+    return { ...config, imagePath, imageDataUrl, revision, unchanged: false, themes };
 }
 
 // 初始化运行同步与挂载 IPC 接口
@@ -1963,22 +2006,49 @@ electron_1.ipcMain.handle('agy-theme:get', (_event, previousRevision) => {
 });
 
 electron_1.ipcMain.handle('agy-theme:set', (_event, themeId) => {
-    const theme = AGY_THEME_CATALOG.find(item => item.id === themeId);
-    if (!theme) throw new Error('未知主题');
-    
     const paths = agyThemePaths();
-    const source = findAgyThemeFile(theme.file);
-    if (!source) throw new Error(`找不到主题图片：${theme.file}`);
+    let theme = AGY_THEME_CATALOG.find(item => item.id === themeId);
+    let isCustom = false;
+    let imagePath = '';
     
-    const stablePath = agyThemePath.join(paths.assetsDir, theme.file);
-    if (agyThemePath.resolve(source) !== agyThemePath.resolve(stablePath)) {
-        fs.copyFileSync(source, stablePath);
+    if (!theme) {
+        const libraryPath = agyThemePath.join(paths.configDir, 'custom-themes.json');
+        if (fs.existsSync(libraryPath)) {
+            const data = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
+            const customs = data.customs || [];
+            const customTheme = customs.find(c => c.id === themeId);
+            if (customTheme) {
+                isCustom = true;
+                const palette = AGY_THEME_CATALOG.find(t => t.id === customTheme.paletteId) || AGY_THEME_CATALOG[0];
+                theme = {
+                    id: customTheme.id,
+                    name: customTheme.name,
+                    accent: palette.accent,
+                    overlay: palette.overlay,
+                    position: palette.position,
+                    paletteId: palette.id
+                };
+                imagePath = agyThemePath.join(paths.configDir, 'agy-themes-custom', customTheme.imageFile);
+            }
+        }
+    } else {
+        imagePath = findAgyThemeFile(theme.file);
+    }
+    
+    if (!theme) throw new Error('未知主题');
+    if (!imagePath || !fs.existsSync(imagePath)) throw new Error('主题图片不存在');
+    
+    const stablePath = isCustom ? imagePath : agyThemePath.join(paths.assetsDir, theme.file);
+    if (!isCustom && agyThemePath.resolve(imagePath) !== agyThemePath.resolve(stablePath)) {
+        fs.copyFileSync(imagePath, stablePath);
     }
     
     writeAgyThemeConfig({
         version: 1,
         enabled: true,
-        id: theme.id,
+        id: isCustom ? theme.paletteId : theme.id,
+        sourceThemeId: isCustom ? theme.id : undefined,
+        isCustom,
         name: theme.name,
         imagePath: stablePath,
         accent: theme.accent,

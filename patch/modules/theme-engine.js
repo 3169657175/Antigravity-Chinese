@@ -1027,8 +1027,66 @@
         setThemeVariables(theme);
         document.documentElement.classList.add('agy-theme-active-v2');
         document.documentElement.dataset.agyTheme = theme.id;
-        updateChoiceState(theme.id);
+        
+        const activeId = config.sourceThemeId || config.id;
+        renderSwitcherChoices(config.themes || [], activeId);
         scheduleSemanticUpdate();
+    }
+
+    function renderSwitcherChoices(themes, activeId) {
+        const menu = document.getElementById('agy-theme-menu-v2');
+        if (!menu) return;
+        
+        // 保留标题，清空所有按钮
+        const title = menu.querySelector('strong');
+        menu.innerHTML = '';
+        if (title) menu.appendChild(title);
+        
+        const themesList = themes && themes.length > 0 ? themes : catalog;
+        
+        themesList.forEach(theme => {
+            const button = document.createElement('button');
+            button.className = 'agy-theme-v2-choice';
+            button.dataset.themeId = theme.id;
+            button.style.setProperty('--choice-accent', theme.accent);
+            button.innerHTML = '<span class="agy-theme-v2-swatch"></span><span></span>';
+            button.lastElementChild.textContent = theme.name;
+            if (theme.id === activeId) {
+                button.classList.add('active');
+            }
+            button.addEventListener('click', async event => {
+                event.stopPropagation();
+                try {
+                    const config = await themeIpc.invoke('agy-theme:set', theme.id);
+                    lastRevision = config.revision || '';
+                    applyConfig(config);
+                } catch (error) {
+                    console.warn('[AGY Theme V2] switch failed:', error);
+                }
+                const switcher = document.getElementById('agy-theme-switcher-v2');
+                if (switcher) switcher.classList.remove('open');
+            });
+            menu.appendChild(button);
+        });
+
+        const nativeButton = document.createElement('button');
+        nativeButton.className = 'agy-theme-v2-choice agy-theme-v2-native';
+        nativeButton.dataset.themeId = 'native';
+        if (activeId === 'native') nativeButton.classList.add('active');
+        nativeButton.innerHTML = '<span class="agy-theme-v2-swatch" style="--choice-accent:#9aa4ad"></span><span>恢复原生主题</span>';
+        nativeButton.addEventListener('click', async event => {
+            event.stopPropagation();
+            try {
+                const config = await themeIpc.invoke('agy-theme:disable');
+                lastRevision = config.revision || '';
+                applyConfig(config);
+            } catch (error) {
+                console.warn('[AGY Theme V2] disable failed:', error);
+            }
+            const switcher = document.getElementById('agy-theme-switcher-v2');
+            if (switcher) switcher.classList.remove('open');
+        });
+        menu.appendChild(nativeButton);
     }
 
     function ensureSwitcher() {
@@ -1040,42 +1098,7 @@
         const title = document.createElement('strong');
         title.textContent = 'Antigravity 主题皮肤';
         menu.appendChild(title);
-        catalog.forEach(theme => {
-            const button = document.createElement('button');
-            button.className = 'agy-theme-v2-choice';
-            button.dataset.themeId = theme.id;
-            button.style.setProperty('--choice-accent', theme.accent);
-            button.innerHTML = '<span class="agy-theme-v2-swatch"></span><span></span>';
-            button.lastElementChild.textContent = theme.name;
-            button.addEventListener('click', async event => {
-                event.stopPropagation();
-                try {
-                    const config = await themeIpc.invoke('agy-theme:set', theme.id);
-                    lastRevision = config.revision || '';
-                    applyConfig(config);
-                } catch (error) {
-                    console.warn('[AGY Theme V2] switch failed:', error);
-                }
-                switcher.classList.remove('open');
-            });
-            menu.appendChild(button);
-        });
-        const nativeButton = document.createElement('button');
-        nativeButton.className = 'agy-theme-v2-choice agy-theme-v2-native';
-        nativeButton.dataset.themeId = 'native';
-        nativeButton.innerHTML = '<span class="agy-theme-v2-swatch" style="--choice-accent:#9aa4ad"></span><span>恢复原生主题</span>';
-        nativeButton.addEventListener('click', async event => {
-            event.stopPropagation();
-            try {
-                const config = await themeIpc.invoke('agy-theme:disable');
-                lastRevision = config.revision || '';
-                applyConfig(config);
-            } catch (error) {
-                console.warn('[AGY Theme V2] disable failed:', error);
-            }
-            switcher.classList.remove('open');
-        });
-        menu.appendChild(nativeButton);
+        
         const trigger = document.createElement('button');
         trigger.id = 'agy-theme-trigger-v2';
         trigger.type = 'button';
@@ -1089,12 +1112,18 @@
         switcher.append(menu, trigger);
         document.body.appendChild(switcher);
         document.addEventListener('click', () => switcher.classList.remove('open'));
+        
+        renderSwitcherChoices([], 'native');
     }
 
     async function refreshTheme() {
         try {
             const config = await themeIpc.invoke('agy-theme:get', lastRevision);
-            if (!config || config.unchanged) return;
+            if (!config) return;
+            const activeId = config.sourceThemeId || config.id;
+            renderSwitcherChoices(config.themes || [], activeId);
+            
+            if (config.unchanged) return;
             lastRevision = config.revision || '';
             applyConfig(config);
         } catch (error) {
