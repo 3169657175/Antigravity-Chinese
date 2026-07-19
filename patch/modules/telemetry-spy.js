@@ -1,4 +1,4 @@
-﻿/**
+/**
  * modules/telemetry-spy.js
  * Antigravity-Chinese v2 - 缃戠粶娴侀噺鐩戝惉妯″潡
  * 鐙珛妯″潡锛屾棤澶栭儴渚濊禆
@@ -66,7 +66,8 @@ function startStartupSniff() {
   }, 2000);
 }
 
-// Network Telemetry Spy锛堟敞鍏ュ埌娓叉煋杩涚▼闅旂鐜锛?function injectTelemetrySpy() {
+// Network Telemetry Spy (注入到渲染进程隔离环境)
+function injectTelemetrySpy() {
   try {
     const spyCode = `
       (() => {

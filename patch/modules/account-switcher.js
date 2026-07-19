@@ -1,4 +1,4 @@
-﻿/**
+/**
  * modules/account-switcher.js
  * Antigravity-Chinese v2 - 鐧诲綍椤佃处鍙峰揩鎹峰垏鎹㈢粍浠? * 渚濊禆锛歵heme-adapter.js锛坓etNativeThemeColors锛? * 鎻愪緵锛歩njectQuickLogin
  */
@@ -32,7 +32,7 @@ function injectQuickLogin() {
 
       const title = document.createElement('div');
       title.style.cssText = `font-size:12px;font-weight:600;color:${quickTheme.muted};opacity:1;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;user-select:none;`;
-      title.textContent = '鈥?蹇嵎鐧诲綍宸插瓨璐﹀彿 鈥?;
+      title.textContent = '✦ 快捷登录已存账号 ✦';
       qkContainer.appendChild(title);
 
       accounts.forEach(acc => {
@@ -58,7 +58,7 @@ function injectQuickLogin() {
           e.stopPropagation();
           btn.style.opacity = '0.6';
           btn.style.pointerEvents = 'none';
-          btn.textContent = '姝ｅ湪蹇嵎鐧诲綍骞堕噸鍚?..';
+          btn.textContent = '正在快捷登录并重载...';
           electron_1.ipcRenderer.invoke('accounts:switch', acc.id);
         };
 

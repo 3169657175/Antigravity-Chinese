@@ -15,14 +15,14 @@ function updateStoredQuota() {
       const el = allDivs[i];
       if (!el || el.children.length > 0) continue;
       const text = el.textContent ? el.textContent.trim() : '';
-      if (text.includes('姣忓懆棰濆害闄愰') || text.includes('Weekly Limit')) {
+      if (text.includes('每周额度限额') || text.includes('Weekly Limit')) {
         const val = findPercentageNearby(el);
         if (val) {
           const group = checkModelGroup(el);
           if (group === 'gemini') localStorage.setItem('quota_gemini_weekly', val);
           else if (group === 'claude') localStorage.setItem('quota_claude_weekly', val);
         }
-      } else if (text.includes('浜斿皬鏃堕搴﹂檺棰?) || text.includes('Five Hour Limit') || text.includes('5-hour limit')) {
+      } else if (text.includes('五小时额度限制') || text.includes('Five Hour Limit') || text.includes('5-hour limit')) {
         const val = findPercentageNearby(el);
         if (val) {
           const group = checkModelGroup(el);
@@ -62,9 +62,11 @@ function checkModelGroup(element) {
   return null;
 }
 
-// BUG FIX: 绮惧噯妫€娴嬪綋鍓?UI 閫変腑鐨勬ā鍨嬶紝鎺掗櫎瀵硅瘽姘旀场鍐呭鐨勫共鎵?function getCurrentModel() {
+// BUG FIX: 精准检测当前 UI 选中的模型，排除对话气泡内容的干扰
+function getCurrentModel() {
   try {
-    // 浼樺厛鏌ヨ搴曢儴宸ュ叿鏍忕殑涓撳睘妯″瀷閫夋嫨鍣?    const modelSelectors = [
+    // 优先查询底部工具栏的专属模型选择器
+    const modelSelectors = [
       '.model-selector', '.model-select', '[data-model]',
       'button[aria-label*="model" i]', 'button[aria-label*="Model" i]',
     ];
@@ -76,7 +78,8 @@ function checkModelGroup(element) {
         if (m) return m[1];
       }
     }
-    // 娆￠€夛細鍙壂鎻忓簳閮ㄨ緭鍏ュ尯鍩燂紝璺宠繃闀挎枃鏈紙瀵硅瘽姘旀场锛?    const bottomBar = document.querySelector('.bottom-bar, .input-area, .composer, footer, form');
+    // 娆￠€夛細鍙壂鎻忓簳閮ㄨ緭鍏ュ尯鍩燂紝璺宠繃闀挎枃鏈紙瀵硅瘽姘旀场锛?    
+const bottomBar = document.querySelector('.bottom-bar, .input-area, .composer, footer, form');
     const searchRoot = bottomBar || document;
     const interactives = searchRoot.querySelectorAll('button, [role="button"], .select, .trigger, .dropdown');
     for (let i = 0; i < interactives.length; i++) {
@@ -92,7 +95,8 @@ function checkModelGroup(element) {
 
 function injectQuotaWidget() {
   try {
-    // 1. 寮傛杞藉叆澶氳处鍙峰垪琛?    if (window.antigravityAccounts === undefined) {
+    // 1. 寮傛杞藉叆澶氳处鍙峰垪琛?    
+if (window.antigravityAccounts === undefined) {
       window.antigravityAccounts = null;
       electron_1.ipcRenderer.invoke('accounts:list').then(res => {
         window.antigravityAccounts = res.accounts || [];
@@ -103,7 +107,7 @@ function injectQuotaWidget() {
     }
     if (window.antigravityAccounts === null) return;
 
-    // 2. 鎵惧埌鐩爣瀹瑰櫒锛堣缃寜閽尯鍩燂級
+    // 2. 找到目标容器（设置按钮区域）
     const settingsBtn = Array.from(document.querySelectorAll('button, [role="button"], a')).find(el => {
       const text = el.textContent ? el.textContent.trim() : '';
       const label = el.getAttribute ? (el.getAttribute('aria-label') || '') : '';
@@ -113,7 +117,7 @@ function injectQuotaWidget() {
 
     updateStoredQuota();
 
-    // 3. 鍒涘缓鎴栧鐢?widget
+    // 3. 创建或复用 widget
     let widget = document.getElementById('antigravity-quota-widget');
     if (!widget) {
       widget = document.createElement('div');
@@ -251,7 +255,7 @@ function injectQuotaWidget() {
     const root = widget.shadowRoot.querySelector('.quota-root');
     if (!root) return;
 
-    // 4. 涓婚閫傞厤
+    // 4. 主题适配
     const quotaTheme = readQuotaTheme(settingsBtn);
     widget.style.setProperty('--ag-fg', quotaTheme.fg);
     widget.style.setProperty('--ag-muted-fg', quotaTheme.muted);
@@ -268,12 +272,12 @@ function injectQuotaWidget() {
     const cWeekly = localStorage.getItem('quota_claude_weekly') || '--';
     const c5h = localStorage.getItem('quota_claude_5h') || '--';
 
-    // BUG FIX: 閫氳繃鏃堕棿鎴抽槻姝?Gemini 鍚庡彴鎺㈤拡鏁版嵁姹℃煋褰撳墠 Claude 棰濆害鏄剧ず
+    // BUG FIX: 通过时间戳防止 Gemini 后台探测数据污染当前 Claude 额度显示
     const geminiTs = parseInt(localStorage.getItem('quota_gemini_ts') || '0', 10);
     const claudeTs = parseInt(localStorage.getItem('quota_claude_ts') || '0', 10);
     const currentModel = getCurrentModel().toLowerCase();
     const isGemini = currentModel.includes('gemini');
-    // 濡傛灉鐢?Claude 鏃?Gemini 鎺㈤拡鍒氳Е鍙戯紙5 绉掑唴锛夛細鍙潤榛樺瓨鍌ㄦ暟瀛楋紝涓嶆敼鏍囬
+    // 如果用 Claude 时 Gemini 探测刚触发（5 秒内）：只静默存储数字，不改标题
     const geminiJustUpdated = !isGemini && (geminiTs > claudeTs + 5000);
 
     const titleEl = root.querySelector('.quota-title');
@@ -286,7 +290,7 @@ function injectQuotaWidget() {
       if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
       if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
     } else if (geminiJustUpdated) {
-      // 鍚庡彴鎺㈤拡鍒氭洿鏂颁簡 Gemini 鏁版嵁锛屼絾鎴戜滑鍦ㄧ敤 Claude 鈥斺€?鍙洿鏂版暟瀛楋紝涓嶆敼鏍囬
+      // 后台探测刚更新了 Gemini 数据，但我们在用 Claude —— 只更新数字，不改标题
       if (weeklyEl.textContent !== gWeekly && gWeekly !== '--') weeklyEl.textContent = gWeekly;
       if (hourlyEl.textContent !== g5h && g5h !== '--') hourlyEl.textContent = g5h;
     } else {
@@ -298,7 +302,7 @@ function injectQuotaWidget() {
       if (hourlyEl.textContent !== c5h) hourlyEl.textContent = c5h;
     }
 
-    // 5. 璐﹀彿鍒囨崲 UI
+    // 5. 账号切换 UI
     let trigger = accountsContainer.querySelector('#antigravity-account-select-trigger');
     if (!trigger && window.antigravityAccounts && window.antigravityAccounts.length > 0) {
       const currentAcc = window.antigravityAccounts.find(a => a.id === window.antigravityCurrentAccount);
@@ -378,9 +382,9 @@ function injectQuotaWidget() {
         };
         addBtn.onmousedown = (e) => e.stopPropagation();
       }
-      }
+
     } else if (trigger) {
-      // 鏇存柊宸插瓨鍦ㄧ殑 trigger 鏍囩
+      // 更新已存在的 trigger 标签
       const currentAcc = window.antigravityAccounts ? window.antigravityAccounts.find(a => a.id === window.antigravityCurrentAccount) : null;
       const labelEl = trigger.querySelector('.trigger-label');
       if (labelEl) {

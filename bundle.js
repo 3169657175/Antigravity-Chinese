@@ -18,7 +18,7 @@ if (!fs.existsSync(preloadTplFile)) {
   process.exit(1);
 }
 
-const preloadTpl = fs.readFileSync(preloadTplFile, 'utf8');
+const preloadTpl = fs.readFileSync(preloadTplFile, 'utf8').replace(/^\uFEFF/g, '');
 
 // 定义折叠加载的模块列表
 const modulesToBundle = [
@@ -47,7 +47,7 @@ let modulesCode = 'const __agy_modules__ = {\n';
 for (const mod of modulesToBundle) {
   const fullPath = path.join(projectDir, mod.file);
   if (fs.existsSync(fullPath)) {
-    const code = fs.readFileSync(fullPath, 'utf8');
+    const code = fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/g, '');
     // 将代码包裹为 CommonJS 闭包容器
     modulesCode += `  ${JSON.stringify(mod.name)}: function(module, exports, require, __dirname, __filename) {\n${code}\n  },\n`;
   } else {
