@@ -23,6 +23,7 @@ const preloadTpl = fs.readFileSync(preloadTplFile, 'utf8').replace(/^\uFEFF/g, '
 // 定义折叠加载的模块列表
 const modulesToBundle = [
   { name: './core/dom', file: 'patch/core/dom.js' },
+  { name: './dom', file: 'patch/core/dom.js' },
   { name: '../modules/theme-adapter', file: 'patch/modules/theme-adapter.js' },
   { name: './theme-adapter', file: 'patch/modules/theme-adapter.js' },
   { name: '../modules/dictionary', file: 'patch/modules/dictionary.js' },
