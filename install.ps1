@@ -117,9 +117,10 @@ if (Test-Path $pkgJsonPath) {
     
     # 强制将哈希指纹注入为 package.json 的元数据
     $pkg | Add-Member -MemberType NoteProperty -Name "checksums" -Value $checksums -Force
-    # 将更新后的 package.json 重新写入
+    # 将更新后的 package.json 重新写入 (使用无 BOM 头的 UTF8 编码)
     $newJson = $pkg | ConvertTo-Json -Depth 100
-    [System.IO.File]::WriteAllText($pkgJsonPath, $newJson, [System.Text.Encoding]::UTF8)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($pkgJsonPath, $newJson, $utf8NoBom)
     Write-Host "[OK] SHA-256 checksums embedded into package.json!" -ForegroundColor Green
 } else {
     Write-Error "CRITICAL ERROR: package.json not found in unpacked temp dir!"
