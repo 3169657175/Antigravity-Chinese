@@ -1,142 +1,307 @@
-# Antigravity 2.0 汉化与体验优化补丁
+# Antigravity 中文增强与 AGY Hub
 
-这个项目是针对 Google 智能体编程客户端 **Antigravity 2.0** 制作的无损汉化与体验优化补丁。
+[![Release](https://img.shields.io/github/v/release/3169657175/Antigravity-Chinese?display_name=tag&sort=semver)](https://github.com/3169657175/Antigravity-Chinese/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/3169657175/Antigravity-Chinese/total)](https://github.com/3169657175/Antigravity-Chinese/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-2563eb?logo=windows)](#运行环境)
 
-> **当前版本：v1.2.5** · 已适配官方最新版 **Antigravity 2.3.1** · 支持通过桌面管家 EXE 直接安装汉化补丁。
+这是一个面向 Windows 版 Google Antigravity 的中文增强项目。
 
-旨在全面提升客户端的中文使用环境与操作体验，一键解决官方版中存在的界面语言单一、系统托盘唤醒缓慢、以及网络环境配置繁琐等常见使用痛点。
+项目包含两部分：
 
----
+- **Antigravity 中文与体验优化补丁**：负责界面汉化、主题皮肤、账号与额度组件、托盘和网络体验优化。
+- **AGY Hub 桌面管家**：负责补丁注入与回退、账号管理、Codex/Claude Code 接入、Token 监控、MCP/Skill 管理、诊断和在线更新。
 
-## v1.2.5 更新内容
+推荐普通用户直接安装 AGY Hub。仓库中的 PowerShell 与 BAT 脚本主要用于手动安装、调试和补丁开发。
 
-* **全新换肤定制功能**：支持自由切换各种不同风格的精美皮肤（如蜡笔小新、哆啦A梦等），左侧霓虹发光实体线、自适应高透磨砂面板以及额度卡片高度融合美化，细节拉满。
-* **管家社区反馈入口**：桌面管家助手中集成社区反馈快捷入口，遇到任何异常均可一键提交建议。
-* **汉化检查数据清洗**：汉化覆盖检查面板物理过滤掉物理路径、配置文件等乱码杂质，且将会话 UUID 长路由做极简的人类友好简写展示。
-* **设置选项高亮自适应**：彻底修复无法分清被选中设置项的缺陷，选中菜单以饱和主题色高亮，其余菜单透明磨砂，与动漫墙纸底盘交相辉映。
+> 当前 AGY Hub 开发版补丁构建链已适配 Antigravity 2.4.3；公开安装包的支持范围以对应 Release 说明为准。Antigravity 更新后可能改变内部文件结构，请不要把旧补丁强行注入新版本。
 
-## v1.2.4 更新内容
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6b41253e-5ba3-4a63-80aa-a8cc9f4cfba0" alt="Antigravity 中文主题界面" width="92%">
+</p>
 
-* **适配 Antigravity 2.3.1**：同步最新版客户端结构，修复旧补丁导致新版本无法启动的问题。
-* **EXE 直接安装汉化**：Release 提供最新版 AGY Hub 桌面管家安装包，可自动检测客户端并安装内置汉化插件。
-* **账号存档安全加固**：本地账号令牌改用 Electron Safe Storage 加密，并自动迁移旧格式存档。
-* **账号重复保存修复**：规范化账号邮箱并复用已有存档，避免重复生成本地账号记录。
-* **汉化覆盖继续完善**：补齐项目、权限、删除确认、额度重置时间与自定义额度等 2.3.1 新界面文案。
-<img width="1529" height="1019" alt="image" src="https://github.com/user-attachments/assets/065d720f-ea05-4376-affb-1d9539354434" />
+## 下载与安装
 
----
+### 使用 AGY Hub 安装（推荐）
 
-## 🚀 核心改进
+1. 打开 [Releases](https://github.com/3169657175/Antigravity-Chinese/releases/latest)。
+2. 下载名称中包含 <code>agy-hub-setup</code> 的 Windows 安装包。
+3. 安装并打开 AGY Hub。
+4. 进入“汉化注入”，确认识别到的 Antigravity 版本。
+5. 点击“一键注入”，完成后重新打开 Antigravity。
 
-### 1. 深度中文汉化（支持云端异步更新）
-* **全界面覆盖**：汉化范围包含系统菜单栏、托盘菜单、侧边设置项、新手向导提示以及窗口标题栏，提供完整的本土化视觉体验。
-* **智能代码保护**：内置精确的分流过滤引擎，自动跳过 Monaco 编辑器代码区、富文本输入框及日志控制台，**绝对不会破坏任何代码字符**，保证语法高亮与代码格式原汁原味。
-* **极速加载**：启动时优先采用本地缓存词库瞬间渲染，并在后台异步静默拉取合并最新校对，后续无需重复安装补丁。
+README 不写死安装包版本号，实际文件名以最新 Release 附件为准。
 
-*炫彩主题换肤与汉化主界面：*
-<img width="2099" height="1349" alt="1.2.5换肤主界面" src="https://github.com/user-attachments/assets/6b41253e-5ba3-4a63-80aa-a8cc9f4cfba0" />
+### 使用仓库脚本安装
 
-### 2. 免 TUN 模式代理穿透（✨ 独家首创）
-* **自动环境适配**：补丁会在客户端启动时自动检测 Chromium 的系统代理设置。
-* **进程级代理注入**：智能将代理地址转化为对应的环境变量参数，并以局部作用域形式注入给后台智能体服务进程（`language_server`）。
-* **无需系统级代理**：用户只需使用常规的代理客户端，无需特意开启高开销、全局污染的 TUN 网卡模式，即可实现 AI 智能体的流畅通信。
+适合需要查看补丁源码或手动控制安装过程的用户。
 
-### 3. 0ms 瞬间还原（告别 Loading 重新加载）
-* **后台挂起隐藏**：在开启“常驻后台”时，点击窗口关闭按钮将执行隐藏（Hide）操作，而不是销毁（Destroy）进程。
-* **托盘秒级呼出**：为系统托盘图标深度绑定了单击/双击唤醒事件。再次打开时窗口在 0ms 内瞬间还原，**彻底消灭了官方版从托盘唤醒时极慢且反复加载的 `loading antigravity` 进度条**，同时完美保留您关闭前未写完的输入框草稿。
-* **干净退出**：若关闭“常驻后台”，点击关闭则会干净退出，不残留任何后台僵尸进程。
+1. 下载仓库 ZIP 并完整解压。
+2. 确保系统已安装 Node.js。
+3. 双击 <code>安装汉化与优化补丁.bat</code>，或在 PowerShell 中运行：
 
-### 4. 智能额度无感静默更新（✨ 独家首创）
-* **常驻额度看板**：在侧边栏左下角直观集成 Gemini 和 Claude 额度配额小组件，随时掌控使用配额。
-* **自适应心跳刷新**：当处于打字和对话活跃期间（最近 15 秒内有操作），心跳检查自动缩短至 5 秒一次，让额度扣减无感、精准地反馈在看板上。
-* **闲置自动降频**：检测到闲置时自动降频至 30 秒一次的安全低频轮询，规避高频请求可能触发的谷歌云端限流（429 Too Many Requests）风险。
-* **防瞬闪处理**：首屏加载时自动展示 `--` 占位符以等待底层服务就绪，秒级内平滑切换至真实数值，去除官方的假 100% 刷新闪烁。
-
-*左下角常驻智能配额看板：*
-<img width="2099" height="1349" alt="26c840e071acd86153f818b072cd10d8" src="https://github.com/user-attachments/assets/24b8632f-1640-488e-b430-16027b4db58b" />
-
-### 5. 多账号极速切换与自动嗅探
-* **登录态自动管理**：当在官方客户端点击“添加账号”并登录成功后，补丁会自动捕捉、纯净化并保存最新的登录凭据。
-* **无缝快捷切换**：左下角常驻多账号下拉菜单，点击即可在一秒内重置系统 Keyring 证书上下文并平滑热重启底层语言服务，实现完全独立的极速账号切换。
-
-*登录界面中文化与一键 Google 快捷登录：*
-<img width="2099" height="1349" alt="f54cb9ea05f7bc8e381248cbf6cc99c1" src="https://github.com/user-attachments/assets/670b81e0-ec00-4d00-9adc-0a5a1f255ebe" />
-
-*多账号侧边栏极速切换下拉框：*
-<img width="2099" height="1349" alt="908854b247c173276bfa27b39c5f9aeb" src="https://github.com/user-attachments/assets/b35ecaaa-3be5-42c2-97c7-770b9ef557f0" />
-
-*精美高透设置磨砂背景与选项自适应高亮：*
-<img width="2099" height="1349" alt="1.2.5设置磨砂高亮界面" src="https://github.com/user-attachments/assets/c28cde51-ab98-4a4b-b2b4-8a23908795af" />
-
-### 6. 一键自动检测更新与自动重启（✨ 独家首创）
-* **主进程穿透检测**：由于客户端内置沙箱具备严格的 CSP 网页安全域名限制，更新检测自动上移至底层的 Node.js 主进程，彻底实现 100% 畅通的版本更新检测。
-* **非侵入式绝对定位**：借鉴开源项目 `CodexPlus` 方案，版本号与更新提示按钮强制绝对浮动在窗口右上角控制栏左侧（向左偏移 180px 避开原生最小化按钮），美观协调且能够完美响应鼠标悬停与一键升级点击。
-* **无感静默热重包**：点击“有新版本”即可在后台全自动静默下载、解压、提取旧版 `app.asar`、注入优化代码、自动重包、生成重启覆盖脚本。点击“重启生效”在秒级内瞬间热重载。
-
-*右上角常驻版本指示与一键热更新气泡：*
-<img width="2099" height="1349" alt="image" src="https://github.com/user-attachments/assets/28df01cc-9859-41a8-a55b-a48b280c0307" />
-
----
-
-## 💾 快速安装
-
-> **注意**：本补丁采用**本地动态解包与重新封包技术**，只修补必要文件，不改动核心二进制。安装前会自动备份原版文件，并针对 Antigravity 2.3.1 完成兼容适配。
-
-### 方法 A：桌面管家 EXE 直接安装（推荐）
-1. 前往 [Releases](https://github.com/3169657175/Antigravity-Chinese/releases/latest) 下载 **`AGY.Hub.Setup.1.0.0.exe`**。
-2. 双击安装并打开 **AGY Hub 桌面管家**。
-3. 点击“一键汉化补丁”中的安装按钮，程序会自动检测 Antigravity、备份原版并注入最新版汉化插件。
-4. 安装完成后重新打开 Antigravity 即可生效，无需手动解压补丁文件。
-
-### 方法 B：ZIP 双击一键安装
-1. 下载本项目 ZIP 压缩包并解压。
-2. 双击运行 **`安装汉化与优化补丁.bat`**。
-3. 安装程序会自动获取必要权限、安全终止运行中的客户端、备份原版、执行解包覆盖和重新打包（全程约 3 秒）。
-4. 重新打开客户端即可享受优化版。
-
-> ZIP/脚本安装方式需要系统中已安装 Node.js（npm/npx）；使用桌面管家 EXE 则无需单独准备补丁目录。
-
-### 方法 C：PowerShell 手动安装
-以管理员身份打开终端，在项目根目录下运行：
-```powershell
+~~~powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\install.ps1
-```
+~~~
 
----
+恢复官方版本：
 
-## 🔄 一键卸载/还原
+~~~powershell
+.\restore.ps1
+~~~
 
-如果您需要恢复为官方原版，无需手动清理：
-1. 双击运行项目根目录下的 **`一键还原官方原版.bat`**。
-2. 还原程序会自动关闭当前客户端，并使用备份的核心文件一键覆盖还原。
-3. 自动注销和清理防更新覆盖的开机自愈服务，实现无残留的纯净还原。
+也可以直接双击 <code>一键还原官方原版.bat</code>。
 
----
+## 功能总览
 
-## 📁 项目结构
+### 中文补丁与安全回退
 
-* `patch/`：汉化与优化补丁的源码
-* `安装汉化与优化补丁.bat`：Windows 一键安装脚本
-* `一键还原官方原版.bat`：Windows 一键还原官方原版脚本
-* `install.ps1`：PowerShell 核心安装与 ASAR 打包器
-* `restore.ps1`：PowerShell 核心还原与清理器
-* `auto_heal.ps1`：防更新覆盖的开机自愈服务脚本
-* `README.md`：本说明文档
+- 覆盖菜单、设置、引导、账号、权限、额度、项目和常用操作界面。
+- 对编辑器、代码块、终端和日志区域做隔离，避免把代码内容误翻译。
+- 基于当前官方 <code>app.asar</code> 动态生成兼容补丁，不再长期覆盖一份旧客户端。
+- 注入前验证补丁结构、JavaScript 语法和必要能力。
+- 固定保留三个状态：当前版本、上一版汉化补丁、当前官方原版。
+- 支持“一键注入”“回退上一版”“恢复官方原版”，不会每次注入生成一批时间戳备份。
+- Antigravity 更新后重新读取官方底包，只在兼容层处理发生变化的部分。
 
----
+### 主题与界面增强
 
-## 🙏 致谢
+- 内置哆啦 A 梦、蜡笔小新、线条小狗、海贼王、狐妖小红娘等主题。
+- 支持导入本地图片作为自定义皮肤。
+- 主题背景、磨砂层、侧边栏、卡片、输入区和选中状态保持统一。
+- 针对 Antigravity 2.4.3 的侧边栏结构变化提供兼容适配。
+- 自定义主题可同时出现在 AGY Hub 和 Antigravity 的主题列表中。
 
-本项目在开发过程中参考了以下优秀的开源项目，在此向两位作者表示诚挚的感谢：
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/c28cde51-ab98-4a4b-b2b4-8a23908795af" alt="Antigravity 设置界面主题效果" width="92%">
+</p>
 
-* **[BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)**
-  感谢 BigPizzaV3 的开源贡献。本项目右上角版本指示器与更新气泡的 `position: fixed` 悬浮挂载方案，参考了 CodexPlusPlus 的实现思路，使其能够绕开复杂的动态 React DOM 树，以非侵入式的方式稳定挂载在客户端窗口中。
+### 本地账号与额度
 
-* **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)**
-  感谢 lbjlaq 的先驱工作。本项目在多账号管理、额度看板等功能的设计上受到了 Antigravity-Manager 的启发，并在此基础上进行了深度整合与扩展优化。
+- 自动识别 Antigravity 本地登录账号。
+- 支持账号保存、切换、导入、导出和状态检查。
+- 凭据使用 Electron Safe Storage 保护，并兼容旧存档迁移。
+- 分别展示 Gemini 与 Claude 的额度和重置时间。
+- 账号授权失效时显示可理解的重新登录提示，不直接暴露接口 JSON。
+- 本地账号 Token 记录按每页 20 条分页。
+- 活跃和后台状态使用不同刷新频率，降低无意义请求。
 
+### Codex 接入
 
+- 将 Antigravity 模型接入 Codex，支持 OpenAI Responses 与流式输出。
+- 支持 Gemini、Claude 等 Antigravity 可用模型。
+- 可以切换账号、查看额度并选择实际模型。
+- 支持自定义 OpenAI 兼容 Provider，例如 Sub2API。
+- 自定义 Provider 与 Antigravity Provider 相互隔离，测试模型不会改变当前已连接线路。
+- 修复工具调用历史、重复输出、长对话 ID 和兼容性问题。
+- 长对话达到阈值时支持压缩请求和本地恢复摘要。
+- Gemini 思考内容可转换为 Codex reasoning summary 事件。
 
+### Claude Code 与 Claude Desktop 接入
 
+- 提供 Anthropic Messages 与 <code>count_tokens</code> 兼容接口。
+- Claude Code 可以显示模型列表并选择 Antigravity 中的真实模型。
+- 对外使用 Claude 兼容别名，转发时恢复为用户选择的真实 Gemini/Claude 模型。
+- 支持账号切换、额度查看、模型路由和连接状态检测。
+- 接入后可以自动启动或重启 Claude Desktop。
+- 写入真实的 Claude Desktop 配置和 Windows 托管配置，不只修改界面显示。
+- Codex 与 Claude 使用独立账号、模型和连接状态。
 
+### 三路反代配置隔离
+
+AGY Hub 分别保存和管理：
+
+1. Codex 使用 Antigravity；
+2. Codex 使用自定义 Provider；
+3. Claude Code/Claude Desktop 使用 Antigravity。
+
+每条线路拥有独立的账号、模型、测试状态和连接状态。点击“测试”只验证草稿配置，只有明确点击“接入”才会改变正在使用的路由。
+
+~~~mermaid
+flowchart LR
+    C[Codex] -->|Responses API| G[AGY Hub 127.0.0.1:8046]
+    D[Claude Code / Desktop] -->|Anthropic Messages| G
+    G --> A[Antigravity / Cloud Code]
+    G --> S[自定义 Provider / Sub2API]
+    A --> M[Gemini 与 Claude 模型]
+    S --> U[自定义渠道与模型]
+~~~
+
+### 三级测试与诊断报告
+
+反代接入按层检查：
+
+1. **配置层**：地址、端口、密钥、模型和本地配置；
+2. **连接层**：本地服务、模型接口和上游连通性；
+3. **真实调用层**：使用目标协议完成一次最小模型请求。
+
+一键诊断报告会汇总当前线路、本地端口、配置写入结果、上游连通性、最近路由日志、补丁版本和处理建议。报告会隐藏 API Key、Token、账号 ID 和对话内容。
+
+### Token 与缓存监控
+
+- 分别统计本地 Antigravity 与反代请求。
+- 展示输入、输出、总 Token、缓存读取量和缓存命中率。
+- 区分上游返回的官方数据与本地估算数据。
+- 支持 JSON、SSE、protobuf 和 gRPC protobuf 中的 UsageMetadata。
+- 日、周、月及明细视图使用分页和增量存储。
+- Token 日志不会把普通 Cloud Code POST 请求误判为模型生成。
+
+### MCP 与 Skill 市场
+
+- 展示可用 MCP 和 Skill，并提供分类、序号、搜索和分页。
+- 页面根据窗口尺寸重新计算布局。
+- Skill 英文简介支持按内容哈希缓存的增量中文翻译。
+- 新增或变化的简介会重新进入待翻译状态。
+- MCP 安装前检查命令、包名和固定版本，拒绝危险或不可审计的启动参数。
+- 支持配置检查和显式深度握手，避免页面长期停留在“正在启动并执行握手”。
+
+### 社区、更新与运行反馈
+
+- AGY Hub 内置公告、反馈和问题提交入口。
+- 更新说明会清理 HTML 标签并保留基本段落结构。
+- 支持 GitHub Release 更新检查、下载安装和安全退出。
+- 长时间操作在全局区域显示进度。
+- 测试、接入、注入和诊断使用可覆盖的页面内反馈，减少连续弹窗。
+
+## 自定义 Sub2API
+
+如果已经通过 Docker 运行 Sub2API，可以在 AGY Hub 的“自定义 Provider”中填写它提供的 OpenAI 兼容地址、API Key 和模型名。
+
+常见本地地址示例：
+
+~~~text
+http://127.0.0.1:8080/v1
+~~~
+
+AGY Hub 的本地网关通常监听：
+
+~~~text
+http://127.0.0.1:8046
+~~~
+
+- <code>8080</code> 是 Sub2API 自己的上游兼容接口；
+- <code>8046</code> 是 AGY Hub 提供给 Codex 和 Claude Code 的本地统一入口。
+
+只点击“测试”不会切换当前线路。确认测试通过后，需要点击“接入”才会写入 Codex 配置。
+
+## 操作边界
+
+| 操作 | 会做什么 | 会不会改变当前使用线路 |
+|---|---|---|
+| 测试模型 | 使用当前表单做只读探测 | 不会 |
+| 接入 Codex | 写入 Codex Provider 与模型目录 | 会 |
+| 接入 Claude | 写入 Claude 配置并准备本地网关 | 会 |
+| 一键注入 | 修改 Antigravity 的补丁文件 | 与反代线路无关 |
+| 回退上一版 | 恢复上一份汉化补丁 | 与反代线路无关 |
+| 恢复官方原版 | 恢复当前客户端对应的官方文件 | 与反代线路无关 |
+
+## 运行环境
+
+| 项目 | 支持情况 |
+|---|---|
+| Windows 10/11 | 支持 |
+| Antigravity 2.4.3 | 当前 AGY Hub 开发版兼容构建已适配 |
+| Antigravity 后续版本 | 需要先通过兼容构建与真实注入验证 |
+| Codex | 支持 Responses 接入 |
+| Claude Code / Claude Desktop | 支持 Anthropic Messages 接入 |
+| 自定义 OpenAI 兼容服务 | 支持，例如 Sub2API |
+| macOS / Linux | 当前未提供完整安装和注入支持 |
+
+## 常见问题
+
+### Antigravity 更新后还能直接注入吗？
+
+不要直接沿用旧补丁。AGY Hub 会读取当前官方 <code>app.asar</code> 并生成兼容补丁；如果官方结构变化导致规则失效，验证阶段会阻止安装。
+
+### 测试成功，Codex 或 Claude 仍然报错怎么办？
+
+“测试成功”只代表指定测试层通过。先确认是否已经点击“接入”，再运行三级测试或导出诊断报告。长对话、工具调用和普通短测试使用的请求结构不同。
+
+### 为什么会出现 502？
+
+502 可能来自上游容量、地区限制、模型下线、请求格式、工具历史或临时网络波动。AGY Hub 会尽量把错误分类为可重试、需要更换模型、需要重新授权或历史不兼容。
+
+### 需要开启 TUN 模式吗？
+
+补丁支持把代理环境传递给 Antigravity 的语言服务，大多数情况下不要求开启全局 TUN。实际效果取决于使用的代理软件和网络环境。
+
+### 数据会上传到项目服务器吗？
+
+账号凭据、Token 统计和本地配置默认保存在本机。社区反馈、更新检查以及主动配置的模型上游会产生网络请求。分享诊断报告前仍建议人工检查。
+
+## 仓库结构
+
+~~~text
+Antigravity-Chinese/
+├─ patch/                         Antigravity 补丁源码
+│  ├─ locales/                    中文词典
+│  ├─ themes/                     内置主题图片
+│  ├─ ideInstall/                 安装向导增强
+│  ├─ main.js                     主进程增强
+│  ├─ preload.js                  渲染进程注入入口
+│  ├─ ipcHandlers.js              账号、额度及 IPC
+│  └─ languageServer.js           语言服务启动与代理环境
+├─ install.ps1                    手动安装脚本
+├─ restore.ps1                    官方原版恢复脚本
+├─ auto_heal.ps1                  脚本版更新恢复辅助
+├─ bundle.js                      沙盒 preload 模块打包器
+├─ 安装汉化与优化补丁.bat
+└─ 一键还原官方原版.bat
+~~~
+
+AGY Hub 桌面管家的完整源码位于：
+
+[3169657175/any-sub](https://github.com/3169657175/any-sub)
+
+桌面管家源码已经按账号、反代、协议转换、Token、MCP、Skill、补丁和主题等领域拆分，并配有自动化测试与维护文档。
+
+## 开发与验证
+
+仓库根目录保留脚本版补丁源码和安装/恢复脚本。AGY Hub 开发与补丁验证请在桌面管家源码仓库中执行：
+
+~~~powershell
+npm install
+npm test
+npm run patch:rebuild
+npm run patch:verify
+npm run dist:sync
+~~~
+
+补丁修改后至少验证：
+
+- Antigravity 可以正常启动，不白屏；
+- 登录、账号切换和额度读取正常；
+- 内置及自定义主题正常；
+- Codex Responses 和 Claude Messages 可以完成真实请求；
+- 长对话、工具调用和流式输出正常；
+- 回退上一版与恢复官方原版分别可用。
+
+## 安全说明
+
+- 本项目不是 Google、OpenAI 或 Anthropic 的官方产品。
+- 注入前请确认客户端版本和补丁支持范围。
+- 不要向他人分享 API Key、Refresh Token、账号存档或未脱敏日志。
+- 使用第三方模型中转服务时，请自行确认其隐私政策和账号风险。
+- 官方客户端更新后，应先保留新的官方原版，再重新生成对应补丁。
+
+## 参与项目
+
+提交 Issue 时建议附上：
+
+- Antigravity 与 AGY Hub 版本；
+- 使用的是 Codex、Claude 还是自定义 Provider；
+- 三级测试中失败的层级；
+- 脱敏后的一键诊断报告；
+- 可以稳定复现问题的最短步骤。
+
+请不要在公开 Issue 中粘贴密钥、Token、完整账号 ID 或私人对话内容。
+
+## 致谢
+
+项目在账号管理、界面挂载和客户端增强设计上参考了：
+
+- [BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)
+- [lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)
+- [farion1231/cc-switch](https://github.com/farion1231/cc-switch)
+
+感谢所有提交测试结果、错误日志、汉化校对和兼容反馈的使用者。
