@@ -1472,6 +1472,7 @@ conn.close()
             const restartBatPath = path.join(scratchDir, 'restart.bat');
             
             let batContent = `@echo off
+chcp 65001 >nul
 timeout /t 1 /nobreak >nul
 :: 1. 覆盖 app.asar 主程序包
 copy /y "${localNewAsar}" "${asarPath}"
@@ -1507,7 +1508,8 @@ rmdir /s /q "${tempDir}"
 start "" "${path.join(appPath, 'Antigravity.exe')}"
 exit
 `;
-            fs.writeFileSync(restartBatPath, batContent.replace(/\r?\n/g, '\r\n'), 'ascii');
+            const content = '\uFEFF' + batContent.replace(/\r?\n/g, '\r\n');
+            fs.writeFileSync(restartBatPath, content, 'utf-8');
             
             process.noAsar = originalNoAsar;
             return { success: true, restartScript: restartBatPath };
