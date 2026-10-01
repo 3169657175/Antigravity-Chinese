@@ -2,14 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const asar = require('@electron/asar');
 const path = require('path');
-const PROJECT_ROOT = path.resolve(__dirname, '..');
 const fs = require('fs');
 const vm = require('vm');
 const { buildMain, buildTray, buildUtils, assertTrayModuleLoads } = require('../patch-workbench/compatibility');
 
-const legacyArchive = path.join(PROJECT_ROOT, 'patch-workbench', 'legacy-payload.asar');
-const patchArchive = path.join(PROJECT_ROOT, 'assets', 'app.asar');
-const officialTray = fs.readFileSync(path.join(PROJECT_ROOT, 'patch-workbench/fixtures/tray-2.17.0.js.txt'), 'utf8');
+const legacyArchive = path.join(__dirname, '..', 'patch-workbench', 'legacy-payload.asar');
+const patchArchive = path.join(__dirname, '..', 'assets', 'app.asar');
+const officialTray = fs.readFileSync(path.join(__dirname, '..', 'patch-workbench', 'fixtures', 'tray-2.17.0.js.txt'), 'utf8');
 
 function loadTray(source) {
   const state = { events: new Map(), menu: null, resetCount: 0 };

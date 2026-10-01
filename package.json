@@ -16,7 +16,7 @@
     "test": "node --test tests/*.test.js",
     "test:architecture": "node --test tests/architectureBoundaries.test.js tests/navigationPerformance.test.js tests/runtimeDeps.test.js",
     "release:verify": "node scripts/releaseGuard.js",
-    "release:build": "npm test && node scripts/releaseGuard.js && electron-builder --win nsis && node scripts/releaseGuard.js --artifacts"
+    "release:build": "npm run patch:rebuild && npm run patch:verify && npm test && node scripts/releaseGuard.js && electron-builder --win nsis && node scripts/releaseGuard.js --artifacts"
   },
   "build": {
     "appId": "com.agy.hub",

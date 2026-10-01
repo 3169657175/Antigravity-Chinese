@@ -6,8 +6,9 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { validateMcpLaunchConfig } = require('../src/mcpLaunchConfig.js');
 
-const liveTest = process.env.AGY_MCP_LIVE_TEST === '1' ? test : test.skip;
 const configPath = path.join(os.homedir(), '.gemini', 'config', 'mcp_config.json');
+const hasLiveConfig = fs.existsSync(configPath);
+const liveTest = process.env.AGY_MCP_LIVE_TEST === '1' && hasLiveConfig ? test : test.skip;
 
 function probe(config, timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
@@ -58,7 +59,7 @@ function probe(config, timeoutMs = 60000) {
   });
 }
 
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const config = hasLiveConfig ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : { mcpServers: {} };
 for (const id of ['chrome-devtools-mcp', 'cloudrun', 'sequential-thinking']) {
   liveTest(`${id} 完成真实 MCP initialize 握手`, { timeout: 70000 }, async () => {
     const serverInfo = await probe(config.mcpServers[id]);

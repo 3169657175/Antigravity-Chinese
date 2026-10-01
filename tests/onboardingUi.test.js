@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
 const renderer = fs.readFileSync(path.join(root, 'renderer.js'), 'utf8');
-const controllerSource = fs.readFileSync(path.join(root, 'onboardingController.js'), 'utf8');
+const controllerSource = fs.readFileSync(path.join(root, 'src', 'onboardingController.js'), 'utf8');
 const controller = require('../src/onboardingController');
 const packageJson = require('../package.json');
 
@@ -19,9 +19,9 @@ test('首次询问、完整导览、反代分支和聚光定位都拥有独立�
   ]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
-  assert.match(html, /<script src="onboardingController\.js"><\/script>[\s\S]*<script src="renderer\.js"><\/script>/);
+  assert.match(html, /<script src="src\/onboardingController\.js"><\/script>[\s\S]*<script src="renderer\.js"><\/script>/);
   assert.match(renderer, /AgyOnboardingController\?\.init\(\)/);
-  assert.ok(packageJson.build.files.includes('onboardingController.js'));
+  assert.ok(packageJson.build.files.includes('src/**/*.js'));
   assert.doesNotMatch(html, /id="btn-reopen-guide"/);
 });
 

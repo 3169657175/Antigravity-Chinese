@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const PROJECT_ROOT = path.resolve(__dirname, '..');
 const { Worker } = require('worker_threads');
 const asar = require('@electron/asar');
 const { inspectPatchArchive } = require('../src/patchWorker');
@@ -57,7 +56,7 @@ test('patch worker validates, installs and preserves the official original', asy
   }));
 
   const result = await new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(PROJECT_ROOT, 'src/patchWorker.js'), { workerData: {
+    const worker = new Worker(path.join(__dirname, '..', 'src', 'patchWorker.js'), { workerData: {
       asarPath: path.join(resources, 'app.asar'),
       sourceAsar: path.join(patchDir, 'app.asar'),
       originalVersion: '1.2.3',
@@ -96,7 +95,7 @@ test('patch worker cancellation before commit leaves the target archive unchange
   const before = fs.readFileSync(targetPath);
 
   const result = await new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(PROJECT_ROOT, 'src/patchWorker.js'), { workerData: {
+    const worker = new Worker(path.join(__dirname, '..', 'src', 'patchWorker.js'), { workerData: {
       asarPath: targetPath,
       sourceAsar: path.join(patchDir, 'app.asar'),
       originalVersion: '1.2.3',
@@ -136,7 +135,7 @@ test('format v2 preserves the official app.asar.unpacked directory', async () =>
   }));
 
   const result = await new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(PROJECT_ROOT, 'src/patchWorker.js'), { workerData: {
+    const worker = new Worker(path.join(__dirname, '..', 'src', 'patchWorker.js'), { workerData: {
       asarPath: targetPath,
       sourceAsar: path.join(patchDir, 'app.asar'),
       originalVersion: '1.2.3',
