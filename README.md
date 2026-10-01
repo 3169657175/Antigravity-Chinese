@@ -4,14 +4,14 @@
 [![Downloads](https://img.shields.io/github/downloads/3169657175/Antigravity-Chinese/total)](https://github.com/3169657175/Antigravity-Chinese/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-2563eb?logo=windows)](#运行环境)
 [![AGY Hub](https://img.shields.io/badge/AGY%20Hub-1.3.0-0A7D5A)](#当前版本)
-[![Antigravity](https://img.shields.io/badge/Antigravity-2.17.0-5B5BD6)](#当前版本)
+[![Antigravity](https://img.shields.io/badge/Antigravity-2.19.1-5B5BD6)](#当前版本)
 
 面向 Windows 版 Google Antigravity 的中文增强与桌面管理项目。当前主线统一为 **AGY Hub 桌面管家**，提供汉化补丁、账号额度、Codex / 自定义 Provider 接入、Token 统计、MCP / Skill、主题、社区和更新能力。
 
 ## 当前版本
 
 - AGY Hub：**1.3.0**
-- Antigravity 兼容基线：**2.17.0**
+- Antigravity 兼容基线：**2.19.1**
 - Electron：31.x
 - Windows：10 / 11 x64
 
@@ -35,7 +35,7 @@
 - 基于当前官方 `app.asar` 构建兼容补丁。
 - 注入前执行结构、语法、关键能力和哈希校验。
 - 固定保留官方原版与上一版汉化，支持安全回退。
-- 当前补丁构建链已适配 Antigravity 2.17.0。
+- 当前补丁构建链已适配 Antigravity 2.19.1。
 
 ### 本地账号与额度
 

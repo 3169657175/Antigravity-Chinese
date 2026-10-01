@@ -1,27 +1,27 @@
 {
   "ok": true,
   "officialAsar": "C:\\Users\\niu\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar.original",
-  "officialVersion": "2.17.0",
-  "officialSha256": "85c97057c762f01fe9fa8b0380f8055ff76344ceb47c840cd3d8d43aa035142b",
+  "officialVersion": "2.19.1",
+  "officialSha256": "341234faf45bd1776fd5418a3c288dedc5487ebfcf153f53d75de17cfe15c1de",
   "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5102914,
-  "outputSha256": "91c21864fc0e2c7635f8acdd74ecfe75dfd8822404088fee733ffbb4481511df",
+  "outputSize": 5114434,
+  "outputSha256": "cee6fa3c265592fbc0df3f1ac6aa62bf71386ee891a7a376ad42e0236fd91996",
   "compatibility": {
     "files": [
       {
         "file": "dist/preload.js",
-        "officialBytes": 5151,
-        "rebuiltBytes": 368258
+        "officialBytes": 5337,
+        "rebuiltBytes": 368444
       },
       {
         "file": "dist/main.js",
-        "officialBytes": 19782,
-        "rebuiltBytes": 31749
+        "officialBytes": 20023,
+        "rebuiltBytes": 31990
       },
       {
         "file": "dist/tray.js",
-        "officialBytes": 3669,
-        "rebuiltBytes": 4982
+        "officialBytes": 3765,
+        "rebuiltBytes": 5078
       },
       {
         "file": "dist/utils.js",
@@ -30,8 +30,8 @@
       },
       {
         "file": "dist/ipcHandlers.js",
-        "officialBytes": 14110,
-        "rebuiltBytes": 111007
+        "officialBytes": 16557,
+        "rebuiltBytes": 113454
       },
       {
         "file": "dist/languageServer.js",

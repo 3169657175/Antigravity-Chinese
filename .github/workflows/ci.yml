@@ -15,7 +15,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run patch:rebuild
       - run: npm run patch:verify
       - run: npm test
       - run: npm run test:architecture
