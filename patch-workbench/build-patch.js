@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const asar = require('@electron/asar');
 const { normalizeVersion } = require('./compatibility');
-const { buildPatchForTarget } = require('../patchRuntimeBuilder');
+const { buildPatchForTarget } = require('../src/patchRuntimeBuilder');
 
 const workbenchDir = __dirname;
 const root = path.resolve(workbenchDir, '..');
