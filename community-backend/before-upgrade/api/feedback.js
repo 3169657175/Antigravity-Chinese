@@ -89,7 +89,8 @@ export async function onRequestGet(context) {
     }
 
     // 3. 联合检索二级回复：支持回复点赞与高赞置顶排序 (点赞降序，时间升序)
-    const feedbackIds = feedbacks.map(f => f.id).join(',');
+    const feedbackIds = feedbacks.map(f => f.id);
+    const feedbackIdPlaceholders = feedbackIds.map(() => '?').join(',');
     const { results: allReplies } = await db.prepare(`
       SELECT 
         r.id, 
@@ -100,9 +101,9 @@ export async function onRequestGet(context) {
         (SELECT COUNT(*) FROM reply_likes WHERE reply_id = r.id) as likes_count,
         (SELECT COUNT(*) FROM reply_likes WHERE reply_id = r.id AND username = ?) as has_liked
       FROM replies r 
-      WHERE r.feedback_id IN (${feedbackIds})
+      WHERE r.feedback_id IN (${feedbackIdPlaceholders})
       ORDER BY likes_count DESC, r.created_at ASC
-    `).bind(currentUsername).all();
+    `).bind(currentUsername, ...feedbackIds).all();
 
     // 4. 将子回复嵌套拼装
     const mergedList = feedbacks.map(fb => {
