@@ -1,0 +1,39 @@
+{
+  "verifiedAt": "2026-10-01T02:45:10.999Z",
+  "ok": true,
+  "archivePath": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
+  "archiveSize": 5102914,
+  "archiveSha256": "91c21864fc0e2c7635f8acdd74ecfe75dfd8822404088fee733ffbb4481511df",
+  "packageVersion": "2.17.0",
+  "formatVersion": 2,
+  "unpackedMode": "preserve-official",
+  "requiredFiles": [
+    "package.json",
+    "dist/languageServer.js",
+    "dist/preload.js",
+    "dist/main.js",
+    "dist/tray.js",
+    "dist/utils.js",
+    "dist/ipcHandlers.js"
+  ],
+  "checkedSyntax": [
+    "dist/languageServer.js",
+    "dist/preload.js",
+    "dist/main.js",
+    "dist/tray.js",
+    "dist/utils.js",
+    "dist/ipcHandlers.js",
+    "dist/accountVault.js"
+  ],
+  "checkedTrayModuleExports": [
+    "createTray",
+    "insertTrayMenuItem",
+    "updateTrayAgentCount"
+  ],
+  "preservedOfficialCapabilities": [
+    "dialog:open-workspaces",
+    "shell:reveal-in-file-picker",
+    "tray:double-click",
+    "window:close-to-background"
+  ]
+}

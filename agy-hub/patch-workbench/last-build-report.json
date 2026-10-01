@@ -1,0 +1,77 @@
+{
+  "ok": true,
+  "officialAsar": "C:\\Users\\niu\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar.original",
+  "officialVersion": "2.17.0",
+  "officialSha256": "85c97057c762f01fe9fa8b0380f8055ff76344ceb47c840cd3d8d43aa035142b",
+  "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
+  "outputSize": 5102914,
+  "outputSha256": "91c21864fc0e2c7635f8acdd74ecfe75dfd8822404088fee733ffbb4481511df",
+  "compatibility": {
+    "files": [
+      {
+        "file": "dist/preload.js",
+        "officialBytes": 5151,
+        "rebuiltBytes": 368258
+      },
+      {
+        "file": "dist/main.js",
+        "officialBytes": 19782,
+        "rebuiltBytes": 31749
+      },
+      {
+        "file": "dist/tray.js",
+        "officialBytes": 3669,
+        "rebuiltBytes": 4982
+      },
+      {
+        "file": "dist/utils.js",
+        "officialBytes": 12716,
+        "rebuiltBytes": 13788
+      },
+      {
+        "file": "dist/ipcHandlers.js",
+        "officialBytes": 14110,
+        "rebuiltBytes": 111007
+      },
+      {
+        "file": "dist/languageServer.js",
+        "officialBytes": 18804,
+        "rebuiltBytes": 21514
+      },
+      {
+        "file": "dist/accountVault.js",
+        "addedByPatch": true,
+        "rebuiltBytes": 3402
+      }
+    ],
+    "appliedRuntimeRules": [
+      {
+        "index": 3,
+        "file": "dist/preload.js",
+        "description": "Restore the original glass sidebar when Antigravity 2.4.3 changes sidebar dimensions or wrapper names",
+        "hits": 1
+      },
+      {
+        "index": 4,
+        "file": "dist/preload.js",
+        "description": "Remove only opaque Antigravity 2.4.3 sidebar wrapper backgrounds while preserving the established glass gradient",
+        "hits": 1
+      },
+      {
+        "index": 1,
+        "file": "dist/ipcHandlers.js",
+        "description": "Use the current Cloud Code quota service in the Antigravity account dialog",
+        "hits": 0,
+        "alreadyApplied": true
+      },
+      {
+        "index": 2,
+        "file": "dist/ipcHandlers.js",
+        "description": "Do not turn missing quota fields into fake 100 percent values",
+        "hits": 0,
+        "alreadyApplied": true
+      }
+    ]
+  },
+  "unpackPattern": "node_modules/chrome-devtools-mcp"
+}

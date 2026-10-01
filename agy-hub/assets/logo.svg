@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">AGY Hub</title>
+  <desc id="desc">由三条智能路由汇聚成中央枢纽的 AGY Hub 标识</desc>
+  <defs>
+    <linearGradient id="bg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111B35"/>
+      <stop offset="0.55" stop-color="#0A1022"/>
+      <stop offset="1" stop-color="#070B16"/>
+    </linearGradient>
+    <linearGradient id="route" x1="109" y1="95" x2="403" y2="414" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5EE7F5"/>
+      <stop offset="0.48" stop-color="#568BFF"/>
+      <stop offset="1" stop-color="#A66BFF"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientTransform="translate(256 258) rotate(90) scale(108)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECFEFF"/>
+      <stop offset="0.3" stop-color="#80F3E2"/>
+      <stop offset="1" stop-color="#33A8FF"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="20" y="20" width="472" height="472" rx="116" fill="url(#bg)"/>
+  <rect x="21" y="21" width="470" height="470" rx="115" fill="none" stroke="#8CEBFF" stroke-opacity=".16" stroke-width="2"/>
+  <path d="M139 137 226 224M373 137l-87 87M256 369V285" fill="none" stroke="url(#route)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M139 137 226 224M373 137l-87 87M256 369V285" fill="none" stroke="#DDFBFF" stroke-opacity=".28" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="139" cy="137" r="35" fill="#5EE7F5" filter="url(#glow)"/>
+  <circle cx="373" cy="137" r="35" fill="#8A78FF" filter="url(#glow)"/>
+  <circle cx="256" cy="369" r="35" fill="#64E4B7" filter="url(#glow)"/>
+  <circle cx="256" cy="254" r="78" fill="#0A1022" stroke="url(#route)" stroke-width="16"/>
+  <path d="m256 204 43 25v50l-43 25-43-25v-50l43-25Z" fill="url(#core)" filter="url(#glow)"/>
+  <path d="m256 221 28 16v33l-28 17-28-17v-33l28-16Z" fill="#F2FFFF" fill-opacity=".82"/>
+</svg>

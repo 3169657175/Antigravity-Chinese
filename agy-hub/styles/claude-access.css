@@ -1,0 +1,95 @@
+.provider-result.error { color: var(--accent-pink); border-color: rgba(227,125,128,.45); }
+
+/* 反代接入：Claude Code 独立二级页 */
+.claude-access-shell {
+  height: auto;
+  min-height: 0;
+  padding: 20px;
+  overflow: visible;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(93, 139, 255, .055), transparent 38%), var(--bg-card);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .16);
+}
+.claude-access-hero,
+.claude-access-actions { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.claude-access-hero { padding: 2px 2px 20px; border-bottom: 1px solid var(--border-subtle); }
+.claude-access-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.claude-access-icon {
+  width: 48px; height: 48px; flex: 0 0 48px; display: grid; place-items: center;
+  color: #7de7ee; border: 1px solid rgba(93, 211, 223, .32); border-radius: 12px;
+  background: linear-gradient(145deg, rgba(75, 205, 220, .16), rgba(104, 92, 240, .1));
+}
+.claude-access-identity > div { display: grid; gap: 4px; }
+.claude-access-eyebrow { color: var(--accent-cyan); font: 600 9px/1.2 Consolas, monospace; letter-spacing: .14em; }
+.claude-access-identity h3 { margin: 0; color: var(--text-main); font-size: 17px; font-weight: 650; }
+.claude-access-identity p { max-width: 680px; margin: 0; color: var(--text-dim); font-size: 11px; line-height: 1.65; }
+.claude-access-grid { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(360px, 1.1fr); gap: 14px; margin: 16px 0; }
+.claude-access-card { padding: 17px; border: 1px solid var(--border-subtle); border-radius: 10px; background: rgba(0, 0, 0, .1); }
+.claude-access-card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.claude-access-card-head > div { display: grid; gap: 3px; }
+.claude-access-card-head span { color: var(--text-muted); font-size: 9px; letter-spacing: .08em; }
+.claude-access-card-head strong { color: var(--text-main); font-size: 13px; font-weight: 620; }
+.claude-access-step { color: rgba(125, 231, 238, .5) !important; font: 700 18px/1 Consolas, monospace !important; }
+.claude-model-field { width: 100%; }
+.claude-model-field select { min-height: 38px; font-size: 12px; }
+.claude-access-endpoint { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--border-subtle); border-radius: 7px; }
+.claude-access-endpoint span { color: var(--text-muted); font-size: 10px; }
+.claude-access-endpoint code { color: var(--accent-cyan); font-size: 11px; }
+.claude-access-note { margin: 12px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.6; }
+.claude-route-diagram { display: grid; grid-template-columns: 1fr 20px 1.15fr 20px 1fr; align-items: center; gap: 5px; }
+.claude-route-diagram > div { min-width: 0; padding: 12px 9px; border: 1px solid var(--border-subtle); border-radius: 8px; text-align: center; background: rgba(255,255,255,.02); }
+.claude-route-diagram > div.active { border-color: rgba(93,211,223,.38); background: rgba(75,205,220,.07); }
+.claude-route-diagram b, .claude-route-diagram small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.claude-route-diagram b { color: var(--text-main); font-size: 10px; }
+.claude-route-diagram small { margin-top: 4px; color: var(--text-muted); font-size: 8px; }
+.claude-route-diagram i { color: var(--text-muted); text-align: center; font-style: normal; }
+.claude-access-checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 15px 0 0; padding: 0; list-style: none; }
+.claude-access-checks li { position: relative; padding-left: 15px; color: var(--text-dim); font-size: 9px; line-height: 1.45; }
+.claude-access-checks li::before { content: '✓'; position: absolute; left: 0; color: #67d9ad; font-weight: 700; }
+.claude-access-actions { padding: 14px 2px; border-top: 1px solid var(--border-subtle); }
+.claude-access-actions > div:first-child { display: grid; gap: 3px; }
+.claude-access-actions strong { color: var(--text-main); font-size: 12px; }
+.claude-access-actions span { color: var(--text-muted); font-size: 10px; }
+.claude-access-actions + .claude-desktop-result { margin-top: 2px; }
+.titlebar-logo .brand-mark { width: 25px; height: 25px; padding: 0; object-fit: contain; border: 0; border-radius: 7px; background: transparent; box-shadow: none; }
+
+body.light-theme .claude-access-shell { background: linear-gradient(145deg, rgba(14, 165, 183, .055), transparent 38%), #fff !important; }
+body.light-theme .claude-access-card { background: #f8fafc !important; border-color: #d5dee9 !important; }
+body.light-theme .claude-route-diagram > div { background: #fff; border-color: #d5dee9; }
+body.light-theme .claude-route-diagram > div.active { background: #effbfc; border-color: #86cdd5; }
+
+@media (max-width: 1080px) {
+  .claude-access-grid { grid-template-columns: 1fr; }
+  .claude-access-actions { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 780px) {
+  .claude-access-hero { align-items: flex-start; flex-direction: column; }
+  .claude-route-diagram { grid-template-columns: 1fr; }
+  .claude-route-diagram i { transform: rotate(90deg); }
+  .claude-access-checks { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codex-workspace-tab,
+  .codex-gateway-actions .btn,
+  .provider-profile-actions .btn,
+  .provider-profile-card { transition: none !important; }
+  .btn.is-busy::before { animation-duration: 1.8s; }
+}
+
+.theme-status-card,
+.theme-card,
+.theme-editor-dialog { background-image: none !important; backdrop-filter: none !important; }
+.theme-status-dot,
+.codex-gateway-dot { box-shadow: none !important; }
+.cyber-card-value,
+.codex-usage-metric strong { text-shadow: none !important; }
+
+@media (max-width: 900px) {
+  .sidebar { width: 205px; }
+  .main-content, body.light-theme .main-content { padding: 22px; }
+  .provider-form-grid { grid-template-columns: 1fr; }
+  .provider-field-wide { grid-column: auto; }
+  .codex-workspace-header { align-items: flex-start; flex-direction: column; }
+}

@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: https:; font-src 'self' data:; connect-src 'self' http: https: ws: wss:; object-src 'none'; base-uri 'none'">
+  <title>Antigravity 桌面管家 (AGY Hub)</title>
+  <link rel="stylesheet" href="style.css?t=1784441755">
+  <link rel="stylesheet" href="gatewayUi.css?t=1785033600">
+  <link rel="stylesheet" href="accountUi.css?t=1785033600">
+</head>
+<body>
+
+  <!-- 自定义精密工业窗口标题栏 -->
+  <div class="window-titlebar">
+    <div class="titlebar-drag-zone">
+      <div class="titlebar-logo">
+        <img class="brand-mark" src="assets/logo.svg" alt="" aria-hidden="true">
+        <span class="logo-text">AGY Hub</span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <!-- 亮色/暗色主题切换 -->
+      <button class="titlebar-theme-toggle-btn" id="btn-toggle-light-dark" title="切换亮色/暗色主题">
+        <span class="theme-icon-sun" id="theme-icon-sun" style="display: none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path></svg></span>
+        <span class="theme-icon-moon" id="theme-icon-moon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path></svg></span>
+      </button>
+      <!-- 自动更新按钮 -->
+      <div class="titlebar-update-zone" style="margin-right: 8px;">
+        <button class="titlebar-login-btn" id="btn-check-update" title="从 GitHub Release 检测新版本">检查更新</button>
+      </div>
+      <!-- 全局顶部右上角登录入口 -->
+      <div class="titlebar-auth-zone" id="titlebar-user-area">
+        <button class="titlebar-login-btn" id="btn-titlebar-login">登录/注册</button>
+        <div class="titlebar-user-dropdown" id="titlebar-user-dropdown" style="display: none;">
+          <span class="titlebar-user-name" id="text-titlebar-username">@未知用户</span>
+          <button class="titlebar-logout-btn" id="btn-titlebar-logout" title="退出登录">🚪 退出</button>
+        </div>
+      </div>
+      <button class="control-btn minimize-btn" id="btn-minimize" title="最小化">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </button>
+      <button class="control-btn maximize-btn" id="btn-maximize" title="全屏/小屏">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+      </button>
+      <button class="control-btn close-btn" id="btn-close" title="关闭">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 主布局 -->
+  <div class="app-container">
+    
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+      <nav class="nav-menu">
+        <button class="nav-item active" data-target="tab-patch">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+          </span>
+          <span class="nav-text">一键汉化补丁</span>
+        </button>
+
+        <button class="nav-item" data-target="tab-local-accounts">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 11h-6"></path><path d="M19 8v6"></path></svg>
+          </span>
+          <span class="nav-text">本地账号</span>
+        </button>
+        <button class="nav-item" data-target="tab-codex-gateway">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M8 9l3 3-3 3"></path><path d="M13 15h3"></path></svg>
+          </span>
+          <span class="nav-text">反代接入</span>
+        </button>
+        <button class="nav-item" data-target="tab-themes">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.5a1.5 1.5 0 0 0 0-3H12a1.5 1.5 0 0 1 0-3h3a6 6 0 0 0 0-12h-3z"></path><circle cx="7.5" cy="10" r="1"></circle><circle cx="9.5" cy="6.5" r="1"></circle><circle cx="14" cy="6.5" r="1"></circle><circle cx="17" cy="10" r="1"></circle></svg>
+          </span>
+          <span class="nav-text">主题皮肤</span>
+        </button>
+        <button class="nav-item" data-target="tab-mcp">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          </span>
+          <span class="nav-text">MCP 插件市场</span>
+        </button>
+        <button class="nav-item" data-target="tab-skill-market">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          </span>
+          <span class="nav-text">智能体 Skill 市场</span>
+        </button>
+        <button class="nav-item" data-target="tab-skills">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          </span>
+          <span class="nav-text">自定义 Skill 工坊</span>
+        </button>
+        <button class="nav-item" data-target="tab-feedback">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          </span>
+          <span class="nav-text">反馈与公告</span>
+        </button>
+        <button class="nav-item nav-admin-only" data-target="tab-admin-users" style="display: none;">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </span>
+          <span class="nav-text">用户管理</span>
+        </button>
+        <button class="nav-item nav-admin-only" data-target="tab-admin-announcement" style="display: none;">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          </span>
+          <span class="nav-text">发布公告</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn-open-guide" id="btn-open-guide" type="button" title="重新打开 AGY Hub 使用引导">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.1 9a3 3 0 1 1 5.8 1c-.7 1.2-2.9 1.5-2.9 3"></path><path d="M12 17h.01"></path></svg>
+          使用引导
+        </button>
+        <button class="btn-visit-website" id="btn-visit-website" title="访问网站 myagy.me">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          访问官方网站
+        </button>
+        <div class="version-badge" id="app-version-badge">v-- Stable</div>
+      </div>
+    </aside>
+
+    <!-- 右侧功能主面板 -->
+    <div class="main-wrapper">
+      <main class="main-content">
+      
+      <!-- Tab 1: 一键汉化补丁 -->
+      <section class="tab-pane active" id="tab-patch">
+        <div class="pane-header">
+          <h2>汉化与版本管理</h2>
+          <p class="subtitle">深度汉化 Antigravity 客户端，支持多版本安全备份与智能回滚还原。</p>
+        </div>
+        
+        <div class="pane-body">
+          <div class="card">
+            <h3>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="title-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              客户端检测
+            </h3>
+            
+            <div class="path-status" id="path-status-text">正在检索安装路径...</div>
+            
+            <!-- 版本元数据展示行 -->
+            <div class="version-row">
+              <div class="version-item">
+                <span class="version-label">官方客户端</span>
+                <span class="version-number number-original" id="text-original-version">-</span>
+              </div>
+              <div class="version-item">
+                <span class="version-label">汉化补丁包</span>
+                <span class="version-number number-patch" id="text-patch-version">-</span>
+              </div>
+            </div>
+            <div class="patch-compatibility-strip" id="patch-compatibility-strip" data-state="checking">
+              <span class="patch-compatibility-dot"></span>
+              <div><strong id="patch-compatibility-title">正在执行兼容性预检</strong><small id="patch-compatibility-detail">检查客户端版本、补丁目标和备份状态</small></div>
+            </div>
+
+            <div class="input-group">
+              <label for="input-install-dir">匹配的客户端安装路径：</label>
+              <div class="input-wrapper">
+                <input type="text" id="input-install-dir" placeholder="请选择或输入 app.asar 所在的 resources 目录">
+              </div>
+            </div>
+
+            <div class="button-action-row">
+              <button class="btn btn-primary" id="btn-install-patch">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                注入中文汉化补丁
+              </button>
+              <button class="btn btn-secondary" id="btn-cancel-patch" type="button" style="display:none;" title="仅在最终写入前可以安全取消">
+                取消注入
+              </button>
+              <button class="btn btn-secondary" id="btn-restore-previous" disabled title="完成第二次汉化注入后可用">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20a8 8 0 0 0-8-8H4"></path></svg>
+                退回上一版汉化
+              </button>
+              <button class="btn btn-secondary" id="btn-restore-original">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"></path><path d="M22 11.5A10 10 0 0 0 9.5 3.5L2.5 8M2 12.5a10 10 0 0 0 12.5 8L21.5 16"></path></svg>
+                还原官方英文原版
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+
+      <!-- Tab 3: 本地账号 -->
+      <section class="tab-pane" id="tab-local-accounts">
+        <div class="pane-header local-accounts-header" style="flex-direction: row; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <h2>Antigravity 本地账号 & Token 监控</h2>
+            <p class="subtitle">管理当前 Windows 用户下保存的客户端账号，并独立监控 Token 消费与缓存命中。</p>
+          </div>
+          <div class="local-accounts-tab-navigation" style="display: flex; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+            <button class="la-tab-btn active" id="btn-la-tab-accounts" style="padding: 6px 12px; border: none; background: var(--bg-card); color: var(--text-main); border-radius: 4px; font-size: 11px; cursor: pointer;">👤 本地账号管理</button>
+            <button class="la-tab-btn" id="btn-la-tab-token" style="padding: 6px 12px; border: none; background: transparent; color: var(--text-dim); border-radius: 4px; font-size: 11px; cursor: pointer;">📈 Token 使用统计</button>
+          </div>
+        </div>
+
+        <div class="local-accounts-content-wrapper" style="position: relative; height: calc(100% - 70px);">
+          <!-- 本地账号面板 -->
+          <div class="la-panel" id="panel-la-accounts" style="height: 100%; display: flex; flex-direction: column;">
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-bottom: 12px;">
+              <button class="btn btn-add-local-account" id="btn-add-local-account" type="button" style="background-color: var(--accent-cyan-dim); border: 1px solid var(--accent-cyan); color: var(--accent-cyan);">
+                ➕ 添加新账号
+              </button>
+              <button class="btn local-accounts-refresh" id="btn-refresh-local-accounts" type="button" title="刷新本地账号">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
+                刷新
+              </button>
+            </div>
+            
+            <div class="local-account-summary" aria-live="polite">
+              <div class="local-account-metric">
+                <span class="local-account-metric-value" id="local-account-count">-</span>
+                <span class="local-account-metric-label">已保存账号</span>
+              </div>
+              <div class="local-account-summary-divider"></div>
+              <div class="local-account-current-summary">
+                <span class="local-account-summary-label">当前账号</span>
+                <span class="local-account-summary-value" id="local-account-current">正在读取...</span>
+              </div>
+            </div>
+
+            <div class="local-accounts-list" id="local-accounts-list" style="flex: 1; overflow-y: auto;">
+              <div class="local-accounts-state">正在读取本地账号...</div>
+            </div>
+          </div>
+
+          <!-- Token 监控大屏面板 -->
+          <div class="la-panel" id="panel-la-token" style="display: none; height: 100%; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-main);">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#8dbbd1" stroke-width="2" class="title-icon" style="margin: 0;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Token 使用统计
+              </h3>
+              <div style="font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--text-dim);">上游转发:</span>
+                <input type="text" id="input-proxy-upstream" value="https://generativelanguage.googleapis.com" style="width: 280px; text-align: left; padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
+                <button class="btn btn-secondary" id="btn-proxy-apply" style="padding: 5px 10px; font-size: 11px; border-radius: 6px;">应用</button>
+                <button class="btn btn-secondary" id="btn-refresh-token-stats" type="button" title="手动刷新 Token 统计数据" style="padding: 5px 12px; font-size: 11px; display: flex; align-items: center; gap: 6px; border-radius: 6px;">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" id="icon-refresh-token-spin"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  刷新
+                </button>
+              </div>
+            </div>
+            
+            <div class="cyber-dashboard-grid">
+              <div class="cyber-stat-card cyber-card-cyan">
+                <div class="cyber-card-head">
+                  <span class="cyber-card-title">观测 Token (输入+输出)</span>
+                  <span class="cyber-card-icon">⚡</span>
+                </div>
+                <div class="cyber-card-value" id="stat-total-token">0</div>
+              </div>
+              <div class="cyber-stat-card cyber-card-amber">
+                <div class="cyber-card-head">
+                  <span class="cyber-card-title">官方缓存命中率</span>
+                  <span class="cyber-card-icon">🎯</span>
+                </div>
+                <div class="cyber-card-value" id="stat-cache-hit-rate">0.0%</div>
+                <div class="cyber-progress-track">
+                  <div class="cyber-progress-bar" id="cache-rate-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div class="cyber-stat-card cyber-card-emerald">
+                <div class="cyber-card-head">
+                  <span class="cyber-card-title">官方缓存 Token 数</span>
+                  <span class="cyber-card-icon">💎</span>
+                </div>
+                <div class="cyber-card-value" id="stat-cached-token">0</div>
+              </div>
+              <div class="cyber-stat-card cyber-card-rose">
+                <div class="cyber-card-head">
+                  <span class="cyber-card-title">观测输出 Token 数</span>
+                  <span class="cyber-card-icon">🚀</span>
+                </div>
+                <div class="cyber-card-value" id="stat-output-token">0</div>
+              </div>
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span>🔴 实时记录日志 (本地监听端口: 31000)</span>
+                <div class="token-filter-tabs" id="token-filter-tabs" style="display: flex; gap: 4px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 4px;">
+                  <button class="filter-tab active" data-filter="all" style="background: var(--bg-card); color: var(--text-main); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">全部</button>
+                  <button class="filter-tab" data-filter="hour" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本时</button>
+                  <button class="filter-tab" data-filter="day" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本日</button>
+                  <button class="filter-tab" data-filter="week" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本周</button>
+                  <button class="filter-tab" data-filter="month" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本月</button>
+                </div>
+              </div>
+              <div class="token-log-list" id="token-log-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                <div style="font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 20px;">等待 Antigravity 模型调用...</div>
+              </div>
+              <div id="token-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; color: var(--text-dim);">
+                <div id="token-page-info">共 0 条，第 1 页</div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" id="btn-page-prev" style="padding: 2px 8px; font-size: 10px;" disabled>上一页</button>
+                  <button class="btn btn-secondary" id="btn-page-next" style="padding: 2px 8px; font-size: 10px;" disabled>下一页</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Codex 本地接入面板 -->
+          <div class="la-panel codex-gateway-panel" id="panel-la-codex" style="display: none; height: 100%; flex-direction: column;">
+            <div class="codex-gateway-toolbar">
+              <div class="codex-gateway-state" id="codex-gateway-state" aria-live="polite">
+                <span class="codex-gateway-dot"></span>
+                <div>
+                  <strong id="codex-gateway-state-title">正在读取服务状态</strong>
+                  <span id="codex-gateway-state-detail">127.0.0.1</span>
+                </div>
+              </div>
+              <div class="codex-gateway-endpoint">
+                <code id="codex-gateway-base-url">http://127.0.0.1:8046/v1</code>
+                <button class="icon-btn" id="btn-copy-codex-url" type="button" title="复制 API 地址" aria-label="复制 API 地址">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="codex-gateway-form">
+              <label class="codex-gateway-field">
+                <span>反代账号</span>
+                <select id="codex-gateway-account"></select>
+              </label>
+              <label class="codex-gateway-field">
+                <span>默认模型</span>
+                <select id="codex-gateway-model"></select>
+              </label>
+              <label class="codex-gateway-field">
+                <span>模型控制</span>
+                <select id="codex-gateway-model-control">
+                  <option value="gateway">小助手强制</option>
+                  <option value="client">跟随 Codex</option>
+                </select>
+              </label>
+              <label class="codex-gateway-field codex-gateway-port-field">
+                <span>监听端口</span>
+                <input id="codex-gateway-port" type="number" min="1024" max="65535" value="8046">
+              </label>
+              <label class="codex-gateway-field codex-gateway-key-field">
+                <span>本地 API Key</span>
+                <div class="codex-gateway-key-input">
+                  <input id="codex-gateway-api-key" type="password" readonly>
+                  <button class="icon-btn" id="btn-toggle-codex-key" type="button" title="显示或隐藏 API Key" aria-label="显示或隐藏 API Key">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+                  <button class="icon-btn" id="btn-copy-codex-key" type="button" title="复制 API Key" aria-label="复制 API Key">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div class="codex-gateway-account-status" id="codex-gateway-account-status" aria-live="polite">
+              <div class="codex-gateway-account-heading">
+                <div>
+                  <span>当前网关账号</span>
+                  <strong id="codex-gateway-account-name">正在读取...</strong>
+                </div>
+                <button class="btn btn-secondary" id="btn-codex-gateway-refresh-quota" type="button">刷新额度</button>
+              </div>
+              <div class="codex-gateway-quota-grid" id="codex-gateway-quota-grid">
+                <div class="codex-gateway-quota-item" data-quota="gemini5h">
+                  <div><span>Gemini 5h</span><strong>--</strong></div>
+                  <div class="codex-gateway-quota-track"><i></i></div>
+                  <small>等待查询</small>
+                </div>
+                <div class="codex-gateway-quota-item" data-quota="geminiWeekly">
+                  <div><span>Gemini 每周</span><strong>--</strong></div>
+                  <div class="codex-gateway-quota-track"><i></i></div>
+                  <small>等待查询</small>
+                </div>
+                <div class="codex-gateway-quota-item" data-quota="claude5h">
+                  <div><span>Claude 5h</span><strong>--</strong></div>
+                  <div class="codex-gateway-quota-track"><i></i></div>
+                  <small>等待查询</small>
+                </div>
+                <div class="codex-gateway-quota-item" data-quota="claudeWeekly">
+                  <div><span>Claude 每周</span><strong>--</strong></div>
+                  <div class="codex-gateway-quota-track"><i></i></div>
+                  <small>等待查询</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="codex-gateway-actions">
+              <button class="btn btn-primary" id="btn-codex-gateway-start" type="button">启动服务</button>
+              <button class="btn btn-secondary" id="btn-codex-gateway-stop" type="button">停止</button>
+              <button class="btn btn-secondary" id="btn-codex-gateway-test" type="button">三级测试</button>
+              <span class="codex-gateway-action-divider"></span>
+              <button class="btn btn-primary" id="btn-codex-gateway-connect" type="button">连接到 Codex</button>
+              <button class="btn btn-secondary" id="btn-codex-gateway-restore" type="button">恢复 Codex 配置</button>
+            </div>
+
+            <div class="codex-gateway-result" id="codex-gateway-result" aria-live="polite">
+              <span>等待操作</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-pane codex-workspace" id="tab-codex-gateway">
+        <div class="pane-header codex-workspace-header">
+          <div>
+            <h2>反代接入</h2>
+            <p class="subtitle">统一管理 Codex、Claude Code、本地模型网关与自定义 Provider。</p>
+          </div>
+          <div class="codex-workspace-header-actions">
+            <div class="codex-workspace-tabs">
+              <button class="codex-workspace-tab active" type="button" data-codex-page="overview">Codex</button>
+              <button class="codex-workspace-tab" type="button" data-codex-page="claude">Claude Code</button>
+              <button class="codex-workspace-tab" type="button" data-codex-page="usage">Token 统计</button>
+              <button class="codex-workspace-tab" type="button" data-codex-page="provider">自定义 Provider</button>
+            </div>
+            <div class="gateway-header-tools" aria-label="反代辅助工具">
+              <button class="btn btn-secondary gateway-diagnostic-button" id="btn-gateway-snapshot" type="button">配置快照</button>
+              <button class="btn btn-secondary gateway-diagnostic-button" id="btn-gateway-timeline" type="button">请求时间线</button>
+              <button class="btn btn-secondary gateway-diagnostic-button" id="btn-copy-gateway-diagnostics" type="button">一键诊断</button>
+            </div>
+          </div>
+        </div>
+        <div class="gateway-insight-panel" id="gateway-insight-panel" hidden>
+          <div class="gateway-insight-head"><strong id="gateway-insight-title">运行信息</strong><button class="icon-btn" id="btn-close-gateway-insight" type="button" aria-label="关闭">×</button></div>
+          <div class="gateway-insight-content" id="gateway-insight-content"></div>
+        </div>
+        <div class="codex-workspace-body">
+          <div class="codex-workspace-page active" id="codex-page-overview">
+            <div id="codex-overview-mount"></div>
+          </div>
+          <div class="codex-workspace-page" id="codex-page-claude">
+            <div class="codex-gateway-panel claude-gateway-panel" id="claude-desktop-connect-panel">
+              <div class="codex-gateway-toolbar">
+                <div class="codex-gateway-state" id="claude-gateway-state" aria-live="polite">
+                  <span class="codex-gateway-dot"></span>
+                  <div>
+                    <strong id="claude-gateway-state-title">正在读取服务状态</strong>
+                    <span id="claude-gateway-state-detail">127.0.0.1:8046 · Anthropic Messages API</span>
+                  </div>
+                </div>
+                <div class="codex-gateway-endpoint">
+                  <code id="claude-gateway-base-url">http://127.0.0.1:8046</code>
+                  <button class="icon-btn" id="btn-copy-claude-url" type="button" title="复制 Claude API 地址" aria-label="复制 Claude API 地址">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="codex-gateway-form">
+                <label class="codex-gateway-field">
+                  <span>反代账号</span>
+                  <select id="claude-desktop-account"></select>
+                </label>
+                <label class="codex-gateway-field">
+                  <span>默认模型</span>
+                  <select id="claude-desktop-model">
+                    <option value="agy-auto">AGY 自动路由（按额度）</option>
+                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite（实验）</option>
+                    <option value="gemini-3.6-flash-high">Gemini 3.6 Flash (High)</option>
+                    <option value="gemini-3.6-flash-medium">Gemini 3.6 Flash (Medium)</option>
+                    <option value="gemini-3.6-flash-low">Gemini 3.6 Flash (Low)</option>
+                    <option value="gemini-3.1-pro-high">Gemini 3.1 Pro (High)</option>
+                    <option value="gemini-3.1-pro-low">Gemini 3.1 Pro (Low)</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                    <option value="claude-opus-4-6-thinking">Claude Opus 4.6 Thinking</option>
+                    <option value="gpt-oss-120b-medium">GPT-OSS 120B (Medium)</option>
+                  </select>
+                </label>
+                <label class="codex-gateway-field">
+                  <span>模型控制</span>
+                  <select id="claude-desktop-model-control" disabled>
+                    <option>跟随 Claude Code 模型列表</option>
+                  </select>
+                </label>
+                <label class="codex-gateway-field codex-gateway-port-field">
+                  <span>监听端口</span>
+                  <input id="claude-gateway-port" type="number" value="8046" readonly>
+                </label>
+                <label class="codex-gateway-field codex-gateway-key-field">
+                  <span>本地 API Key</span>
+                  <div class="codex-gateway-key-input">
+                    <input id="claude-desktop-api-key" type="password" readonly>
+                    <button class="icon-btn" id="btn-toggle-claude-key" type="button" title="显示或隐藏 API Key" aria-label="显示或隐藏 API Key">
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                    <button class="icon-btn" id="btn-copy-claude-key" type="button" title="复制 API Key" aria-label="复制 API Key">
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                  </div>
+                </label>
+              </div>
+
+              <div class="codex-gateway-account-status" id="claude-gateway-account-status" aria-live="polite">
+                <div class="codex-gateway-account-heading">
+                  <div>
+                    <span>当前 Claude Code 反代账号</span>
+                    <strong id="claude-gateway-account-name">正在读取...</strong>
+                  </div>
+                  <button class="btn btn-secondary" id="btn-claude-gateway-refresh-quota" type="button">刷新额度</button>
+                </div>
+                <div class="codex-gateway-quota-grid" id="claude-gateway-quota-grid">
+                  <div class="codex-gateway-quota-item" data-quota="gemini5h"><div><span>Gemini 5h</span><strong>--</strong></div><div class="codex-gateway-quota-track"><i></i></div><small>等待查询</small></div>
+                  <div class="codex-gateway-quota-item" data-quota="geminiWeekly"><div><span>Gemini 每周</span><strong>--</strong></div><div class="codex-gateway-quota-track"><i></i></div><small>等待查询</small></div>
+                  <div class="codex-gateway-quota-item" data-quota="claude5h"><div><span>Claude 5h</span><strong>--</strong></div><div class="codex-gateway-quota-track"><i></i></div><small>等待查询</small></div>
+                  <div class="codex-gateway-quota-item" data-quota="claudeWeekly"><div><span>Claude 每周</span><strong>--</strong></div><div class="codex-gateway-quota-track"><i></i></div><small>等待查询</small></div>
+                </div>
+              </div>
+
+              <div class="codex-gateway-actions claude-desktop-connect-actions">
+                <button class="btn btn-primary" id="btn-claude-gateway-start" type="button">启动服务</button>
+                <button class="btn btn-secondary" id="btn-claude-gateway-stop" type="button">停止</button>
+                <button class="btn btn-secondary" id="btn-claude-desktop-test" type="button">三级测试</button>
+                <span class="codex-gateway-action-divider"></span>
+                <button class="btn btn-primary" id="btn-claude-desktop-connect" type="button">连接到 Claude Code</button>
+                <button class="btn btn-secondary" id="btn-claude-desktop-restore" type="button">恢复 Claude 配置</button>
+              </div>
+              <div class="codex-gateway-result claude-desktop-result" id="claude-desktop-result" aria-live="polite">等待操作</div>
+            </div>
+          </div>
+          <div class="codex-workspace-page" id="codex-page-usage">
+            <div class="codex-usage-source-bar">
+              <div>
+                <span class="codex-usage-source-eyebrow">独立统计视图</span>
+                <strong id="gateway-usage-source-title">Codex 反代统计</strong>
+              </div>
+              <div class="codex-usage-source-tabs" role="tablist" aria-label="选择反代统计来源">
+                <button class="codex-usage-source-tab active" type="button" role="tab" aria-selected="true" data-usage-source="codex-gateway">
+                  <span>Codex</span><small data-usage-count="codex-gateway">0 次</small>
+                </button>
+                <button class="codex-usage-source-tab" type="button" role="tab" aria-selected="false" data-usage-source="claude-code-gateway">
+                  <span>Claude Code</span><small data-usage-count="claude-code-gateway">0 次</small>
+                </button>
+              </div>
+            </div>
+            <div class="codex-usage-grid">
+              <div class="codex-usage-metric"><span>未缓存输入</span><strong id="codex-stat-input">0</strong><small>总上下文 0</small></div>
+              <div class="codex-usage-metric"><span>输出 Token</span><strong id="codex-stat-output">0</strong><small>含思考 Token</small></div>
+              <div class="codex-usage-metric accent"><span>缓存 Token</span><strong id="codex-stat-cached">0</strong><small>官方 cachedContentTokenCount</small></div>
+              <div class="codex-usage-metric"><span>缓存命中率</span><strong id="codex-stat-rate">0.0%</strong><small>缓存 / 输入</small></div>
+              <div class="codex-usage-metric"><span id="gateway-stat-request-label">Codex 请求</span><strong id="codex-stat-requests">0</strong><small>已记录调用</small></div>
+            </div>
+            <div class="codex-usage-breakdown">
+              <div class="codex-usage-breakdown-header"><strong id="gateway-usage-log-title">最近 Codex 调用</strong><span id="gateway-usage-log-subtitle">Codex 与 Claude Code 数据分开统计，可在上方切换</span></div>
+              <div class="codex-usage-log" id="codex-usage-log"><div class="codex-usage-empty">等待 Codex 通过 AGY Hub 发起请求</div></div>
+              <nav class="codex-usage-pagination" id="codex-usage-pagination" aria-label="Token 调用记录分页" hidden>
+                <button type="button" data-page-action="previous">上一页</button>
+                <div class="codex-usage-page-numbers" id="codex-usage-page-numbers"></div>
+                <button type="button" data-page-action="next">下一页</button>
+                <span id="codex-usage-page-summary">第 1 / 1 页</span>
+              </nav>
+            </div>
+          </div>
+          <div class="codex-workspace-page" id="codex-page-provider">
+            <div class="provider-profile-manager" id="codex-provider-profile-manager">
+              <div class="provider-profile-toolbar">
+                <div>
+                  <h3>已保存的 API</h3>
+                  <p>选择一张配置卡片接入 Codex，需要修改时再进入编辑页面。</p>
+                </div>
+                <button class="btn btn-primary" id="btn-add-custom-provider" type="button">添加 API</button>
+              </div>
+              <div class="provider-profile-grid" id="codex-provider-profile-grid"></div>
+              <div class="provider-profile-empty" id="codex-provider-profile-empty">还没有保存的 API，点击“添加 API”创建第一张配置卡片。</div>
+            </div>
+            <div class="provider-settings-layout" id="codex-provider-editor" hidden>
+              <div class="provider-settings-header">
+                <div>
+                  <h3 id="codex-provider-editor-title">添加 OpenAI Responses Provider</h3>
+                  <p>保存为固定配置卡片，之后可直接选择并接入 Codex。</p>
+                </div>
+                <span class="provider-protocol-badge">Responses API</span>
+              </div>
+              <div class="provider-form-grid">
+                <label class="provider-field">
+                  <span>Provider 名称</span>
+                  <input id="codex-provider-name" type="text" value="Sub2API" maxlength="80">
+                </label>
+                <label class="provider-field">
+                  <span>协议</span>
+                  <select id="codex-provider-protocol">
+                    <option value="responses">OpenAI Responses</option>
+                    <option value="chat-completions">OpenAI Chat Completions</option>
+                    <option value="anthropic-messages">Anthropic Messages</option>
+                    <option value="gemini-native">Gemini Native</option>
+                  </select>
+                </label>
+                <label class="provider-field">
+                  <span>认证方式</span>
+                  <select id="codex-provider-auth-mode">
+                    <option value="bearer">Authorization: Bearer</option>
+                    <option value="x-api-key">x-api-key</option>
+                    <option value="api-key">api-key</option>
+                    <option value="query">URL Query Key</option>
+                    <option value="custom">自定义 Header</option>
+                  </select>
+                </label>
+                <label class="provider-field" id="codex-provider-auth-query-field" hidden>
+                  <span>Query 参数名</span>
+                  <input id="codex-provider-auth-query" type="text" value="key" spellcheck="false">
+                </label>
+                <label class="provider-field provider-field-wide">
+                  <span>Provider URL</span>
+                  <input id="codex-provider-url" type="url" value="http://localhost:8080/v1" spellcheck="false">
+                </label>
+                <label class="provider-field provider-field-wide" id="codex-provider-custom-headers-field" hidden>
+                  <span>自定义 Header JSON（使用 {{API_KEY}} 代入密钥）</span>
+                  <textarea id="codex-provider-custom-headers" rows="3" placeholder='{"Authorization":"Token {{API_KEY}}"}'></textarea>
+                </label>
+                <label class="provider-field provider-field-wide">
+                  <span>备用 Provider URL（可选，每行一个；主地址故障时依次切换）</span>
+                  <textarea id="codex-provider-fallback-urls" rows="2" placeholder="https://backup.example.com/v1"></textarea>
+                </label>
+                <label class="provider-field provider-field-wide">
+                  <span>API Key</span>
+                  <div class="provider-key-input">
+                    <input id="codex-provider-key" type="password" autocomplete="off" spellcheck="false" placeholder="输入 Sub2API Key">
+                    <button class="icon-btn" id="btn-toggle-provider-key" type="button" title="显示或隐藏 API Key" aria-label="显示或隐藏 API Key">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </label>
+                <label class="provider-field">
+                  <span>模型来源</span>
+                  <select id="codex-provider-model-mode">
+                    <option value="openai">OpenAI / Codex 模型</option>
+                    <option value="custom">自定义模型</option>
+                  </select>
+                </label>
+                <label class="provider-field" id="codex-provider-native-model-field">
+                  <span>默认模型</span>
+                  <select id="codex-provider-native-model">
+                    <option value="gpt-5.6">GPT-5.6</option>
+                    <option value="gpt-5.6-sol">GPT-5.6 Sol</option>
+                    <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
+                    <option value="gpt-5.6-luna">GPT-5.6 Luna</option>
+                    <option value="gpt-5.5">GPT-5.5</option>
+                    <option value="gpt-5.4">GPT-5.4</option>
+                    <option value="gpt-5.4-mini">GPT-5.4 Mini</option>
+                    <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
+                  </select>
+                </label>
+                <label class="provider-field provider-field-wide" id="codex-provider-custom-model-field" hidden>
+                  <span>自定义模型（多个模型用逗号或换行分隔，第一个为默认）</span>
+                  <textarea id="codex-provider-custom-models" rows="3" placeholder="例如：claude-sonnet-4-6, gemini-3.1-pro-high"></textarea>
+                </label>
+              </div>
+              <div class="provider-actions">
+                <button class="btn btn-secondary" id="btn-cancel-custom-provider" type="button">取消</button>
+                <button class="btn btn-secondary" id="btn-discover-provider-models" type="button">获取模型</button>
+                <button class="btn btn-secondary" id="btn-test-custom-provider" type="button">三级测试</button>
+                <button class="btn btn-primary" id="btn-connect-custom-provider" type="button">保存配置</button>
+              </div>
+              <div class="provider-result" id="codex-provider-result" aria-live="polite">等待连接测试</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: MCP 插件市场 -->
+      <section class="tab-pane" id="tab-themes">
+        <div class="pane-header theme-pane-header">
+          <div>
+            <h2>Antigravity 主题皮肤</h2>
+            <p class="subtitle">一键切换后立即生效，并在退出软件或重启电脑后自动保持。</p>
+          </div>
+          <div class="theme-header-actions">
+            <button class="btn theme-custom-button" id="btn-create-theme" type="button">＋ 自定义皮肤</button>
+            <button class="btn theme-native-button" id="btn-disable-theme" type="button">恢复原生</button>
+          </div>
+        </div>
+
+        <div class="theme-status-card" id="theme-status-card">
+          <span class="theme-status-dot"></span>
+          <div>
+            <div class="theme-status-title" id="theme-status-title">正在读取当前主题…</div>
+            <div class="theme-status-subtitle">配置保存在 Antigravity 用户目录，汉化补丁会自动监听变化。</div>
+          </div>
+        </div>
+
+        <div class="theme-grid" id="theme-grid">
+          <div class="theme-loading">正在准备主题素材…</div>
+        </div>
+      </section>
+
+      <div class="theme-editor-modal" id="theme-editor-modal" aria-hidden="true">
+        <div class="theme-editor-backdrop" data-theme-editor-close></div>
+        <section class="theme-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="theme-editor-title">
+          <header class="theme-editor-header">
+            <div>
+          <span class="theme-editor-kicker">主题编辑器</span>
+              <h3 id="theme-editor-title">自定义皮肤</h3>
+              <p id="theme-editor-subtitle">上传一张壁纸，再选择与界面搭配的整体色调。</p>
+            </div>
+            <button class="theme-editor-close" id="btn-close-theme-editor" type="button" aria-label="关闭">×</button>
+          </header>
+          <div class="theme-editor-content">
+            <div class="theme-editor-preview" id="theme-editor-preview">
+              <div class="theme-editor-preview-empty">
+                <strong>选择主题图片</strong>
+                <span>推荐 16:9、1920×1080 或更高分辨率</span>
+              </div>
+              <button class="theme-image-picker" id="btn-pick-theme-image" type="button">选择图片</button>
+            </div>
+            <div class="theme-editor-fields">
+              <label class="theme-editor-field" id="theme-name-field">
+                <span>皮肤名称</span>
+                <input id="input-theme-name" type="text" maxlength="30" placeholder="例如：春日小新" />
+              </label>
+              <div class="theme-editor-field">
+                <span>界面整体色调</span>
+                <div class="theme-palette-list" id="theme-palette-list"></div>
+                <small>色调会统一控制侧栏、输入框、按钮、额度卡片和选中状态。</small>
+              </div>
+            </div>
+          </div>
+          <div class="theme-editor-message" id="theme-editor-message" role="status"></div>
+          <footer class="theme-editor-footer">
+            <div class="theme-editor-danger-actions">
+              <button class="theme-editor-text-button" id="btn-reset-theme-image" type="button">恢复默认图片</button>
+              <button class="theme-editor-text-button danger" id="btn-delete-custom-theme" type="button">删除此皮肤</button>
+            </div>
+            <div class="theme-editor-main-actions">
+              <button class="btn theme-native-button" id="btn-cancel-theme-editor" type="button">取消</button>
+              <button class="btn theme-custom-button" id="btn-save-theme-editor" type="button">保存皮肤</button>
+            </div>
+          </footer>
+        </section>
+      </div>
+
+      <section class="tab-pane" id="tab-mcp">
+        <div class="pane-header mcp-header-row">
+          <div class="title-section">
+            <h2>MCP 模型上下文协议插件</h2>
+            <p class="subtitle">一键为大模型挂载本地沙箱、数据库、浏览器或系统容器调用能力。</p>
+          </div>
+          <div class="mcp-tab-navigation">
+            <button class="mcp-tab-btn active" id="btn-mcp-tab-market">推荐市场</button>
+            <button class="mcp-tab-btn" id="btn-mcp-tab-installed">已部署本地 (<span id="installed-mcp-count">0</span>)</button>
+          </div>
+        </div>
+
+        <div class="mcp-toolbar-row">
+          <div class="integration-summary" id="mcp-market-summary">正在读取官方配置...</div>
+          <button class="btn-compact" id="btn-refresh-mcp-status">深度验证</button>
+        </div>
+
+        <div class="mcp-validation-progress" id="mcp-validation-progress" hidden>
+          <div class="mcp-validation-progress-head">
+            <strong id="mcp-validation-progress-title">正在深度验证 MCP</strong>
+            <span id="mcp-validation-progress-percent">0%</span>
+          </div>
+          <div class="mcp-validation-progress-message" id="mcp-validation-progress-message"></div>
+          <div class="mcp-validation-progress-track"><span id="mcp-validation-progress-bar"></span></div>
+        </div>
+
+        <div class="mcp-grid" id="mcp-list-container">
+          <!-- 动态载入 -->
+        </div>
+        <div class="skill-market-pagination" id="mcp-market-pagination"></div>
+      </section>
+
+      <!-- Tab 4: 智能体 Skill 市场 -->
+      <section class="tab-pane" id="tab-skill-market">
+        <div class="pane-header market-header-row">
+          <div class="title-section">
+            <h2>智能体 Skill 技能推荐市场</h2>
+            <p class="subtitle">来自 awesome-skills 开源生态的高频实用技能，一键导入并注册使用。</p>
+          </div>
+          <div class="market-tab-navigation">
+            <button class="market-tab-btn active" id="btn-tab-market">技能推荐</button>
+            <button class="market-tab-btn" id="btn-tab-installed">本地已安装 (<span id="installed-skills-count">0</span>)</button>
+          </div>
+        </div>
+
+        <div class="market-toolbar">
+          <div class="search-box-wrapper">
+            <input type="text" id="input-search-skill" placeholder="🔍 输入关键字、领域或标识进行过滤筛选...">
+          </div>
+          <button class="btn-sync-github" id="btn-sync-github-skills">
+            同步 GitHub 社区仓库
+          </button>
+          <button class="btn-sync-github" id="btn-translate-skill-descriptions" title="只翻译新增或英文简介发生变化的 Skill，并保存到本地缓存">
+            翻译新增简介
+          </button>
+        </div>
+
+        <div class="integration-summary" id="skill-market-summary">正在读取本地 Skill...</div>
+
+        <div class="market-skills-grid" id="skills-market-container">
+          <!-- 动态渲染 -->
+        </div>
+        <div class="skill-market-pagination" id="skills-market-pagination"></div>
+      </section>
+
+      <!-- Tab 5: 自定义 Skill 工坊 -->
+      <section class="tab-pane" id="tab-skills">
+        <div class="pane-header">
+          <h2>可视化 Skill 技能生成器</h2>
+          <p class="subtitle">自定义你的智能体操作规范，生成带 YAML 元数据的标准 SKILL.md。</p>
+        </div>
+
+        <div class="pane-body">
+          <div class="card">
+            <h3>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="title-icon"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              创建新技能
+            </h3>
+            
+            <div class="form-group">
+              <label for="input-skill-name">技能唯一标识 (英文，如 code-reviewer)：</label>
+              <input type="text" id="input-skill-name" placeholder="如 git-helper">
+            </div>
+
+            <div class="form-group">
+              <label for="input-skill-desc">功能简要说明：</label>
+              <input type="text" id="input-skill-desc" placeholder="如 自动检测并审查当前工作区的 Git 改动差分">
+            </div>
+
+            <div class="form-group">
+              <label for="input-skill-prompt">核心系统 Prompt 指令集：</label>
+              <textarea id="input-skill-prompt" rows="5" placeholder="你是一个资深重构专家。当收到用户的修改提示时，你需要..."></textarea>
+            </div>
+
+            <button class="btn btn-primary" id="btn-generate-skill" style="width: 100%;">
+              生成并一键挂载至客户端
+            </button>
+            <div class="integration-result" id="custom-skill-result">尚未创建自定义 Skill</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 7: 极客反馈看板 -->
+      <section class="tab-pane" id="tab-feedback">
+        <div class="pane-header flex-row space-between-align-center">
+          <div>
+            <h2>反馈与讨论</h2>
+            <p class="subtitle">与官网 nhw1029.pages.dev 实时数据共享，同步呈现您的优化反馈。</p>
+          </div>
+          <button class="btn-refresh-feedbacks" id="btn-refresh-feedbacks" title="刷新反馈流">🔄 刷新反馈流</button>
+        </div>
+        
+        <div class="pane-body flex-column gap-20">
+          
+          <!-- 上方：仿大厂高级发帖撰写框 (带登录状态锁) -->
+          <div class="feedback-write-box" id="feedback-write-container">
+            <!-- 锁定蒙层 (未登录时显示) -->
+            <div class="write-box-lock-overlay" id="write-lock-overlay">
+              <div class="lock-card">
+                <span class="lock-icon">🔒</span>
+                <span class="lock-text">极客专属权限：请先登录您的账号后再发表反馈</span>
+                <button class="btn btn-primary btn-trigger-login" id="btn-lock-trigger-login">立即登录账号</button>
+              </div>
+            </div>
+            
+            <div class="write-box-header">
+              <span class="write-box-title">✍️ 撰写优化反馈</span>
+              <span class="char-counter" id="text-char-counter">0 / 500</span>
+            </div>
+            
+            <div class="write-box-body">
+              <textarea id="input-feedback-content" rows="4" placeholder="写下您在使用汉化补丁或桌面管家时遇到的问题、反馈或您的宝贵建议... (最大500字)" maxlength="500"></textarea>
+            </div>
+            
+            <!-- 上传图片预览条 (选择文件后在此渲染预览图) -->
+            <div class="upload-preview-area" id="upload-preview-wrapper" style="display: none;">
+              <div class="preview-thumbnail-box">
+                <img src="" id="img-upload-preview" alt="待上传图片预览">
+                <button class="btn-remove-uploaded" id="btn-remove-uploaded-img" title="移除图片">✕</button>
+              </div>
+              <span class="upload-status-text" id="text-upload-status">已就绪</span>
+            </div>
+
+            <div class="write-box-footer">
+              <div class="footer-actions-left">
+                <button class="btn-action-upload" id="btn-trigger-upload" title="上传本地截图">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                  上传截图 (可选)
+                </button>
+              </div>
+              <button class="btn btn-primary" id="btn-send-feedback">发送</button>
+            </div>
+          </div>
+
+          <!-- 下方：反馈列表 -->
+<div class="community-toolbar"><label class="community-search">搜索反馈<input type="search" id="feedback-search" placeholder="搜索已加载的作者或内容"></label><label>显示顺序<select id="feedback-sort"><option value="newest">最新发布</option><option value="popular">最多点赞</option><option value="unanswered">待回复</option></select></label><span id="feedback-result-count" class="community-muted" aria-live="polite"></span></div><p class="community-muted">默认按发布时间排列。截图以缩略图显示，点击可查看原图。</p>
+          <div class="feedback-stream-card">
+            <div class="feedback-flow-container" id="feedback-flow-list">
+              <!-- 骨架屏 / 实时云数据 -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Tab 7: 用户管理 (管理专享) -->
+      <section class="tab-pane" id="tab-admin-users">
+        <div class="pane-header">
+          <h2>系统用户管理中心</h2>
+          <p class="subtitle">搜索注册用户，查看账号资料与发言，管理角色、账号状态和内容。</p>
+        </div>
+
+        <div class="pane-body">
+
+          <div id="admin-users-list-panel" class="card community-workbench">
+            <div class="community-row"><h3>注册用户 <span class="community-tag" id="text-admin-users-count">0</span></h3><button class="btn btn-secondary" id="admin-users-refresh" type="button">刷新列表</button></div>
+            <p id="admin-user-summary" class="community-muted"></p>
+            <div class="community-toolbar">
+              <label class="community-search">搜索用户<input id="admin-user-search" type="search" placeholder="输入用户名"></label>
+              <label>角色<select id="admin-user-role-filter"><option value="">全部角色</option><option value="admin">管理员</option><option value="user">普通用户</option></select></label>
+              <label>状态<select id="admin-user-status-filter"><option value="">全部状态</option><option value="active">正常</option><option value="disabled">已禁用</option></select></label>
+              <label>排序<select id="admin-user-sort"><option value="newest">最近注册</option><option value="activity">发言最多</option><option value="name">用户名</option></select></label>
+            </div>
+            <div id="admin-users-list-container" aria-live="polite"></div>
+            <div class="community-row community-pagination"><span id="admin-user-pagination"></span><div><button class="btn btn-secondary" id="admin-user-prev" type="button">上一页</button> <button class="btn btn-secondary" id="admin-user-next" type="button">下一页</button></div></div>
+          </div>
+          <div id="admin-user-detail-panel" style="display:none">
+            <button class="btn btn-secondary" id="btn-back-to-users" type="button">← 返回列表</button>
+            <div class="card community-workbench">
+              <div class="community-row"><h3 id="text-detail-username"></h3><span id="text-detail-user-stats" class="community-tag"></span></div>
+              <dl class="community-properties" id="admin-user-properties"></dl>
+              <div id="admin-user-actions" hidden>
+                <div class="community-toolbar"><label>用户角色<select id="admin-detail-role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><button class="btn btn-secondary" id="admin-save-role" type="button">保存角色</button><button class="btn btn-secondary" id="admin-toggle-status" type="button">禁用账号</button></div>
+                <label class="community-field">管理备注<textarea id="admin-user-note" rows="2" maxlength="500" placeholder="仅管理员可见，最多 500 字"></textarea></label><button class="btn btn-secondary" id="admin-save-note" type="button">保存备注</button>
+              </div>
+              <div class="community-toolbar"><label class="community-search">重置密码<input type="password" id="input-detail-new-pass" autocomplete="new-password" minlength="6" placeholder="新密码至少 6 位"></label><button class="btn btn-secondary" id="btn-submit-detail-reset-pass" type="button">重置密码</button></div>
+              <p id="admin-user-message" class="community-message" role="status" aria-live="polite"></p>
+              <div class="community-danger-zone"><p>内容清理和账号删除不可撤销；当前管理员账号不能删除、禁用或调整自己的角色。</p><button class="btn btn-secondary" id="admin-clear-content" type="button">清理全部发言</button> <button class="btn btn-secondary" id="admin-delete-user" type="button">删除账号与内容</button></div>
+            </div>
+            <div class="card community-workbench"><h3>反馈与回复记录</h3><div class="community-toolbar"><label class="community-search">搜索内容<input type="search" id="admin-activity-search" placeholder="搜索该用户的发言"></label><label>类型<select id="admin-activity-type"><option value="">全部发言</option><option value="feedback">反馈</option><option value="reply">回复</option></select></label></div><div id="admin-detail-user-feedbacks"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 8: 发布公告 (管理专享) -->
+      <section class="tab-pane" id="tab-admin-announcement">
+        <div class="pane-header">
+          <h2>系统公告发布与管理</h2>
+          <p class="subtitle">新公告按发布时间展示；编辑只更新内容，不改变发布时间和排列位置。</p>
+        </div>
+
+        <div class="pane-body flex-column gap-20">
+          <div class="card admin-workbench-card">
+            <h3 id="text-ann-form-title">📢 发布系统新公告</h3>
+            <input type="hidden" id="input-announce-edit-id" value="">
+            
+            <div class="form-group" style="margin-top: 12px;">
+              <label for="input-announce-content">公告内容：</label>
+              <textarea id="input-announce-content" rows="4" placeholder="写下系统重要通知、更新内容等..."></textarea>
+            </div>
+
+            <!-- 上传图片预览 -->
+            <div class="upload-preview-area" id="ann-upload-preview-wrapper" style="display: none; margin-bottom: 12px; margin-top: 12px;">
+              <div class="preview-thumbnail-box">
+                <img src="" id="img-ann-upload-preview" alt="公告配图预览">
+                <button class="btn-remove-uploaded" id="btn-remove-ann-uploaded-img" title="移除图片">✕</button>
+              </div>
+              <span class="upload-status-text" id="text-ann-upload-status">已就绪</span>
+            </div>
+
+            <div class="button-action-row-space" style="display:flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+              <button class="btn-action-upload" id="btn-trigger-ann-upload" style="padding: 6px 14px; font-size: 11px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                上传公告图 (可选)
+              </button>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" id="btn-cancel-ann-edit" style="display: none; padding: 6px 14px; font-size: 11px;">取消编辑</button>
+                <button class="btn btn-primary" id="btn-publish-announcement" style="padding: 6px 18px; font-size: 11px;">发布公告</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 历史公告列表面板 -->
+          <div class="card">
+            <h3>公告记录</h3><p class="community-muted">默认最新发布在前，同一时间按公告编号降序；编辑公告不改变顺序。</p><div class="community-toolbar"><label class="community-search">搜索公告<input type="search" id="admin-ann-search" placeholder="搜索公告内容"></label><label>排序<select id="admin-ann-sort"><option value="newest">最新发布</option><option value="oldest">最早发布</option></select></label></div>
+            <div class="announcement-history-flow" id="admin-ann-history-list" style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+              <!-- 动态载入历史公告 -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部极窄缝隙状态日志栏 -->
+    <footer class="terminal-bar" id="terminal-bar">
+      <div class="terminal-header" id="terminal-header">
+        <span class="terminal-title">活动日志</span>
+        <div class="terminal-header-actions">
+          <button class="terminal-clear-btn" id="btn-clear-terminal">清除</button>
+          <button class="terminal-toggle-btn" id="btn-toggle-terminal">显示日志</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="terminal-log-output">
+        [System] AGY Hub 桌面管家初始化成功，已就绪。
+        [System] 提示：按下 Ctrl+Shift+I 可以开启 Chrome DevTools 深度开发调试。
+      </div>
+    </footer>
+  </div>
+  </div>
+
+  <!-- 隐藏的本地图片文件选择控件 -->
+  <input type="file" id="input-file-image" accept="image/*" style="display: none;">
+  <input type="file" id="input-file-ann-image" accept="image/*" style="display: none;">
+
+  <!-- 高级感高斯模糊登录/注册模态弹窗 -->
+  <div class="modal-overlay" id="auth-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-logo">
+          <span class="pulse-dot"></span>
+          <span class="logo-text">ANTIGRAVITY <span class="highlight-cyan">.ACCOUNT</span></span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-auth-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs-row">
+          <button class="auth-tab-btn active" id="btn-tab-login">快速登录</button>
+          <button class="auth-tab-btn" id="btn-tab-register">账号注册</button>
+        </div>
+        
+        <!-- 内联交互提示 Banner (替代原生 alert 解决 Electron 失焦问题) -->
+        <div id="auth-msg-banner" style="display: none; padding: 8px 12px; margin-bottom: 12px; border-radius: 6px; font-size: 12px; text-align: center; font-weight: 500; transition: all 0.2s ease;"></div>
+        
+        <!-- 登录表单 -->
+        <div id="form-login-box" class="auth-form-box active">
+          <div class="form-group">
+            <label for="input-login-username">账号：</label>
+            <input type="text" id="input-login-username" placeholder="请输入您的极客用户名">
+          </div>
+          <div class="form-group">
+            <label for="input-login-password">密码：</label>
+            <input type="password" id="input-login-password" placeholder="请输入密码">
+          </div>
+          <button class="btn btn-primary" id="btn-submit-login" style="width:100%; margin-top: 16px;">立即登录</button>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="form-register-box" class="auth-form-box">
+          <div class="form-group">
+            <label for="input-reg-username">新账号 (3-20字)：</label>
+            <input type="text" id="input-reg-username" placeholder="设置您的极客用户名">
+          </div>
+          <div class="form-group">
+            <label for="input-reg-password">设置密码 (最少6位)：</label>
+            <input type="password" id="input-reg-password" placeholder="设置登录密码">
+          </div>
+          <button class="btn btn-secondary" id="btn-submit-register" style="width:100%; margin-top: 16px;">提交注册</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MCP 参数配置与真实启动验证 -->
+  <div class="modal-overlay" id="mcp-setup-modal" style="display: none; z-index: 10009;">
+    <div class="modal-content mcp-setup-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="modal-logo">配置 MCP 服务</div>
+          <div class="modal-subtitle" id="mcp-setup-subtitle">填写启动所需参数</div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-mcp-setup">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="mcp-setup-fields"></div>
+        <div class="mcp-setup-note" id="mcp-setup-note"></div>
+        <div class="integration-result" id="mcp-setup-result">保存前会启动服务并执行 MCP 握手验证。</div>
+        <div class="modal-actions-row">
+          <button class="btn btn-secondary" id="btn-cancel-mcp-setup">取消</button>
+          <button class="btn btn-primary" id="btn-confirm-mcp-setup">安装并验证</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全屏灯箱图片大图预览模态框 -->
+  <div class="modal-overlay lightbox-overlay" id="lightbox-modal" style="display: none;">
+    <button class="lightbox-close-btn" id="btn-close-lightbox">✕</button>
+    <div class="lightbox-img-container">
+      <img class="lightbox-img" id="lightbox-large-img" src="" alt="极客反馈截图大图">
+    </div>
+  </div>
+
+  <!-- 反馈详细内容与二级高赞回复模态弹窗 -->
+  <div class="modal-overlay" id="feedback-detail-modal" style="display: none; z-index: 10008;">
+    <div class="modal-content" style="width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-logo">
+          <span class="pulse-dot"></span>
+          <span class="logo-text">💬 极客反馈详情</span>
+        </div>
+        <button class="modal-close-btn" id="detail-modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body" id="detail-modal-body" style="overflow-y: auto; flex: 1; padding-right: 4px;">
+        <!-- 详情动态内容 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 关联/添加新账号 Modal -->
+  <div class="modal-overlay" id="add-account-modal" style="display: none; z-index: 10006;">
+    <div class="modal-content" style="width: 500px;">
+      <div class="modal-header">
+        <div class="modal-logo">
+          <span class="pulse-dot"></span>
+          <span class="logo-text">👤 关联与导入新账号</span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-add-account-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 8px;">
+        <div class="add-account-tabs" style="display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+          <button class="add-account-tab-btn active" id="btn-add-tab-official" style="flex: 1; padding: 8px 4px; background: transparent; border: none; color: var(--text-main); font-size: 11px; cursor: pointer; border-bottom: 2px solid var(--accent-cyan); font-weight: bold;">方式一：OAuth 授权登录</button>
+          <button class="add-account-tab-btn" id="btn-add-tab-json" style="flex: 1; padding: 8px 4px; background: transparent; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;">方式二: 配置文件导入</button>
+        </div>
+
+        <!-- 方式一面板：OAuth 授权登录 -->
+        <div class="add-account-panel-content" id="panel-add-official">
+          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; text-align: center;">
+            推荐方式：将自动打开系统浏览器进行 Google 登录授权，安全获取并导入 Token。
+          </p>
+          <button class="btn" id="btn-start-oauth" style="width: 100%; background: #3b82f6; color: #fff; font-weight: bold; padding: 10px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; margin-bottom: 14px;">
+            🌐 开始 OAuth 授权
+          </button>
+          
+          <div class="form-group" style="margin-bottom: 12px; display: none;" id="oauth-link-group">
+            <label style="display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">授权链接 (如果浏览器未自动打开，请手动复制访问)：</label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="input-oauth-url" readonly style="flex: 1; padding: 6px 8px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 4px; font-size: 10px;">
+              <button class="btn" id="btn-copy-oauth-url" style="background: var(--bg-card); color: var(--text-main); font-size: 10px; padding: 6px 10px; border: 1px solid var(--border-subtle); border-radius: 4px; cursor: pointer;">复制</button>
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 16px;">
+            <label style="display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">如果浏览器没有自动跳转回小助手，请把认证成功后的链接 (或 Code) 粘贴在下方提交：</label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="input-oauth-code" placeholder="在此粘贴回调链接或 Authorization Code" style="flex: 1; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 4px; font-size: 11px;">
+              <button class="btn" id="btn-submit-oauth-code" style="background: var(--accent-cyan); color: #000; font-weight: bold; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">提交</button>
+            </div>
+          </div>
+          <div id="oauth-status-message" style="margin-top: 10px; font-size: 11px; text-align: center; color: var(--accent-cyan); min-height: 16px;"></div>
+        </div>
+
+        <!-- 方式二面板：配置文件导入 -->
+        <div class="add-account-panel-content" id="panel-add-json" style="display: none;">
+          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 24px; line-height: 1.5;">
+            支持通过选择其他设备导出的 <code>.json</code> 账号凭证配置文件直接导入。一秒同步，零操作门槛。
+          </p>
+          <button class="btn" id="btn-import-json-file" style="width: 100%; background: var(--accent-cyan); color: #000; font-weight: bold; padding: 12px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            📥 选择本地账号 JSON 配置文件
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay update-modal-overlay" id="update-modal" style="display: none; z-index: 10012;">
+    <div class="modal-content update-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+      <div class="modal-header update-modal-header">
+        <div class="update-modal-heading">
+          <span class="update-modal-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+          </span>
+          <div>
+            <h3 id="update-modal-title">检测到新版本</h3>
+            <p id="update-modal-summary">AGY Hub 有可用更新</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-update-modal" title="关闭更新窗口" aria-label="关闭更新窗口">✕</button>
+      </div>
+      <div class="update-modal-body">
+        <div class="update-version-row" aria-label="版本信息">
+          <div class="update-version-item">
+            <span>当前版本</span>
+            <strong id="update-current-version">v--</strong>
+          </div>
+          <svg class="update-version-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+          <div class="update-version-item latest">
+            <span>最新版本</span>
+            <strong id="update-latest-version">v--</strong>
+          </div>
+        </div>
+        <div class="update-release-section">
+          <div class="update-release-title">本次更新内容</div>
+          <div class="update-release-notes" id="update-release-notes">正在读取 GitHub Release 更新说明...</div>
+        </div>
+        <div class="update-progress-section" id="update-progress-section" hidden>
+          <div class="update-progress-label">
+            <span id="update-progress-text">正在准备下载...</span>
+            <strong id="update-progress-percent">0%</strong>
+          </div>
+          <div class="update-progress-track"><span id="update-progress-bar"></span></div>
+        </div>
+        <div class="update-modal-status" id="update-modal-status" aria-live="polite"></div>
+      </div>
+      <div class="update-modal-footer">
+        <button class="btn update-cancel-btn" id="btn-update-cancel">关闭</button>
+        <button class="btn btn-primary update-action-btn" id="btn-update-action">更新</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-overlay" id="guide-overlay" hidden>
+    <div class="guide-spotlight" id="guide-spotlight" hidden aria-hidden="true"></div>
+    <section class="guide-dialog" id="guide-dialog" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+      <header class="guide-header">
+        <div class="guide-heading">
+          <span class="guide-icon" aria-hidden="true">?</span>
+          <div><small id="guide-eyebrow">首次使用</small><h3 id="guide-title">是否需要使用引导？</h3></div>
+        </div>
+        <button class="icon-btn guide-close" id="btn-close-guide" type="button" aria-label="退出引导" title="退出引导（Esc）">×</button>
+      </header>
+      <div class="guide-progress" id="guide-progress" hidden><span id="guide-progress-bar"></span></div>
+      <div class="guide-body">
+        <div class="guide-step-index" id="guide-step-index">第一次打开时只询问一次</div>
+        <p class="guide-description" id="guide-description">引导会依次介绍汉化注入、本地账号、8046 服务、Codex、Claude Code 和自定义 Provider。你可以随时按 Esc 退出，以后也能从左下角重新打开。</p>
+        <div class="guide-purpose" id="guide-purpose"><strong>引导不会自动修改配置</strong><span>它只会带你前往对应页面并说明每一步的用途，由你决定是否执行。</span></div>
+      </div>
+      <footer class="guide-footer">
+        <div class="guide-decision-actions" id="guide-decision-actions" hidden>
+          <button class="btn btn-secondary" id="btn-guide-decision-prev" type="button">上一步</button>
+          <button class="btn btn-secondary" id="btn-guide-proxy-skip" type="button">跳过反代，进入皮肤</button>
+          <button class="btn btn-primary" id="btn-guide-proxy-start" type="button">需要，开始反代接入</button>
+        </div>
+        <button class="btn btn-secondary" id="btn-guide-skip" type="button">不需要，直接进入</button>
+        <div class="guide-step-actions" id="guide-step-actions" hidden>
+          <button class="btn btn-secondary" id="btn-guide-prev" type="button">上一步</button>
+          <button class="btn btn-primary" id="btn-guide-next" type="button">下一步</button>
+        </div>
+        <button class="btn btn-primary" id="btn-guide-start" type="button">需要，开始引导</button>
+      </footer>
+      <div class="guide-escape-hint">按 Esc 可随时退出</div>
+    </section>
+  </div>
+
+  <div id="operation-toast-host" class="operation-toast-host" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="gatewayUi.js"></script>
+  <script src="accountUi.js"></script>
+  <script src="operationFeedback.js"></script>
+  <script src="safeDom.js"></script>
+  <script src="communityController.js"></script>
+  <script src="communityData.js"></script>
+  <script src="adminCommunityController.js"></script>
+  <script src="navigationController.js"></script>
+  <script src="patchController.js"></script>
+  <script src="themeController.js"></script>
+  <script src="localAccountsController.js"></script>
+  <script src="tokenMonitorController.js"></script>
+  <script src="marketplace/marketplacePresenter.js"></script>
+  <script src="marketplace/marketplaceLayout.js"></script>
+  <script src="marketplaceController.js"></script>
+  <script src="gatewayController.js"></script>
+  <script src="appShellController.js"></script>
+  <script src="onboardingController.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

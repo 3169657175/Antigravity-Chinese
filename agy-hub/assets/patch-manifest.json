@@ -1,0 +1,24 @@
+{
+  "formatVersion": 2,
+  "clientVersion": "2.17.0",
+  "supportedClientRange": ">=2.4.3 <3.0.0",
+  "patchVersion": "1.2.3",
+  "pluginVersion": "1.2.3",
+  "buildStrategy": "official-baseline-with-declarative-overlay",
+  "unpackedMode": "preserve-official",
+  "requiredCapabilities": [
+    "package.json",
+    "dist/languageServer.js",
+    "dist/preload.js",
+    "dist/main.js",
+    "dist/tray.js",
+    "dist/utils.js",
+    "dist/ipcHandlers.js"
+  ],
+  "optionalCapabilities": [
+    "dist/accountVault.js"
+  ],
+  "officialSha256": "85c97057c762f01fe9fa8b0380f8055ff76344ceb47c840cd3d8d43aa035142b",
+  "patchSha256": "91c21864fc0e2c7635f8acdd74ecfe75dfd8822404088fee733ffbb4481511df",
+  "builtAt": "2026-10-01T02:45:10.489Z"
+}

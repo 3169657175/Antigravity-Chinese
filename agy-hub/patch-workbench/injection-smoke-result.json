@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "snapshot": {
+    "themeNames": [
+      "线条小狗",
+      "小猫咪自定义",
+      "恢复原生主题"
+    ],
+    "customCount": 1,
+    "auditRows": [],
+    "labels": [
+      "",
+      "",
+      ""
+    ],
+    "copyText": "复制 JSON",
+    "status": "",
+    "settingsText": "Customizations Add MCP ServersAsk questions. Get answers. This MCP server connects to your analytics account so the coding agent can inspect product data and explain results. Models & UsageAutomatically prompt you to restart the app when a new update is available. When disabled, you can check for updates manually from the app menu.Refresh29 tools enabledRemote Control 已知翻译测试项Plugins are packaged collections 共 skills and MCPs to help the Agent in Antigravity call Google developer products.Build and prototype location-aware applications with Google Maps Platform. Integrate interactive maps, search and inspect Places details, calculate optimal routes.Outside 共 folders file access policy",
+    "refreshMcpLabel": "Refresh MCP servers",
+    "togglePluginLabel": "Toggle chrome-devtools-mcp",
+    "quotaText": "When toggled on, Antigravity will use your AI credits to fulfill model requests once you are out of model quota. Antigravity will always use your model quota first before using AI credits.Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the model.You have used some 共 your weekly limit, it will fully refresh in 4 days, 12 hours.Future quota sentence needs translation.",
+    "rendererMessages": []
+  },
+  "active": null
+}

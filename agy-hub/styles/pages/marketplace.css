@@ -1,0 +1,9 @@
+/*
+ * Marketplace ownership map.
+ *
+ * The production Electron window intentionally loads the fully bundled
+ * style.css to avoid file:// @import timing regressions. Marketplace rules
+ * are authored under the `.market-*`, `.skill-*`, and `.mcp-*` namespaces in
+ * style.css; this file establishes the page-module boundary for the next
+ * mechanical CSS extraction without changing runtime rendering today.
+ */

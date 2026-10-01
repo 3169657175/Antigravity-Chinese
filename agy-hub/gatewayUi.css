@@ -1,0 +1,30 @@
+.codex-workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gateway-diagnostic-button {
+  min-height: 38px;
+  padding: 8px 12px;
+  color: var(--accent-cyan);
+  border-color: rgba(76, 205, 220, .35);
+  background: rgba(76, 205, 220, .06);
+  white-space: nowrap;
+}
+
+.gateway-diagnostic-button:hover:not(:disabled) {
+  border-color: rgba(76, 205, 220, .6);
+  background: rgba(76, 205, 220, .11);
+}
+
+.gateway-diagnostic-button.is-complete {
+  color: #76d5ad;
+  border-color: rgba(82, 196, 156, .45);
+  background: rgba(82, 196, 156, .08);
+}
+
+@media (max-width: 980px) {
+  .codex-workspace-header { align-items: flex-start; }
+  .codex-workspace-header-actions { align-items: flex-end; flex-direction: column; }
+}

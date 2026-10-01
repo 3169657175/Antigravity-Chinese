@@ -1,0 +1,158 @@
+{
+  "name": "agy-hub",
+  "version": "1.2.3",
+  "description": "AGY Hub 桌面管家：管理 Antigravity 汉化注入、账号额度、Codex/Claude Desktop 接入与本地反向代理。",
+  "author": "niu1029",
+  "homepage": "https://github.com/3169657175/Antigravity-Chinese",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "dist:sync": "electron-builder && node sync-d.js",
+    "patch:rebuild": "node patch-workbench/build-patch.js",
+    "patch:verify": "node patch-workbench/verify-patch.js",
+    "test:token-usage": "node --test tokenUsage.test.js",
+    "test:codex-gateway": "node --test codexGateway.test.js",
+    "test:codex-lifecycle": "node --test codexAppLifecycle.test.js",
+    "test": "node --test *.test.js",
+    "test:architecture": "node --test architectureBoundaries.test.js navigationPerformance.test.js runtimeDeps.test.js"
+  },
+  "build": {
+    "appId": "com.agy.hub",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "3169657175",
+        "repo": "Antigravity-Chinese"
+      }
+    ],
+    "files": [
+      "package.json",
+      "LICENSE",
+      "index.html",
+      "style.css",
+      "accountUi.css",
+      "gatewayUi.css",
+      "marketplace/**/*",
+      "assets/icon.ico",
+      "assets/logo-*.png",
+      "assets/logo.svg",
+      "assets/themes/**/*",
+      "accountErrorClassifier.js",
+      "accountIpc.js",
+      "accountUi.js",
+      "anthropicGateway.js",
+      "appShutdown.js",
+      "appShellController.js",
+      "brainMonitor.js",
+      "claudeDesktopConfig.js",
+      "claudeDesktopLifecycle.js",
+      "claudeModelRoutes.js",
+      "codexAppLifecycle.js",
+      "codexConfig.js",
+      "codexGateway.js",
+      "codexModels.js",
+      "codexProviderProfiles.js",
+      "communityClient.js",
+      "communityController.js",
+      "communityIpc.js",
+      "configSnapshotStore.js",
+      "customContextBudget.js",
+      "fsUtils.js",
+      "gatewayConfigStore.js",
+      "gatewayController.js",
+      "gatewayDiagnostics.js",
+      "gatewayHttp.js",
+      "gatewayIpc.js",
+      "gatewayProfiles.js",
+      "gatewayTestRunner.js",
+      "gatewayUi.js",
+      "localAccountsController.js",
+      "logTailReader.js",
+      "main.js",
+      "marketplaceController.js",
+      "mcpLaunchConfig.js",
+      "mcpProbe.js",
+      "navigationController.js",
+      "onboardingController.js",
+      "operationFeedback.js",
+      "providerProtocol.js",
+      "providerHealthStore.js",
+      "patchBackupManager.js",
+      "patchController.js",
+      "patchRuntimeBuilder.js",
+      "patchWorker.js",
+      "patch-workbench/compatibility.js",
+      "preload.js",
+      "proxy.js",
+      "renderer.js",
+      "responsesRequestAdapter.js",
+      "retryPolicy.js",
+      "safeDom.js",
+      "secretCodec.js",
+      "skillTranslationService.js",
+      "skillTranslationStore.js",
+      "themeController.js",
+      "themeIpc.js",
+      "tokenMonitorController.js",
+      "tokenStatsStore.js",
+      "tokenUsage.js",
+      "updaterService.js",
+      "updateUtils.js",
+      "urlPolicy.js",
+      "antigravityModelCatalog.js",
+      "communityData.js",
+      "adminCommunityController.js"
+    ],
+    "productName": "AGY Hub 桌面管家",
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "assets/app.asar",
+        "to": "patch/app.asar"
+      },
+      {
+        "from": "assets/patch-manifest.json",
+        "to": "patch/patch-manifest.json"
+      },
+      {
+        "from": "patch-workbench/legacy-payload.asar",
+        "to": "patch/legacy-payload.asar"
+      },
+      {
+        "from": "patch-workbench/runtime-rules.json",
+        "to": "patch/runtime-rules.json"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "artifactName": "agy-hub-setup-${version}.${ext}",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "shortcutName": "AGY Hub 桌面管家",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "runAfterFinish": true
+    }
+  },
+  "dependencies": {
+    "@electron/asar": "^3.4.1",
+    "electron-updater": "^6.8.9",
+    "https-proxy-agent": "^5.0.1"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.15.3"
+  }
+}

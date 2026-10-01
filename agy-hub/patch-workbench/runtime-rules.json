@@ -1,0 +1,34 @@
+[
+  {
+    "description": "Use the current Cloud Code quota service in the Antigravity account dialog",
+    "file": "dist/ipcHandlers.js",
+    "find": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    "replace": "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    "expectedHits": 2,
+    "enabled": true
+  },
+  {
+    "description": "Do not turn missing quota fields into fake 100 percent values",
+    "file": "dist/ipcHandlers.js",
+    "find": "            if (gemini5hVal === null) gemini5hVal = 100;\n            if (geminiWeeklyVal === null) geminiWeeklyVal = 100;\n            if (claude5hVal === null) claude5hVal = 100;\n            if (claudeWeeklyVal === null) claudeWeeklyVal = 100;",
+    "replace": "            const missingQuotaFields = [\n                ['gemini5h', gemini5hVal],\n                ['geminiWeekly', geminiWeeklyVal],\n                ['claude5h', claude5hVal],\n                ['claudeWeekly', claudeWeeklyVal]\n            ].filter(([, value]) => value === null).map(([name]) => name);\n            if (missingQuotaFields.length > 0) {\n                throw new Error(`Quota response is incomplete: ${missingQuotaFields.join(', ')}`);\n            }",
+    "expectedHits": 1,
+    "enabled": true
+  },
+  {
+    "description": "Restore the original glass sidebar when Antigravity 2.4.3 changes sidebar dimensions or wrapper names",
+    "file": "dist/preload.js",
+    "find": "        const sidebarCandidates = [];\n        for (let current = newChatButton; current; current = current.parentElement) {\n            const rect = current.getBoundingClientRect();\n            if (rect.x <= 2 && rect.width >= 210 && rect.width <= 280 && rect.height > innerHeight * .72) sidebarCandidates.push(current);\n        }\n        let sidebar = sidebarCandidates.sort((a, b) => a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];\n        if (!sidebar) {\n            /* 极致兜底：如果按钮推演失败，直接根据 aside 或 sidebar 关键字寻找可见大容器，并取消死板的宽高校验 */\n            sidebar = document.querySelector('aside') || \n                      Array.from(document.querySelectorAll('div')).find(el => {\n                          const className = String(el.className || '').toLowerCase();\n                          const id = String(el.id || '').toLowerCase();\n                          return (className.includes('sidebar') || className.includes('left-panel') || className.includes('sidebarcandidates') || id.includes('sidebar')) && visible(el);\n                      });\n        }\n        mark(sidebar, 'surface', 'sidebar');",
+    "replace": "        document.querySelectorAll('[data-agy-sidebar-layer=\"true\"]').forEach(element => element.removeAttribute('data-agy-sidebar-layer'));\n        const sidebarCandidates = [];\n        for (let current = newChatButton; current; current = current.parentElement) {\n            const rect = current.getBoundingClientRect();\n            if (rect.x <= 8 && rect.width >= 180 && rect.width <= Math.min(420, innerWidth * .42) && rect.height > innerHeight * .58) sidebarCandidates.push(current);\n        }\n        let sidebar = sidebarCandidates.sort((a, b) => {\n            const aRect = a.getBoundingClientRect();\n            const bRect = b.getBoundingClientRect();\n            return (bRect.width * bRect.height) - (aRect.width * aRect.height);\n        })[0];\n        if (!sidebar) {\n            sidebar = Array.from(document.querySelectorAll('aside, nav, [class*=\"sidebar\" i], [class*=\"left-panel\" i], [id*=\"sidebar\" i]')).find(element => {\n                const rect = element.getBoundingClientRect();\n                return visible(element) && rect.x <= 8 && rect.width >= 180 && rect.width <= Math.min(420, innerWidth * .42) && rect.height > innerHeight * .58;\n            });\n        }\n        if (!sidebar) {\n            sidebar = Array.from(document.querySelectorAll('#root div, #root section, #root nav')).filter(element => {\n                const rect = element.getBoundingClientRect();\n                return visible(element) && rect.x <= 8 && rect.width >= 180 && rect.width <= Math.min(420, innerWidth * .42) && rect.height > innerHeight * .72;\n            }).sort((a, b) => {\n                const aRect = a.getBoundingClientRect();\n                const bRect = b.getBoundingClientRect();\n                return (bRect.width * bRect.height) - (aRect.width * aRect.height);\n            })[0];\n        }\n        mark(sidebar, 'surface', 'sidebar');\n        if (sidebar) {\n            const sidebarRect = sidebar.getBoundingClientRect();\n            for (let current = sidebar.parentElement; current && current !== document.body; current = current.parentElement) {\n                const rect = current.getBoundingClientRect();\n                if (rect.x > 8 || rect.height < innerHeight * .58 || rect.width > Math.min(440, sidebarRect.width + 80)) break;\n                current.setAttribute('data-agy-sidebar-layer', 'true');\n            }\n        }",
+    "expectedHits": 1,
+    "enabled": true
+  },
+  {
+    "description": "Remove only opaque Antigravity 2.4.3 sidebar wrapper backgrounds while preserving the established glass gradient",
+    "file": "dist/preload.js",
+    "find": "          html.agy-theme-active-v2 [data-agy-surface=\"sidebar\"] [class~=\"bg-card\"],",
+    "replace": "          html.agy-theme-active-v2 [data-agy-sidebar-layer=\"true\"]:not([data-agy-surface=\"sidebar\"]),\n          html.agy-theme-active [data-agy-sidebar-layer=\"true\"]:not([data-agy-surface=\"sidebar\"]) {\n            background: transparent !important;\n            background-color: transparent !important;\n            background-image: none !important;\n          }\n\n          html.agy-theme-active-v2 [data-agy-surface=\"sidebar\"] [class~=\"bg-background\"],\n          html.agy-theme-active-v2 [data-agy-surface=\"sidebar\"] [class~=\"bg-sidebar\"],\n          html.agy-theme-active [data-agy-surface=\"sidebar\"] [class~=\"bg-background\"],\n          html.agy-theme-active [data-agy-surface=\"sidebar\"] [class~=\"bg-sidebar\"],\n          html.agy-theme-active aside [class~=\"bg-background\"],\n          html.agy-theme-active aside [class~=\"bg-sidebar\"],\n          html.agy-theme-active-v2 [data-agy-surface=\"sidebar\"] [class~=\"bg-card\"],",
+    "expectedHits": 1,
+    "enabled": true
+  }
+]
