@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  windows:
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -16,5 +16,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run patch:verify
-      - run: node --test --test-concurrency=1 tests/*.test.js
+      - name: Run Windows test suite
+        shell: pwsh
+        run: |
+          $tests = Get-ChildItem tests/*.test.js | Where-Object { $_.Name -notin @('patchWorker.test.js', 'trayBackgroundCompatibility.test.js') } | ForEach-Object { $_.FullName }
+          node --test --test-concurrency=1 $tests
       - run: npm run test:architecture
+
+  asar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run patch:verify
+      - run: node --test tests/patchWorker.test.js tests/trayBackgroundCompatibility.test.js
