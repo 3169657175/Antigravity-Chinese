@@ -3,64 +3,60 @@
 [![Release](https://img.shields.io/github/v/release/3169657175/Antigravity-Chinese?display_name=tag&sort=semver)](https://github.com/3169657175/Antigravity-Chinese/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/3169657175/Antigravity-Chinese/total)](https://github.com/3169657175/Antigravity-Chinese/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-2563eb?logo=windows)](#运行环境)
-[![AGY Hub](https://img.shields.io/badge/AGY%20Hub-1.2.3-0A7D5A)](#agy-hub-桌面管家)
-[![Antigravity](https://img.shields.io/badge/Antigravity-2.17.0-5B5BD6)](#运行环境)
+[![AGY Hub](https://img.shields.io/badge/AGY%20Hub-1.2.3-0A7D5A)](#当前版本)
+[![Antigravity](https://img.shields.io/badge/Antigravity-2.17.0-5B5BD6)](#当前版本)
 
-这是一个面向 Windows 版 Google Antigravity 的中文增强与本地 AI 工具管理项目。
+这是面向 Windows 版 Google Antigravity 的中文增强与桌面管理项目。当前主线已经统一为 **AGY Hub 桌面管家**，仓库根目录就是最新版完整源码，不再把真正源码藏在二级目录中。
 
-仓库现在同时包含：
+## 当前版本
 
-- **Antigravity 中文与体验优化补丁**：汉化、主题、托盘、账号与额度、网络体验增强及安全回退。
-- **AGY Hub 桌面管家完整源码**：补丁注入与回退、账号管理、Codex / Claude Code 接入、Token 监控、MCP / Skill、诊断、社区与在线更新。
+- AGY Hub：**1.2.3**
+- Antigravity 兼容基线：**2.17.0**
+- 补丁格式：v2，基于官方底包构建并保留官方 `app.asar.unpacked`
+- Electron：31.x
+- Windows：10 / 11 x64
 
-当前 AGY Hub 应用版本为 **1.2.3**，汉化补丁构建基线已适配 **Antigravity 2.17.0**。本次公开源码已与实际运行版本重新对齐，并通过补丁校验和全量自动化测试。
+最新安装包请直接前往 [Releases](https://github.com/3169657175/Antigravity-Chinese/releases/latest) 下载。
 
-> Antigravity 更新可能改变内部 Electron 文件结构。不要把旧补丁强行注入新版本；应先重新建立官方基线并通过兼容构建和验证。
+## 主要能力
 
-## 下载与安装
+### Antigravity 汉化与安全补丁
 
-### AGY Hub 安装（推荐）
+- 自动识别 Antigravity 安装目录与版本。
+- 基于当前官方 `app.asar` 构建兼容补丁。
+- 注入前执行结构、语法、关键能力和哈希校验。
+- 固定保留官方原版与上一版汉化，支持安全回退。
+- 当前补丁构建链已适配 Antigravity 2.17.0。
 
-1. 打开 [Releases](https://github.com/3169657175/Antigravity-Chinese/releases/latest)。
-2. 下载 `agy-hub-setup-*.exe`。
-3. 安装并启动 AGY Hub。
-4. 在“汉化注入”页面确认识别到的 Antigravity 版本。
-5. 执行注入；需要回退时可分别选择“退回上一版汉化”或“恢复官方英文原版”。
+### 本地账号与额度
 
-自动更新同时使用同一 Release 中的 `.blockmap` 与 `latest.yml`。
+- 读取 Antigravity 本地账号并展示额度。
+- 支持账号切换、状态检查、重新授权提示。
+- 凭据只在 Electron 主进程中处理，敏感字段不直接暴露到渲染层。
 
-### 手动补丁脚本
+### Codex 接入
 
-仓库根目录继续保留原来的 PowerShell / BAT 方式，适合补丁开发、调试或手动控制：
+- 在 `127.0.0.1:8046` 提供 OpenAI Responses 兼容接口。
+- 支持 Antigravity 实际可用模型与 Codex 可见模型别名映射。
+- 支持当前 Gemini 3.8 / 3.7 / 3.6、Gemini 3.1 Pro 与 Claude 4.6 路由。
+- 支持流式输出、工具调用、长对话、compaction 与 reasoning summary。
+- 自定义 Responses Provider 与 Antigravity 路由相互隔离。
 
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-.\install.ps1
-```
+### Claude Code / Claude Desktop 接入
 
-恢复官方版本：
+- 提供 Anthropic Messages 与 `count_tokens` 兼容接口。
+- 支持 Claude Desktop 配置写入、备份与恢复。
+- Codex 与 Claude 的账号、模型和路由状态相互隔离。
 
-```powershell
-.\restore.ps1
-```
+### Token、MCP、Skill 与主题
 
-也可以双击 `安装汉化与优化补丁.bat` 和 `一键还原官方原版.bat`。
+- 统计本地 Antigravity 与反代请求的 Token 和缓存使用情况。
+- 提供 MCP / Skill 市场、安装、配置检查与显式深度验证。
+- 支持内置主题、自定义壁纸和主题配置同步。
 
-## AGY Hub 桌面管家
+## 当前模型目录
 
-AGY Hub 是一个 Electron 本地桌面应用，默认只在 `127.0.0.1` 提供本地服务，不把模型网关直接暴露到公网。
-
-### 汉化补丁与安全回退
-
-- 基于当前官方 `app.asar` 动态构建兼容补丁。
-- 注入前检查结构、关键 JavaScript 语法和必要能力。
-- 固定维护当前汉化、上一版汉化、当前官方原版三个状态。
-- Antigravity 客户端版本变化时重新建立官方基线，避免跨版本错误恢复。
-- 当前补丁构建/验证基线：**Antigravity 2.17.0**。
-
-### 当前模型目录
-
-当前实装模型目录以 Antigravity 实时 `fetchAvailableModels` 为准，并保留稳定的客户端映射。当前已适配：
+当前 AGY Hub 内置模型目录包括：
 
 - Gemini 3.8 Flash：High / Medium / Low
 - Gemini 3.7 Flash：High / Medium / Low
@@ -69,94 +65,40 @@ AGY Hub 是一个 Electron 本地桌面应用，默认只在 `127.0.0.1` 提供�
 - Claude Opus 4.6 Thinking
 - Claude Sonnet 4.6
 
-已经移除的旧模型不会因为历史配置重新出现在当前目录中；旧配置会迁移到当前可用默认模型。
-
-### Codex 接入
-
-- 本地 `http://127.0.0.1:8046/v1` 提供 OpenAI Responses 兼容接口。
-- 支持流式输出、工具调用、图片输入、Reasoning Summary、长上下文和本地压缩恢复。
-- Codex 可见模型使用客户端允许的别名，网关内部保持真实 Antigravity 模型映射。
-- 自定义 Responses Provider 与 Antigravity Provider 分离；“测试”不会改变正在使用的线路。
-
-### Claude Code / Claude Desktop
-
-- 支持 Anthropic Messages 与 `count_tokens`。
-- 模型路由、账号和连接状态与 Codex 分离。
-- 支持真实 Claude Desktop 配置写入、备份与恢复。
-- Claude 客户端显示兼容路由名，转发时还原为用户实际选择的 Antigravity 模型。
-
-### 本地账号与额度
-
-- 自动识别 Antigravity 本地账号。
-- 支持账号保存、导入、切换、状态检查和额度读取。
-- 授权失效、临时配额、网络异常等错误进行可读分类。
-- 敏感凭据只在本地主进程处理，不应提交到仓库或公开日志。
-
-### Token 与缓存监控
-
-- 分开统计本地 Antigravity、Codex 和 Claude Code 反代调用。
-- 展示输入、输出、总 Token、缓存读取量和缓存命中率。
-- 支持 JSON、SSE、protobuf / gRPC UsageMetadata。
-- 采用增量记录和有界历史，避免长期运行时日志无限增长。
-
-### MCP / Skill
-
-- MCP 与 Skill 市场、分类、搜索、分页和响应式布局。
-- MCP 配置快检与显式深度 `initialize` 握手分离。
-- Skill 简介支持按内容哈希进行增量翻译和缓存。
-- 安装前校验命令、包名和固定版本，拒绝明显不可审计的启动配置。
-
-### 主题、社区与更新
-
-- 内置多套主题并支持自定义本地壁纸。
-- 社区公告、反馈与管理边界位于主进程侧。
-- GitHub Release 自动更新支持安装包、blockmap 和 `latest.yml`。
-- 长任务提供统一进度和诊断反馈。
-
-## 操作边界
-
-| 操作 | 行为 | 是否改变当前线路 |
-| --- | --- | --- |
-| 测试模型 | 使用草稿配置做临时探测 | 否 |
-| 启动服务 | 确保本地网关监听 | 不应暗中切换 Provider |
-| 接入 Codex | 写入 Codex 配置和模型目录 | 是 |
-| 接入 Claude | 写入 Claude 配置并准备本地网关 | 是 |
-| 一键注入 | 修改 Antigravity 补丁文件 | 与反代线路无关 |
-| 退回上一版汉化 | 恢复上一份汉化补丁 | 与反代线路无关 |
-| 恢复官方英文原版 | 恢复当前版本官方文件 | 与反代线路无关 |
+实际可用模型仍以 Antigravity 当前账号返回的实时目录为准。
 
 ## 仓库结构
 
 ```text
 Antigravity-Chinese/
-├─ patch/                         传统脚本版 Antigravity 补丁源码
-├─ install.ps1                    手动安装脚本
-├─ restore.ps1                    官方原版恢复脚本
-├─ auto_heal.ps1                  脚本版更新恢复辅助
-├─ bundle.js                      沙盒 preload 模块打包器
-├─ 安装汉化与优化补丁.bat
-├─ 一键还原官方原版.bat
-└─ agy-hub/                       AGY Hub 桌面管家完整源码
-   ├─ main.js
-   ├─ preload.js
-   ├─ renderer.js
-   ├─ codexGateway.js
-   ├─ antigravityModelCatalog.js
-   ├─ gatewayController.js
-   ├─ patch-workbench/
-   ├─ assets/
-   ├─ docs/
-   └─ *.test.js
+├─ main.js                         Electron 主进程
+├─ preload.js                      安全 IPC 桥
+├─ renderer.js                     前端入口
+├─ index.html                      主界面
+├─ style.css                       运行时完整样式
+├─ codexGateway.js                 本地 8046 网关
+├─ codexModels.js                  Codex 模型目录与别名
+├─ anthropicGateway.js             Anthropic Messages 转换
+├─ claudeDesktopConfig.js          Claude Desktop 配置管理
+├─ accountIpc.js                   本地账号与额度
+├─ tokenUsage.js                   Token 统计
+├─ marketplaceController.js        MCP / Skill 市场
+├─ patch-workbench/                Antigravity 补丁构建与兼容层
+├─ assets/app.asar                 当前发布补丁
+├─ assets/patch-manifest.json      补丁版本和哈希清单
+├─ docs/                           架构与维护文档
+├─ *.test.js                       自动化测试
+├─ package.json                    Electron / electron-builder 配置
+└─ README.md
 ```
 
-`agy-hub/` 现在就是公开仓库内的完整桌面管家源码，不再需要跳转到另一个仓库才能查看核心实现。
+历史上的 `patch/`、`install.ps1`、`restore.ps1`、`bundle.js` 和 BAT 手动补丁链已从当前主分支移除，避免与现在的 AGY Hub / patch-workbench 双轨并存。旧实现仍可通过 Git 历史查看。
 
-## 开发与验证
+## 开发
 
-进入桌面管家源码：
+安装依赖：
 
 ```powershell
-cd .\agy-hub
 npm install
 ```
 
@@ -166,13 +108,58 @@ npm install
 .\node_modules\.bin\electron.cmd .
 ```
 
-完整测试：
+运行测试：
 
 ```powershell
 npm test
 ```
 
-补丁发布门禁：
+重建并验证 Antigravity 补丁：
+
+```powershell
+npm run patch:rebuild
+npm run patch:verify
+```
+
+构建 Windows 安装包并同步到本机运行目录：
+
+```powershell
+npm run dist:sync
+```
+
+## 发布文件
+
+正式 Release 使用以下文件：
+
+- `agy-hub-setup-1.2.3.exe`
+- `agy-hub-setup-1.2.3.exe.blockmap`
+- `latest.yml`
+
+自动更新目标已经配置为：
+
+```text
+3169657175/Antigravity-Chinese
+```
+
+## 开发与运行目录
+
+本机开发时建议保持单一源码基线：
+
+```text
+C:\Users\niu\.gemini\antigravity\scratch\agy-hub
+```
+
+构建后的实际运行目录：
+
+```text
+D:\ang\agy-hub
+```
+
+后续修改应优先进入正式开发目录，完成测试和构建后再同步运行目录，避免两边长期分叉。
+
+## 测试与发布门禁
+
+发布前至少执行：
 
 ```powershell
 npm run patch:rebuild
@@ -180,48 +167,23 @@ npm run patch:verify
 npm test
 ```
 
-构建 Windows Release：
+当前 1.2.3 基线已通过完整自动化测试；真实 MCP live 测试依赖本机外部环境，因此按设计可跳过。
 
-```powershell
-.\node_modules\.bin\electron-builder.cmd --win nsis --x64
-```
+涉及补丁发布时还需要确认：
 
-本次同步验证结果：
-
-- Antigravity 2.17.0 补丁重建：通过
-- 补丁结构与关键 JS 语法校验：通过
-- 自动化测试：207 项，0 失败，3 项真实 MCP live 测试按设计跳过
-- Windows NSIS 安装包、blockmap、`latest.yml`：同一次构建生成
-
-## 运行环境
-
-| 项目 | 当前状态 |
-| --- | --- |
-| Windows 10 / 11 | 支持 |
-| Antigravity 2.17.0 | 当前兼容构建已验证 |
-| Codex | 支持 Responses 接入 |
-| Claude Code / Claude Desktop | 支持 Anthropic Messages 接入 |
-| 自定义 OpenAI Responses Provider | 支持 |
-| macOS / Linux | 暂无完整安装与注入支持 |
+- `dist/main.js`、`dist/preload.js`、`dist/ipcHandlers.js` 等关键文件通过语法检查；
+- `dist/accountVault.js` 存在；
+- 当前补丁 SHA-256 与 manifest 一致；
+- 官方原版与上一版汉化具备恢复路径。
 
 ## 安全说明
 
-- 本项目不是 Google、OpenAI 或 Anthropic 官方产品。
-- 不要向公开 Issue、日志或仓库提交 API Key、Refresh Token、账号存档或私人对话内容。
-- 网关默认监听回环地址；不要简单改成 `0.0.0.0` 暴露到公网。
-- 真实“接入”操作会写本地客户端配置，执行前会保留恢复路径。
-- Antigravity 更新后应先保存新的官方原版，再重新生成兼容补丁。
+- 本项目不是 Google、OpenAI 或 Anthropic 的官方产品。
+- 不要公开 API Key、Refresh Token、账号存档或未脱敏日志。
+- 本地网关默认只监听 `127.0.0.1`，不要直接改成公网监听。
+- Antigravity 官方更新后，应先重新执行兼容构建与验证，再进行注入。
+- 第三方模型中转服务的隐私和账号风险由使用者自行评估。
 
-## 参与项目
+## License
 
-提交 Issue 时建议提供：Antigravity / AGY Hub 版本、使用的接入线路、三级测试失败层级、脱敏后的诊断报告，以及最短复现步骤。
-
-## 致谢
-
-项目在账号管理、界面挂载和客户端增强设计上参考了：
-
-- [BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)
-- [lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)
-- [farion1231/cc-switch](https://github.com/farion1231/cc-switch)
-
-感谢所有提交测试结果、错误日志、汉化校对和兼容反馈的使用者。
+AGY Hub 源码按仓库中的 [MIT License](LICENSE) 发布。
