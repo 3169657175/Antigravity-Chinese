@@ -8,23 +8,23 @@ const vm = require('vm');
 const asar = require('@electron/asar');
 const { exec, execFile, execFileSync, spawn } = require('child_process');
 const { Worker } = require('worker_threads');
-const { startProxy, stopProxy, getInitialStats, getProxyStatus, recordTokenLog } = require('./proxy.js');
-const { BrainTokenMonitor } = require('./brainMonitor.js');
-const { CodexGateway, MODELS, parseUpstreamEvents, collectParts } = require('./codexGateway.js');
-const { probeMcpServer, validateMcpConfig } = require('./mcpProbe.js');
-const { registerGatewayIpc } = require('./gatewayIpc.js');
-const { registerUpdaterService } = require('./updaterService.js');
-const { getGoogleClientId, getGoogleClientSecret, registerAccountIpc } = require('./accountIpc.js');
-const { registerThemeIpc } = require('./themeIpc.js');
-const { PatchBackupManager } = require('./patchBackupManager.js');
-const { LogTailReader, detectLatestRouteState } = require('./logTailReader.js');
-const { SkillTranslationService } = require('./skillTranslationService.js');
-const { SkillTranslationStore, defaultSkillTranslationPath } = require('./skillTranslationStore.js');
-const { CommunityClient } = require('./communityClient.js');
-const { registerCommunityIpc } = require('./communityIpc.js');
-const { readJsonSafe, writeJsonAtomic: writeJsonAtomicSafe } = require('./fsUtils.js');
-const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./appShutdown.js');
-const { createSecretCodec } = require('./secretCodec.js');
+const { startProxy, stopProxy, getInitialStats, getProxyStatus, recordTokenLog } = require('./src/proxy.js');
+const { BrainTokenMonitor } = require('./src/brainMonitor.js');
+const { CodexGateway, MODELS, parseUpstreamEvents, collectParts } = require('./src/codexGateway.js');
+const { probeMcpServer, validateMcpConfig } = require('./src/mcpProbe.js');
+const { registerGatewayIpc } = require('./src/gatewayIpc.js');
+const { registerUpdaterService } = require('./src/updaterService.js');
+const { getGoogleClientId, getGoogleClientSecret, registerAccountIpc } = require('./src/accountIpc.js');
+const { registerThemeIpc } = require('./src/themeIpc.js');
+const { PatchBackupManager } = require('./src/patchBackupManager.js');
+const { LogTailReader, detectLatestRouteState } = require('./src/logTailReader.js');
+const { SkillTranslationService } = require('./src/skillTranslationService.js');
+const { SkillTranslationStore, defaultSkillTranslationPath } = require('./src/skillTranslationStore.js');
+const { CommunityClient } = require('./src/communityClient.js');
+const { registerCommunityIpc } = require('./src/communityIpc.js');
+const { readJsonSafe, writeJsonAtomic: writeJsonAtomicSafe } = require('./src/fsUtils.js');
+const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./src/appShutdown.js');
+const { createSecretCodec } = require('./src/secretCodec.js');
 let activePatchInstall = null;
 let skillTranslationService = null;
 let mainWindow = null;
@@ -871,7 +871,7 @@ ipcMain.handle('install-patch', async (event, { asarPath, sourceAsar }) => {
     }
   };
 
-  const worker = new Worker(path.join(__dirname, 'patchWorker.js'), {
+  const worker = new Worker(path.join(__dirname, 'src', 'patchWorker.js'), {
     workerData: {
       asarPath,
       sourceAsar: finalSourceAsar,
