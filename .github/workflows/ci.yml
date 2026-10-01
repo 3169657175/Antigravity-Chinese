@@ -16,5 +16,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run patch:verify
-      - run: npm test
+      - run: node --test --test-concurrency=1 tests/*.test.js
       - run: npm run test:architecture
