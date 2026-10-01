@@ -10,6 +10,11 @@ const tabPanes = document.querySelectorAll('.tab-pane');
 const logTerminal = document.getElementById('terminal-log-output');
 const btnClearTerminal = document.getElementById('btn-clear-terminal');
 const safeDom = window.AgySafeDom || { text: value => String(value ?? ''), errorMessage: error => String(error?.message || error || ''), imageUrl: () => '' };
+const uiFeedback = window.AgyUiFeedback || { notify: (message, type) => console[type === 'error' ? 'error' : 'log'](message), confirm: message => Promise.resolve(window.confirm(message)) };
+const communityState = window.AgyCommunityState;
+const pageLifecycle = window.AgyPageLifecycle || { once: (_key, task) => Promise.resolve().then(task), reset: () => {}, has: () => false };
+const errorDiagnostics = window.AgyErrorDiagnostics || { classify: input => ({ title: '操作失败', message: String(input?.message || input?.error || input || '未知错误') }) };
+function notifyUiError(input, fallbackTitle = '操作失败') { const info = errorDiagnostics.classify(input); uiFeedback.notify(info.message, 'error', { title: info.title || fallbackTitle }); return info; }
 
 // 网络配置
 const switchNetworkBypass = document.getElementById('switch-network-bypass');
@@ -27,6 +32,60 @@ const customSkillResult = document.getElementById('custom-skill-result');
 
 // 状态池
 let appPaths = null;
+let feedbackSearchTimer = null;
+
+function syncCommunityStateToWindow() {
+  if (communityState) window.currentFeedbacksDesktop = communityState.all();
+}
+
+async function ensureAuthLoaded() {
+  return pageLifecycle.once('auth-session', () => checkAuthSession());
+}
+
+function feedbackFromState(id) {
+  const items = communityState?.all?.() || window.currentFeedbacksDesktop || [];
+  return items.find(item => String(item.id) === String(id)) || null;
+}
+
+function applyFeedbackLikeVisual(id, liked, count) {
+  const btnMain = document.getElementById(`like-btn-${id}`);
+  const countMain = document.getElementById(`like-count-${id}`);
+  const btnDetail = document.getElementById(`detail-like-btn-${id}`);
+  const countDetail = document.getElementById(`detail-like-count-${id}`);
+  for (const [button, counter] of [[btnMain, countMain], [btnDetail, countDetail]]) {
+    if (counter) counter.textContent = String(Math.max(0, Number(count) || 0));
+    if (button) button.classList.toggle('liked', Boolean(liked));
+  }
+}
+
+function renderFeedbackDetailFromState(id) {
+  const item = feedbackFromState(id);
+  if (item) renderDetailModalContentDesktop(item);
+  const count = document.getElementById(`main-comment-count-${id}`);
+  if (count && item) count.textContent = Array.isArray(item.replies) ? item.replies.length : 0;
+}
+
+async function reconcileFeedbacksInBackground() {
+  try {
+    const sort = document.getElementById('feedback-sort')?.value || 'newest';
+    const res = await window.agyHubAPI.fetchFeedbacks({ sort });
+    if (!res?.success) return false;
+    communityState?.setAll(res.data);
+    syncCommunityStateToWindow();
+    if (document.getElementById('tab-feedback')?.classList.contains('active')) await loadFeedbacks(true, { silent: true });
+    return true;
+  } catch (error) {
+    console.warn('[Community] background reconcile failed:', error.message);
+    return false;
+  }
+}
+
+async function ensureCommunityLoaded() {
+  await ensureAuthLoaded();
+  return pageLifecycle.once('community-page', async () => {
+    await Promise.all([loadFeedbacks(false, { showSkeleton: true }), loadAnnouncementSystemDesktop()]);
+  });
+}
 
 function scheduleAfterPaint(task, timeout = 250) {
   requestAnimationFrame(() => {
@@ -72,6 +131,8 @@ function setCompactCount(element, value, label, unit = 'Token') {
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
   logToTerminal('[Info] 正在初始化 AGY Hub 核心引擎...');
+  window.AgyFeatureFlags?.apply?.();
+  ensureAuthLoaded();
   
   // 绑定窗口控制按钮
   btnMinimize.addEventListener('click', () => window.agyHubAPI.minimizeWindow());
@@ -89,17 +150,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       logToTerminal(`[Navigate] 切换至选项卡: ${item.querySelector('.nav-text').textContent}`);
 
       // 动态载入联动
-      if (targetId === 'tab-admin-users') {
-        loadAdminUserData();
+      if (targetId === 'tab-feedback') {
+        scheduleAfterPaint(() => ensureCommunityLoaded());
+      } else if (targetId === 'tab-admin-users') {
+        ensureAuthLoaded().then(() => loadAdminUserData());
       } else if (targetId === 'tab-admin-announcement') {
         loadAnnouncementHistory();
       } else if (targetId === 'tab-local-accounts') {
-        loadLocalAccounts();
+        pageLifecycle.once('local-accounts-page', async () => {
+          await loadLocalAccounts();
+          await initTokenMonitor();
+        });
       } else if (targetId === 'tab-codex-gateway') {
-        scheduleAfterPaint(() => document.dispatchEvent(new CustomEvent('agy-codex-tab-opened')));
+        pageLifecycle.once('codex-page', () => initCodexGateway()).then(() => {
+          scheduleAfterPaint(() => document.dispatchEvent(new CustomEvent('agy-codex-tab-opened')));
+        });
       } else if (targetId === 'tab-mcp' || targetId === 'tab-skill-market') {
-        window.AgyMarketplaceController?.reflow?.(targetId);
-        document.dispatchEvent(new CustomEvent('agy-marketplace-tab-opened', { detail: { targetId } }));
+        pageLifecycle.once('marketplace-page', () => initMarketplace()).then(() => {
+          window.AgyMarketplaceController?.reflow?.(targetId);
+          document.dispatchEvent(new CustomEvent('agy-marketplace-tab-opened', { detail: { targetId } }));
+        });
       }
   }});
 
@@ -113,10 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 【性能优化】：将原本阻塞首屏渲染的串行磁盘/IO检测重构为并发异步非阻塞加载，首屏秒开！
-  initPatchPage().then(() => Promise.all([
-    initNetworkStatus(),
-    initMarketplace()
-  ])).then(() => {
+  initPatchPage().then(() => initNetworkStatus()).then(() => {
     logToTerminal('[System] 核心管理组件并发初始化就绪，冷工业极简模式载入成功。');
   }).catch(err => {
     logToTerminal(`组件载入异常: ${err.message}`, 'error');
@@ -681,17 +748,17 @@ function initFeedbackBoard() {
       if (!file) return;
 
       if (!currentUser || !currentUser.token) {
-        alert('请先登录后再上传图片');
+        uiFeedback.notify('请先登录后再上传图片', 'error', { title: '需要登录' });
         e.target.value = '';
         return;
       }
 
       if (!file.type.startsWith('image/')) {
-        alert('只允许上传图片文件！');
+        uiFeedback.notify('只允许上传图片文件', 'error');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert('图片大小不能超过 5MB！');
+        uiFeedback.notify('图片大小不能超过 5MB', 'error');
         return;
       }
 
@@ -740,7 +807,7 @@ function initFeedbackBoard() {
           textAnnUploadStatus.style.color = '#ff3333';
         }
         logToTerminal(`[Upload] 图片上传失败: ${err.message}`, 'error');
-        alert(`图片上传失败: ${err.message}`);
+        notifyUiError(err, '图片上传失败');
       }
     });
   }
@@ -767,38 +834,58 @@ function initFeedbackBoard() {
     });
   }
 
-  // --- I. 发送反馈留言 ---
+  // --- I. 发送反馈留言：1.3.0 乐观更新 ---
   const btnSendFeedback = document.getElementById('btn-send-feedback');
   if (btnSendFeedback) {
     btnSendFeedback.addEventListener('click', async () => {
       if (!currentUser) {
-        alert('🔒 请先登录您的极客账号后再发表反馈！');
+        uiFeedback.notify('请先登录您的极客账号后再发表反馈', 'error', { title: '需要登录' });
         return;
       }
-
       const content = inputFeedbackContent.value.trim();
-
       if (!content) {
-        alert('反馈内容不能为空！');
+        uiFeedback.notify('反馈内容不能为空', 'error');
         return;
       }
 
+      const snapshot = communityState?.snapshot?.() || [];
+      const pendingId = communityState?.pendingId?.('pending-feedback') || `pending-feedback-${Date.now()}`;
+      const pending = {
+        id: pendingId,
+        username: currentUser.username,
+        role: currentUser.role,
+        content,
+        image_url: uploadedImageUrl || '',
+        created_at: Date.now(),
+        likes_count: 0,
+        has_liked: false,
+        replies: [],
+        pending: true
+      };
+      communityState?.upsert?.(pending);
+      syncCommunityStateToWindow();
+      await loadFeedbacks(true, { silent: true });
+      inputFeedbackContent.value = '';
+      if (textCharCounter) textCharCounter.textContent = '0 / 500';
       btnSendFeedback.disabled = true;
-      btnSendFeedback.textContent = '发送中...';
+      btnSendFeedback.textContent = '发送中…';
 
-      const res = await window.agyHubAPI.submitFeedback(content, uploadedImageUrl);
+      const imageAtSubmit = uploadedImageUrl;
+      const res = await window.agyHubAPI.submitFeedback(content, imageAtSubmit);
       btnSendFeedback.disabled = false;
       btnSendFeedback.textContent = '发送';
-
       if (res.success) {
-        logToTerminal('[Feedback] 优化反馈发送成功！数据已云同步。', 'success');
-        inputFeedbackContent.value = '';
-        if (textCharCounter) textCharCounter.textContent = '0 / 500';
-        if (btnRemoveUploadedImg) btnRemoveUploadedImg.click(); // 清理上传预览
-        loadFeedbacks(); // 刷新看板列表
+        if (btnRemoveUploadedImg) btnRemoveUploadedImg.click();
+        logToTerminal('[Feedback] 反馈已提交，正在后台同步真实数据。', 'success');
+        uiFeedback.notify('反馈已发布', 'success');
+        reconcileFeedbacksInBackground();
       } else {
+        communityState?.restore?.(snapshot);
+        syncCommunityStateToWindow();
+        await loadFeedbacks(true, { silent: true });
+        inputFeedbackContent.value = content;
         const handled = await handleSessionExpiry(res.error);
-        if (!handled) alert(res.error || '发送失败');
+        if (!handled) uiFeedback.notify(res.error || '发送失败', 'error', { title: '反馈发送失败' });
         logToTerminal(`[Feedback] 提交失败: ${res.error}`, 'error');
       }
     });
@@ -827,7 +914,7 @@ function initFeedbackBoard() {
 
       const content = inputAnnounceContent.value.trim();
       if (!content) {
-        alert('请输入公告内容！');
+        uiFeedback.notify('请输入公告内容', 'error');
         return;
       }
 
@@ -852,7 +939,7 @@ function initFeedbackBoard() {
 
         if (annRes.ok && annResult.success) {
           logToTerminal(editId ? `[Admin] 成功更新公告 ID: ${editId}` : '[Admin] 云端新公告发布成功！', 'success');
-          alert(editId ? '🎉 公告修改成功！' : '🎉 公告发布成功！');
+          uiFeedback.notify(editId ? '公告修改成功' : '公告发布成功', 'success');
           
           inputAnnounceContent.value = '';
           inputAnnounceEditId.value = '';
@@ -862,10 +949,10 @@ function initFeedbackBoard() {
           loadAnnouncementHistory();
           loadAnnouncementSystemDesktop();
         } else {
-          alert(`操作失败: ${annResult.error}`);
+          notifyUiError({ message: annResult.error }, '公告操作失败');
         }
       } catch (err) {
-        alert(`系统错误: ${err.message}`);
+        notifyUiError(err, '公告操作失败');
       } finally {
         btnPublishAnnouncement.disabled = false;
         btnPublishAnnouncement.textContent = inputAnnounceEditId.value ? '保存公告修改' : '发布公告';
@@ -901,12 +988,7 @@ function initFeedbackBoard() {
     });
   }
 
-  // 初始化检查本地登录会话并拉取留言板
-  checkAuthSession();
-  loadFeedbacks();
-  
-  // 桌面端专属：自动获取置顶公告并在最上方展示
-  loadAnnouncementSystemDesktop();
+  // 1.3.0：这里只绑定交互，反馈/公告在用户首次进入页面时按需加载。
 }
 
 async function checkAuthSession() {
@@ -915,8 +997,6 @@ async function checkAuthSession() {
     currentUser = res.data;
     logToTerminal(`[Auth-Loader] 自动载入本地登录: @${currentUser.username}, Token: ${currentUser.token ? (currentUser.token.slice(0, 10) + '...') : '无'}`, 'success');
     updateAuthUI();
-    loadFeedbacks();
-    loadAdminUserData();
   } else {
     logToTerminal(`[Auth-Loader] 本地未检测到已保存的登录会话`, 'info');
   }
@@ -937,7 +1017,7 @@ async function handleSessionExpiry(errorMsg) {
   );
   if (isExpired) {
     logToTerminal(`[Auth] 后端提示登录态异常: ${errorMsg}`, 'error');
-    alert(`🔒 操作未成功，后端提示：\n${errorMsg}\n\n如果您未登录，请点击右上角重新登录您的账号。`);
+    uiFeedback.notify(errorMsg || '登录状态异常，请重新登录', 'error', { title: '登录状态异常' });
     return true;
   }
   return false;
@@ -1008,25 +1088,40 @@ function redirectFromAdminTab() {
 }
 
 // 异步加载渲染反馈列表 (支持大图灯箱唤醒)
-async function loadFeedbacks(useCache = false) {
+async function loadFeedbacks(useCache = false, options = {}) {
   const container = document.getElementById('feedback-flow-list');
   if (!container) return;
 
-  container.innerHTML = `
-    <div class="skeleton-loader">
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-    </div>
-  `;
-
-  const res = useCache && window.currentFeedbacksDesktop ? { success: true, data: window.currentFeedbacksDesktop } : await window.agyHubAPI.fetchFeedbacks({ sort: document.getElementById('feedback-sort').value });
-  if (!res.success) {
-    container.innerHTML = `<div class="no-data-tip">❌ 数据载入失败: ${safeDom.text(res.error)}，请检查网络。</div>`;
-    return;
+  const cachedItems = communityState?.all?.() || window.currentFeedbacksDesktop || [];
+  const hasCache = Array.isArray(cachedItems) && cachedItems.length > 0;
+  if (!useCache && !hasCache && options.showSkeleton !== false) {
+    container.innerHTML = `
+      <div class="skeleton-loader">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    `;
   }
 
-  window.currentFeedbacksDesktop = Array.isArray(res.data) ? res.data : [];
+  const res = useCache && hasCache
+    ? { success: true, data: cachedItems }
+    : await window.agyHubAPI.fetchFeedbacks({ sort: document.getElementById('feedback-sort').value });
+  if (!res.success) {
+    if (hasCache) {
+      uiFeedback.notify(res.error || '社区暂时无法连接，正在显示最近一次数据', 'error', { title: '社区网络异常' });
+    } else {
+      container.innerHTML = `<div class="no-data-tip">❌ 数据载入失败: ${safeDom.text(res.error)}，请检查网络。</div>`;
+      return;
+    }
+  }
+
+  const nextItems = res.success ? (Array.isArray(res.data) ? res.data : []) : cachedItems;
+  if (!useCache) communityState?.setAll?.(nextItems);
+  else if (communityState && !communityState.all().length) communityState.setAll(nextItems);
+  syncCommunityStateToWindow();
+  if (!communityState) window.currentFeedbacksDesktop = nextItems;
+  if (res.stale && !options.silent) uiFeedback.notify(res.warning || '网络不可用，正在显示最近一次成功同步的数据', 'info', { title: '离线只读' });
   const list = window.AgyCommunityData.feedbacks(window.currentFeedbacksDesktop, document.getElementById('feedback-sort').value, document.getElementById('feedback-search').value);
   document.getElementById('feedback-result-count').textContent = list.length + ' 条反馈';
   if (!list.length) { container.innerHTML = '<div class="no-data-tip">没有匹配的反馈，试试其他显示顺序或搜索条件。</div>'; return; }
@@ -1040,7 +1135,7 @@ async function loadFeedbacks(useCache = false) {
       
     const isAdminAuthor = fb.role === 'admin';
     const authorClass = isAdminAuthor ? 'feedback-author admin-author' : 'feedback-author';
-    const dateText = new Date(fb.created_at).toLocaleString();
+    const dateText = fb.pending ? '发送中…' : new Date(fb.created_at).toLocaleString();
 
     let imageTag = '';
     const feedbackImageUrl = safeDom.imageUrl(fb.image_url);
@@ -1077,7 +1172,7 @@ async function loadFeedbacks(useCache = false) {
     `;
 
     html += `
-      <div class="feedback-item" data-id="${fb.id}" style="cursor: pointer; margin-bottom: 12px;">
+      <div class="feedback-item${fb.pending ? ' is-pending' : ''}" data-id="${fb.id}" style="cursor: pointer; margin-bottom: 12px;">
         <div class="feedback-meta">
           <span class="${authorClass}">${safeDom.text(fb.username)}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -1095,24 +1190,28 @@ async function loadFeedbacks(useCache = false) {
 
   container.innerHTML = html;
 
-  // 1. 物理级级联删除绑定
+  // 1. 物理级级联删除绑定（乐观移除 + 失败回滚）
   const deleteButtons = container.querySelectorAll('.btn-delete-fb');
   deleteButtons.forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      e.stopPropagation(); // 阻止冒泡到卡片详情
+      e.stopPropagation();
       const fbId = btn.getAttribute('data-id');
-      if (confirm('⚠️ 警告：物理级级联删除操作不可逆，将连同该留言下所有二级回复一并清理！是否确认删除？')) {
-        btn.disabled = true;
-        btn.textContent = '删除中...';
-        const delRes = await window.agyHubAPI.deleteFeedback(fbId);
-        if (delRes.success) {
-          logToTerminal(`[Feedback] 成功物理级联删除留言 ID: ${fbId}`, 'success');
-          loadFeedbacks();
-        } else {
-          alert(`删除失败: ${delRes.error}`);
-          btn.disabled = false;
-          btn.textContent = '🗑️ 删除';
-        }
+      const confirmed = await uiFeedback.confirm('删除后会同时删除该反馈下的回复与点赞，此操作不可撤销。', { title: '删除反馈', okText: '确认删除', danger: true });
+      if (!confirmed) return;
+      const snapshot = communityState?.snapshot?.() || [];
+      communityState?.remove?.(fbId);
+      syncCommunityStateToWindow();
+      await loadFeedbacks(true, { silent: true });
+      const delRes = await window.agyHubAPI.deleteFeedback(fbId);
+      if (delRes.success) {
+        logToTerminal(`[Feedback] 已删除留言 ID: ${fbId}`, 'success');
+        uiFeedback.notify('反馈已删除', 'success');
+        reconcileFeedbacksInBackground();
+      } else {
+        communityState?.restore?.(snapshot);
+        syncCommunityStateToWindow();
+        await loadFeedbacks(true, { silent: true });
+        uiFeedback.notify(delRes.error || '删除失败', 'error', { title: '删除反馈失败' });
       }
     });
   });
@@ -1137,67 +1236,21 @@ async function loadFeedbacks(useCache = false) {
   postCards.forEach(card => {
     card.addEventListener('click', () => {
       const id = card.getAttribute('data-id');
+      if (String(id).startsWith('pending-')) return;
       openFeedbackDetailDesktop(parseInt(id));
     });
   });
 
-  // 4. 点赞按钮事件监听 (局部瞬间重绘)
-  const likeBtns = container.querySelectorAll('.heart-like-btn');
+  // 4. 点赞按钮事件监听：统一走乐观更新函数
+  const likeBtns = container.querySelectorAll('.heart-like-btn[data-id]');
   likeBtns.forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      e.stopPropagation(); // 阻止冒泡到卡片详情
-      if (!currentUser) {
-        alert('🔒 请先登录您的账号后再进行点赞！');
-        return;
-      }
-      const id = btn.getAttribute('data-id');
-      btn.disabled = true;
-      try {
-        const response = await window.AgyCommunityController.request('/api/feedback/like', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + currentUser.token
-          },
-          body: JSON.stringify({ feedback_id: parseInt(id) })
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          logToTerminal(`[Feedback] 点赞/取消点赞 ID: ${id}`, 'success');
-          
-          const btnMain = document.getElementById(`like-btn-${id}`);
-          const countMain = document.getElementById(`like-count-${id}`);
-          const btnDetail = document.getElementById(`detail-like-btn-${id}`);
-          const countDetail = document.getElementById(`detail-like-count-${id}`);
-
-          if (btnMain && countMain) {
-            countMain.textContent = data.likes_count;
-            if (data.liked) btnMain.classList.add('liked');
-            else btnMain.classList.remove('liked');
-          }
-          if (btnDetail && countDetail) {
-            countDetail.textContent = data.likes_count;
-            if (data.liked) btnDetail.classList.add('liked');
-            else btnDetail.classList.remove('liked');
-          }
-
-          // 同步缓存
-          const res = await window.agyHubAPI.fetchFeedbacks();
-          if (res.success) {
-            window.currentFeedbacksDesktop = res.data;
-          }
-        } else {
-          logToTerminal(`[DEBUG] 主贴点赞失败原始错误: "${data.error}"`, 'error');
-          const handled = await handleSessionExpiry(data.error);
-          if (!handled) alert(`点赞失败: ${data.error}`);
-        }
-      } catch (err) {
-        alert(`网络错误: ${err.message}`);
-      } finally {
-        btn.disabled = false;
-      }
+      e.stopPropagation();
+      const id = Number(btn.getAttribute('data-id'));
+      if (Number.isFinite(id)) await toggleLikePostDesktop(id);
     });
   });
+
 }
 
 // 桌面端详情弹窗拉开
@@ -1234,11 +1287,13 @@ function renderDetailModalContentDesktop(fb) {
   let repliesListHtml = '';
   if (fb.replies && fb.replies.length > 0) {
     repliesListHtml = fb.replies.map(r => {
-      const replyDate = new Date(r.created_at).toLocaleString();
-      const deleteReplyBtn = (currentUser && (currentUser.role === 'admin' || currentUser.username === r.username))
-        ? `<button type="button" class="action-text-btn delete-btn" onclick="deleteReplyDesktop(${r.id}, ${fb.id})" style="font-size:9px; margin-left:6px; color: #ef4444; border:none; background:transparent;">✕ 删除</button>`
+      const replyDate = r.pending ? '发送中…' : new Date(r.created_at).toLocaleString();
+      const deleteReplyBtn = (!r.pending && currentUser && (currentUser.role === 'admin' || currentUser.username === r.username))
+        ? `<button type="button" class="action-text-btn delete-btn" data-feedback-detail-action="delete-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" style="font-size:9px; margin-left:6px; color: #ef4444; border:none; background:transparent;">✕ 删除</button>`
         : '';
-      const isAdminReply = (r.username === 'niu1029') ? 'admin' : '';
+      const isAdminReply = r.role === 'admin' ? 'admin' : '';
+      const replyActions = r.pending ? '<span style="font-size:10px;color:var(--text-muted);">正在同步…</span>' : `
+            ${replyActions}`;
 
       return `
         <div class="reply-item" style="border-left: 2px solid var(--accent-pink); padding: 8px 12px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 8px; text-align: left;">
@@ -1251,8 +1306,8 @@ function renderDetailModalContentDesktop(fb) {
           </div>
           <div class="reply-body" style="font-size: 11.5px; color: var(--text-secondary); margin: 4px 0; word-break: break-all;">${escapeHTML(r.content)}</div>
           <div style="display: flex; justify-content: flex-end; gap: 10px; align-items: center;">
-            <button type="button" class="action-text-btn" onclick="focusCommentInputDesktop('${escapeHTML(r.username)}')" style="font-size:10px; color:var(--text-muted); border:none; background:transparent; cursor:pointer;">💬 回复</button>
-            <button type="button" class="reply-like-btn ${r.has_liked ? 'liked' : ''}" onclick="toggleLikeReplyDesktop(${r.id}, ${fb.id})" id="reply-like-btn-${r.id}">
+            <button type="button" class="action-text-btn" data-feedback-detail-action="focus-reply" data-reply-username="${escapeHTML(r.username)}" style="font-size:10px; color:var(--text-muted); border:none; background:transparent; cursor:pointer;">💬 回复</button>
+            <button type="button" class="reply-like-btn ${r.has_liked ? 'liked' : ''}" data-feedback-detail-action="like-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" id="reply-like-btn-${r.id}">
               ${heartSvg}
               <span id="reply-like-count-${r.id}">${r.likes_count || 0}</span>
             </button>
@@ -1268,7 +1323,7 @@ function renderDetailModalContentDesktop(fb) {
     ? `
       <div class="reply-input-box" style="display: flex; gap: 8px; margin-top: 14px; align-items: center;">
         <textarea id="modal-reply-text-${fb.id}" placeholder="写下您的评论... (点击评论的'回复'可快捷@他人)" class="reply-textarea" style="flex: 1; min-height: 42px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; resize:none;"></textarea>
-        <button type="button" class="btn btn-primary" onclick="submitModalReplyDesktop(${fb.id})" style="height: 42px; padding: 0 16px;">发布</button>
+        <button type="button" class="btn btn-primary" data-feedback-detail-action="submit-reply" data-feedback-id="${fb.id}" style="height: 42px; padding: 0 16px;">发布</button>
       </div>
     `
     : `<p style="text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 14px;">🔒 请先登录您的账号，登录后即可发表评论。</p>`;
@@ -1284,7 +1339,7 @@ function renderDetailModalContentDesktop(fb) {
       ${imgTag}
       
       <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-        <button type="button" class="heart-like-btn ${fb.has_liked ? 'liked' : ''}" onclick="toggleLikePostDesktop(${fb.id})" id="detail-like-btn-${fb.id}">
+        <button type="button" class="heart-like-btn ${fb.has_liked ? 'liked' : ''}" data-feedback-detail-action="like-post" data-feedback-id="${fb.id}" id="detail-like-btn-${fb.id}">
           ${heartSvg}
           <span id="detail-like-count-${fb.id}">${fb.likes_count || 0}</span>
         </button>
@@ -1302,6 +1357,25 @@ function renderDetailModalContentDesktop(fb) {
     <!-- 评论发布提交区 -->
     ${inputAreaHtml}
   `;
+
+  // 严格 CSP (script-src 'self') 会拦截内联 onclick。
+  // 详情弹窗统一使用事件委托，避免按钮看起来可点但实际没有任何响应。
+  modalBody.onclick = async (event) => {
+    const button = event.target.closest('[data-feedback-detail-action]');
+    if (!button || !modalBody.contains(button)) return;
+    const action = button.dataset.feedbackDetailAction;
+    if (action === 'submit-reply') {
+      await submitModalReplyDesktop(Number(button.dataset.feedbackId), button);
+    } else if (action === 'focus-reply') {
+      focusCommentInputDesktop(button.dataset.replyUsername || '');
+    } else if (action === 'delete-reply') {
+      await deleteReplyDesktop(Number(button.dataset.replyId), Number(button.dataset.feedbackId));
+    } else if (action === 'like-reply') {
+      await toggleLikeReplyDesktop(Number(button.dataset.replyId), Number(button.dataset.feedbackId));
+    } else if (action === 'like-post') {
+      await toggleLikePostDesktop(Number(button.dataset.feedbackId));
+    }
+  };
 
   // 对大图灯箱绑定
   const updatedLightboxImages = modalBody.querySelectorAll('.img-trigger-lightbox');
@@ -1328,78 +1402,106 @@ function focusCommentInputDesktop(username) {
 window.focusCommentInputDesktop = focusCommentInputDesktop;
 
 // 提交回复评论
-async function submitModalReplyDesktop(feedbackId) {
-  if (!currentUser) return;
+async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
+  if (!currentUser) {
+    uiFeedback.notify('请先登录后再发表评论', 'error', { title: '需要登录' });
+    return;
+  }
   const textarea = document.getElementById(`modal-reply-text-${feedbackId}`);
   if (!textarea) return;
   const content = textarea.value.trim();
   if (!content) {
-    alert('评论内容不能为空！');
+    uiFeedback.notify('评论内容不能为空', 'error');
     return;
   }
+
+  const tempId = communityState?.pendingId?.('reply') || `reply-${Date.now()}`;
+  const pendingReply = {
+    id: tempId,
+    username: currentUser.username,
+    role: currentUser.role || 'user',
+    content,
+    created_at: Date.now(),
+    likes_count: 0,
+    has_liked: false,
+    pending: true
+  };
+  const originalButtonText = triggerButton?.textContent || '发布';
+  communityState?.addReply?.(feedbackId, pendingReply);
+  syncCommunityStateToWindow();
+  textarea.value = '';
+  renderFeedbackDetailFromState(feedbackId);
+  if (triggerButton?.isConnected) {
+    triggerButton.disabled = true;
+    triggerButton.textContent = '发送中…';
+  }
+
   try {
     const replyRes = await window.AgyCommunityController.request('/api/reply', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + currentUser.token
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentUser.token },
       body: JSON.stringify({ feedback_id: feedbackId, content })
     });
     const replyResult = await replyRes.json();
-    if (replyRes.ok && replyResult.success) {
-      textarea.value = '';
-      logToTerminal(`[Feedback] 成功发表评论 ID: ${feedbackId}`, 'success');
-      
-      const res = await window.agyHubAPI.fetchFeedbacks();
-      if (res.success) {
-        window.currentFeedbacksDesktop = res.data;
-        const updatedFb = res.data.find(f => f.id === feedbackId);
-        if (updatedFb) {
-          renderDetailModalContentDesktop(updatedFb);
-          const mainCommentCount = document.getElementById(`main-comment-count-${feedbackId}`);
-          if (mainCommentCount) {
-            mainCommentCount.textContent = updatedFb.replies ? updatedFb.replies.length : 0;
-          }
-        }
-      }
-    } else {
-      const handled = await handleSessionExpiry(replyResult.error);
-      if (!handled) alert(`回复失败: ${replyResult.error}`);
+    if (!(replyRes.ok && replyResult.success)) {
+      const errorMessage = replyResult.error || replyRes.error || '回复请求失败，请稍后重试';
+      communityState?.removeReply?.(feedbackId, tempId);
+      syncCommunityStateToWindow();
+      renderFeedbackDetailFromState(feedbackId);
+      const restored = document.getElementById(`modal-reply-text-${feedbackId}`);
+      if (restored) restored.value = content;
+      const handled = await handleSessionExpiry(errorMessage);
+      if (!handled) uiFeedback.notify(errorMessage, 'error', { title: '回复失败' });
+      return;
     }
+    logToTerminal(`[Feedback] 成功发表评论 ID: ${feedbackId}`, 'success');
+    uiFeedback.notify('回复已发送', 'success');
+    void reconcileFeedbacksInBackground();
   } catch (err) {
-    alert(`系统错误: ${err.message}`);
+    communityState?.removeReply?.(feedbackId, tempId);
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
+    const restored = document.getElementById(`modal-reply-text-${feedbackId}`);
+    if (restored) restored.value = content;
+    uiFeedback.notify(err.message || '网络异常', 'error', { title: '回复失败' });
+  } finally {
+    const currentButton = document.querySelector(`#feedback-detail-modal [data-feedback-detail-action="submit-reply"][data-feedback-id="${feedbackId}"]`);
+    if (currentButton) {
+      currentButton.disabled = false;
+      currentButton.textContent = originalButtonText;
+    }
   }
 }
 window.submitModalReplyDesktop = submitModalReplyDesktop;
 
 // 删除回复的评论
 async function deleteReplyDesktop(replyId, feedbackId) {
-  if (!confirm('确定要彻底删除这条回复评论吗？')) return;
+  const confirmed = await uiFeedback.confirm('确定删除这条回复吗？此操作不可撤销。', { title: '删除回复', okText: '确认删除', danger: true });
+  if (!confirmed) return;
+  const snapshot = communityState?.snapshot?.() || [];
+  communityState?.removeReply?.(feedbackId, replyId);
+  syncCommunityStateToWindow();
+  renderFeedbackDetailFromState(feedbackId);
   try {
     const replyRes = await window.AgyCommunityController.request(`/api/reply?id=${replyId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': 'Bearer ' + currentUser.token
-      }
+      headers: { 'Authorization': 'Bearer ' + currentUser.token }
     });
     const replyResult = await replyRes.json();
     if (replyRes.ok && replyResult.success) {
-      const res = await window.agyHubAPI.fetchFeedbacks();
-      if (res.success) {
-        window.currentFeedbacksDesktop = res.data;
-        const updatedFb = res.data.find(f => f.id === feedbackId);
-        if (updatedFb) {
-          renderDetailModalContentDesktop(updatedFb);
-          const mainCommentCount = document.getElementById(`main-comment-count-${feedbackId}`);
-          if (mainCommentCount) {
-            mainCommentCount.textContent = updatedFb.replies ? updatedFb.replies.length : 0;
-          }
-        }
-      }
+      uiFeedback.notify('回复已删除', 'success');
+      void reconcileFeedbacksInBackground();
+      return;
     }
+    communityState?.restore?.(snapshot);
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
+    uiFeedback.notify(replyResult.error || '删除失败', 'error', { title: '删除回复失败' });
   } catch (err) {
-    console.error(err);
+    communityState?.restore?.(snapshot);
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
+    uiFeedback.notify(err.message || '网络异常', 'error', { title: '删除回复失败' });
   }
 }
 window.deleteReplyDesktop = deleteReplyDesktop;
@@ -1407,116 +1509,72 @@ window.deleteReplyDesktop = deleteReplyDesktop;
 // 点赞主卡片
 async function toggleLikePostDesktop(id) {
   if (!currentUser) {
-    alert('🔒 请先登录您的账号后再进行点赞！');
+    uiFeedback.notify('请先登录后再点赞', 'error', { title: '需要登录' });
     return;
   }
+  const item = feedbackFromState(id);
+  if (!item) return;
+  const previousLiked = Boolean(item.has_liked);
+  const previousCount = Math.max(0, Number(item.likes_count) || 0);
+  const optimisticLiked = !previousLiked;
+  const optimisticCount = Math.max(0, previousCount + (optimisticLiked ? 1 : -1));
+  communityState?.update?.(id, { has_liked: optimisticLiked, likes_count: optimisticCount });
+  syncCommunityStateToWindow();
+  applyFeedbackLikeVisual(id, optimisticLiked, optimisticCount);
   try {
     const response = await window.AgyCommunityController.request('/api/feedback/like', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + currentUser.token
-      },
-      body: JSON.stringify({ feedback_id: id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentUser.token },
+      body: JSON.stringify({ feedback_id: Number(id) })
     });
     const data = await response.json();
-    if (response.ok && data.success) {
-      const btnMain = document.getElementById(`like-btn-${id}`);
-      const countMain = document.getElementById(`like-count-${id}`);
-      const btnDetail = document.getElementById(`detail-like-btn-${id}`);
-      const countDetail = document.getElementById(`detail-like-count-${id}`);
-
-      if (btnMain && countMain) {
-        countMain.textContent = data.likes_count;
-        if (data.liked) btnMain.classList.add('liked');
-        else btnMain.classList.remove('liked');
-      }
-      if (btnDetail && countDetail) {
-        countDetail.textContent = data.likes_count;
-        if (data.liked) btnDetail.classList.add('liked');
-        else btnDetail.classList.remove('liked');
-      }
-
-      const res = await window.agyHubAPI.fetchFeedbacks();
-      if (res.success) {
-        window.currentFeedbacksDesktop = res.data;
-      }
-    }
+    if (!(response.ok && data.success)) throw new Error(data.error || '点赞失败');
+    communityState?.update?.(id, { has_liked: Boolean(data.liked), likes_count: Math.max(0, Number(data.likes_count) || 0) });
+    syncCommunityStateToWindow();
+    applyFeedbackLikeVisual(id, data.liked, data.likes_count);
   } catch (err) {
-    console.error(err);
+    communityState?.update?.(id, { has_liked: previousLiked, likes_count: previousCount });
+    syncCommunityStateToWindow();
+    applyFeedbackLikeVisual(id, previousLiked, previousCount);
+    const handled = await handleSessionExpiry(err.message);
+    if (!handled) uiFeedback.notify(err.message || '点赞失败', 'error');
   }
 }
 window.toggleLikePostDesktop = toggleLikePostDesktop;
 
 // 二级回复点赞
 async function toggleLikeReplyDesktop(replyId, feedbackId) {
-  if (!currentUser) return;
+  if (!currentUser) {
+    uiFeedback.notify('请先登录后再点赞', 'error', { title: '需要登录' });
+    return;
+  }
+  const item = feedbackFromState(feedbackId);
+  const reply = item?.replies?.find(entry => String(entry.id) === String(replyId));
+  if (!reply || reply.pending) return;
+  const previousLiked = Boolean(reply.has_liked);
+  const previousCount = Math.max(0, Number(reply.likes_count) || 0);
+  const optimisticLiked = !previousLiked;
+  const optimisticCount = Math.max(0, previousCount + (optimisticLiked ? 1 : -1));
+  communityState?.updateReply?.(feedbackId, replyId, { has_liked: optimisticLiked, likes_count: optimisticCount });
+  syncCommunityStateToWindow();
+  renderFeedbackDetailFromState(feedbackId);
   try {
     const response = await window.AgyCommunityController.request('/api/reply/like', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + currentUser.token
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentUser.token },
       body: JSON.stringify({ reply_id: replyId })
     });
     const data = await response.json();
-    if (response.ok && data.success) {
-      const btn = document.getElementById(`reply-like-btn-${replyId}`);
-      const count = document.getElementById(`reply-like-count-${replyId}`);
-      if (btn && count) {
-        count.textContent = data.likes_count;
-        if (data.liked) btn.classList.add('liked');
-        else btn.classList.remove('liked');
-      }
-
-      const res = await window.agyHubAPI.fetchFeedbacks();
-      if (res.success) {
-        window.currentFeedbacksDesktop = res.data;
-        const updatedFb = res.data.find(f => f.id === feedbackId);
-        if (updatedFb) {
-          const modalRepliesFlow = document.querySelector('.modal-replies-flow');
-          if (modalRepliesFlow) {
-            const heartSvg = `
-              <svg class="heart-svg" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: middle;">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-              </svg>
-            `;
-            modalRepliesFlow.innerHTML = updatedFb.replies.map(r => {
-              const replyDate = new Date(r.created_at).toLocaleString();
-              const deleteReplyBtn = (currentUser && (currentUser.role === 'admin' || currentUser.username === r.username))
-                ? `<button type="button" class="action-text-btn delete-btn" onclick="deleteReplyDesktop(${r.id}, ${feedbackId})" style="font-size:9px; margin-left:6px; color: #ef4444; border:none; background:transparent;">✕ 删除</button>`
-                : '';
-              const isAdminReply = (r.username === 'niu1029') ? 'admin' : '';
-              return `
-                <div class="reply-item" style="border-left: 2px solid var(--accent-pink); padding: 8px 12px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 8px; text-align: left;">
-                  <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
-                    <span class="reply-author ${isAdminReply}" style="font-weight:600; color: var(--neon-cyan);">${escapeHTML(r.username)} ${isAdminReply ? '(管理员)' : ''}</span>
-                    <span style="color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                      ${replyDate} 
-                      ${deleteReplyBtn}
-                    </span>
-                  </div>
-                  <div class="reply-body" style="font-size: 11.5px; color: var(--text-secondary); margin: 4px 0; word-break: break-all;">${escapeHTML(r.content)}</div>
-                  <div style="display: flex; justify-content: flex-end; gap: 10px; align-items: center;">
-                    <button type="button" class="action-text-btn" onclick="focusCommentInputDesktop('${escapeHTML(r.username)}')" style="font-size:10px; color:var(--text-muted); border:none; background:transparent; cursor:pointer;">💬 回复</button>
-                    <button type="button" class="reply-like-btn ${r.has_liked ? 'liked' : ''}" onclick="toggleLikeReplyDesktop(${r.id}, ${feedbackId})" id="reply-like-btn-${r.id}">
-                      ${heartSvg}
-                      <span id="reply-like-count-${r.id}">${r.likes_count || 0}</span>
-                    </button>
-                  </div>
-                </div>
-              `;
-            }).join('');
-          }
-        }
-      }
-    } else {
-      const handled = await handleSessionExpiry(data.error);
-      if (!handled) alert(`点赞失败: ${data.error}`);
-    }
+    if (!(response.ok && data.success)) throw new Error(data.error || '点赞失败');
+    communityState?.updateReply?.(feedbackId, replyId, { has_liked: Boolean(data.liked), likes_count: Math.max(0, Number(data.likes_count) || 0) });
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
   } catch (err) {
-    console.error(err);
+    communityState?.updateReply?.(feedbackId, replyId, { has_liked: previousLiked, likes_count: previousCount });
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
+    const handled = await handleSessionExpiry(err.message);
+    if (!handled) uiFeedback.notify(err.message || '点赞失败', 'error');
   }
 }
 window.toggleLikeReplyDesktop = toggleLikeReplyDesktop;
@@ -1809,8 +1867,11 @@ async function loadAnnouncementHistory() {
 async function showAdminUserDetail(username) { return window.AgyAdminCommunity.showDetail(username); }
 
 window.AgyAdminCommunity.init({ getUser: () => currentUser, refreshFeedbacks: () => loadFeedbacks() });
-document.getElementById('feedback-sort').addEventListener('change', () => loadFeedbacks());
-document.getElementById('feedback-search').addEventListener('input', () => loadFeedbacks(true));
+document.getElementById('feedback-sort').addEventListener('change', () => loadFeedbacks(Boolean(communityState?.all?.().length)));
+document.getElementById('feedback-search').addEventListener('input', () => {
+  clearTimeout(feedbackSearchTimer);
+  feedbackSearchTimer = setTimeout(() => loadFeedbacks(true, { silent: true }), 120);
+});
 document.getElementById('admin-ann-sort').addEventListener('change', () => loadAnnouncementHistory());
 let announcementSearchTimer;
 document.getElementById('admin-ann-search').addEventListener('input', () => { clearTimeout(announcementSearchTimer); announcementSearchTimer = setTimeout(loadAnnouncementHistory, 150); });
@@ -2014,8 +2075,6 @@ async function initCodexGateway() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  initTokenMonitor();
-  initCodexGateway();
   window.AgyAppShellController?.init();
   window.AgyOnboardingController?.init();
 });

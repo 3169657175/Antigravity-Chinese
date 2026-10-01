@@ -25,6 +25,16 @@
       const updateProgressBar = document.getElementById('update-progress-bar');
       let updateAction = 'check';
       let currentAppVersion = '--';
+      const ui = window.AgyUiFeedback || { notify: (message, type) => console[type === 'error' ? 'error' : 'log'](message) };
+      const diagnostics = window.AgyErrorDiagnostics || { classify: input => ({ title: '操作失败', message: String(input?.message || input?.error || input || '未知错误') }) };
+      const notifyError = (input, fallbackTitle = '操作失败') => { const info = diagnostics.classify(input); ui.notify(info.message, 'error', { title: info.title || fallbackTitle }); return info; };
+
+      function formatDownloadSpeed(bytesPerSecond) {
+        const value = Math.max(0, Number(bytesPerSecond) || 0);
+        if (!value) return '';
+        if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB/s`;
+        return `${Math.max(1, Math.round(value / 1024))} KB/s`;
+      }
     
       function versionLabel(version) {
         const clean = String(version || '--').replace(/^v/i, '');
@@ -93,7 +103,7 @@
         if (updateAction === 'download') {
           setUpdateAction('downloading', '正在下载...', true);
           if (updateProgressSection) updateProgressSection.hidden = false;
-          if (updateModalStatus) updateModalStatus.textContent = '更新包将从 GitHub Release 下载。';
+          if (updateModalStatus) updateModalStatus.textContent = '将直接下载完整安装包，已关闭 GitHub blockmap 差分下载以提升速度。';
           const result = await window.agyHubAPI.startDownloadUpdate();
           if (!result || !result.success) {
             setUpdateAction('download', '重新下载');
@@ -143,12 +153,12 @@
           try {
             const res = await window.agyHubAPI.checkAppUpdate();
             if (!res.success) {
-              alert('检查更新提示: ' + (res.error || '无法连接 GitHub Release'));
+              notifyError({ code: res.code || 'NETWORK_ERROR', message: res.error || '无法连接 GitHub Release' }, '检查更新失败');
               btnCheckUpdate.disabled = false;
               btnCheckUpdate.textContent = '检查更新';
             }
           } catch (e) {
-            alert('检查更新异常: ' + e.message);
+            notifyError(e, '检查更新异常');
             btnCheckUpdate.disabled = false;
             btnCheckUpdate.textContent = '检查更新';
           }
@@ -188,7 +198,8 @@
             btn.disabled = true;
             updateAction = 'downloading';
             if (updateProgressSection) updateProgressSection.hidden = false;
-            if (updateProgressText) updateProgressText.textContent = '正在下载更新包';
+            const speed = formatDownloadSpeed(data.bytesPerSecond);
+            if (updateProgressText) updateProgressText.textContent = speed ? `正在高速下载完整安装包 · ${speed}` : '正在下载完整安装包';
             if (updateProgressPercent) updateProgressPercent.textContent = `${data.percent}%`;
             if (updateProgressBar) updateProgressBar.style.width = `${Math.max(0, Math.min(100, Number(data.percent) || 0))}%`;
             if (btnUpdateAction) {
@@ -209,8 +220,10 @@
           } else if (data.status === 'error') {
             if (updateModalTitle) updateModalTitle.textContent = '检查更新失败';
             if (updateModalSummary) updateModalSummary.textContent = '暂时无法连接更新服务。';
-            if (updateReleaseNotes) updateReleaseNotes.textContent = data.text || '请检查网络后重试。';
-            if (updateModalStatus) updateModalStatus.textContent = data.text || '更新失败';
+            const info = diagnostics.classify({ code: data.code, message: data.error || data.text });
+            if (updateReleaseNotes) updateReleaseNotes.textContent = `${info.message}\n\n建议：${info.action}`;
+            if (updateModalStatus) updateModalStatus.textContent = info.message;
+            ui.notify(info.message, 'error', { title: info.title });
             const modalOpen = Boolean(updateModal && updateModal.style.display !== 'none');
             if (modalOpen) setUpdateAction('download', '重新下载');
             btn.textContent = '检查更新';

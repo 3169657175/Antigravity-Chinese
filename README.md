@@ -3,19 +3,29 @@
 [![Release](https://img.shields.io/github/v/release/3169657175/Antigravity-Chinese?display_name=tag&sort=semver)](https://github.com/3169657175/Antigravity-Chinese/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/3169657175/Antigravity-Chinese/total)](https://github.com/3169657175/Antigravity-Chinese/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-2563eb?logo=windows)](#运行环境)
-[![AGY Hub](https://img.shields.io/badge/AGY%20Hub-1.2.3-0A7D5A)](#当前版本)
+[![AGY Hub](https://img.shields.io/badge/AGY%20Hub-1.3.0-0A7D5A)](#当前版本)
 [![Antigravity](https://img.shields.io/badge/Antigravity-2.17.0-5B5BD6)](#当前版本)
 
-面向 Windows 版 Google Antigravity 的中文增强与桌面管理项目。当前主线统一为 **AGY Hub 桌面管家**，提供汉化补丁、账号额度、Codex / Claude 接入、Token 统计、MCP / Skill、主题和更新能力。
+面向 Windows 版 Google Antigravity 的中文增强与桌面管理项目。当前主线统一为 **AGY Hub 桌面管家**，提供汉化补丁、账号额度、Codex / 自定义 Provider 接入、Token 统计、MCP / Skill、主题、社区和更新能力。
 
 ## 当前版本
 
-- AGY Hub：**1.2.3**
+- AGY Hub：**1.3.0**
 - Antigravity 兼容基线：**2.17.0**
 - Electron：31.x
 - Windows：10 / 11 x64
 
 最新安装包请直接前往 [Releases](https://github.com/3169657175/Antigravity-Chinese/releases/latest) 下载。
+
+## 1.3.0 重点更新
+
+- **更新下载提速**：Windows 自动更新关闭 blockmap 差分下载，改为完整安装包单次下载，保留 SHA512 校验、进度与自动安装。
+- **版本链统一**：更新、源码和 Release 统一到 `3169657175/Antigravity-Chinese`，读取更新说明时兼容 `1.3.0` / `v1.3.0` 标签。
+- **社区即时响应**：反馈、回复、点赞和删除改为本地乐观更新，失败自动回滚；搜索只做本地过滤，不再反复闪骨架屏。
+- **社区容灾**：只读请求支持可配置备用 HTTPS 源和最后成功数据缓存；写操作不会自动重放，避免重复提交。
+- **按需加载**：社区、Codex、MCP / Skill 等较重页面在首次打开时再初始化。
+- **统一交互与诊断**：新增 Toast / 确认框、错误分类、Feature Flag 与 Release Guard。
+- **Claude Code**：入口暂时隐藏，底层实现继续保留；Codex 反代、8046、Token 统计、自定义 Provider 和三级测试保持现有逻辑。
 
 ## 主要能力
 
@@ -33,12 +43,13 @@
 - 支持账号切换、状态检查与重新授权提示。
 - 凭据只在 Electron 主进程中处理，敏感字段不直接暴露到渲染层。
 
-### Codex 与 Claude 接入
+### Codex 与 Provider 接入
 
-- 在 `127.0.0.1:8046` 提供 OpenAI Responses / Anthropic Messages 兼容入口。
+- 在 `127.0.0.1:8046` 提供 Codex 所需的 OpenAI Responses 兼容入口。
 - 支持 Antigravity 实际可用模型与客户端别名映射。
 - 支持流式输出、工具调用、长对话、compaction 与 reasoning summary。
-- Codex、Claude 与自定义 Provider 的账号、模型和路由相互隔离。
+- 自定义 Provider、Token 统计和三级测试继续保持独立。
+- Claude Code 底层实现仍保留，但 1.3.0 默认通过 Feature Flag 隐藏入口，待链路完善后再开放。
 
 ### Token、MCP、Skill 与主题
 
@@ -117,16 +128,16 @@ npm run patch:verify
 构建 Windows 安装包：
 
 ```powershell
-.\node_modules\.bin\electron-builder.cmd
+npm run release:build
 ```
 
 本机开发者如需同步构建结果到自己的运行目录，可使用项目中的 `scripts/sync-d.js` 或自行调整同步目标。
 
 ## 测试与发布门禁
 
-当前 1.2.3 基线已通过：
+当前 1.3.0 基线已通过：
 
-- **207 项自动化测试**；
+- **218 项自动化测试**；
 - **0 项失败**；
 - 3 项真实 MCP live 测试依赖外部环境，按设计跳过；
 - Electron 31.7.7 `--dir` 打包验证通过；
@@ -142,10 +153,10 @@ npm test
 
 ## 发布文件
 
-1.2.3 Release 使用：
+1.3.0 Release 使用：
 
-- `agy-hub-setup-1.2.3.exe`
-- `agy-hub-setup-1.2.3.exe.blockmap`
+- `agy-hub-setup-1.3.0.exe`
+- `agy-hub-setup-1.3.0.exe.blockmap`
 - `latest.yml`
 
 自动更新目标：`3169657175/Antigravity-Chinese`。

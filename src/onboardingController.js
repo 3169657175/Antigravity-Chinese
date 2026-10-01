@@ -5,7 +5,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function createOnboardingController() {
   // v3 deliberately asks once again after the guide became feature-complete.
   const PROMPT_KEY = 'agy-hub:onboarding-prompt:v3';
-  const steps = [
+  const allSteps = [
     {
       id: 'patch',
       title: '先确认 Antigravity 与汉化补丁',
@@ -33,7 +33,7 @@
     {
       id: 'proxy-decision',
       title: '你需要配置反代接入吗？',
-      description: '反代接入用于把 Antigravity 账号额度接入 Codex、Claude Code 或自定义 API Provider。如果你只需要汉化、账号、皮肤、MCP 和 Skill，可以直接跳过。',
+      description: '反代接入用于把 Antigravity 账号额度接入 Codex 或自定义 API Provider。如果你只需要汉化、账号、皮肤、MCP 和 Skill，可以直接跳过。',
       purpose: '选择“跳过反代”不会关闭服务、不会删除已有反代配置；本次引导会直接进入皮肤、MCP 与 Skill。',
       decision: 'proxy'
     },
@@ -41,8 +41,8 @@
       id: 'gateway-start',
       requiresProxy: true,
       title: '启动并完成 8046 三级测试',
-      description: '8046 是本地转换网关：它接收 Codex 或 Claude Code 请求，再转换成 Antigravity Cloud Code 可识别的格式。先启动服务，再运行三级测试。',
-      purpose: '测试成功只说明链路可用；只有点击“连接到 Codex”或“接入 Claude Code”后，才会写入对应客户端的配置。',
+      description: '8046 是本地转换网关：它接收 Codex 请求或自定义 Provider 请求，再转换成 Antigravity Cloud Code 可识别的格式。先启动服务，再运行三级测试。',
+      purpose: '测试成功只说明链路可用；只有点击“连接到 Codex”后，才会写入 Codex 配置。',
       targetTab: 'tab-codex-gateway', codexPage: 'overview', targetSelector: '#btn-codex-gateway-test'
     },
     {
@@ -55,6 +55,7 @@
     },
     {
       id: 'claude-connect',
+      feature: 'claudeCodeGateway',
       requiresProxy: true,
       title: '按需接入 Claude Code',
       description: '切换到 Claude Code 页面，选择账号和真实模型，再执行接入。界面展示真实的 Antigravity 模型；8046 会在内部映射为 Claude Code 可识别的模型名。',
@@ -119,6 +120,7 @@
       purpose: '左下角“使用引导”仍会保留，方便你以后只复习某一项；本次选择不会自动修改配置。'
     }
   ];
+  const steps = allSteps.filter(step => !step.feature || globalThis.AgyFeatureFlags?.enabled?.(step.feature));
 
   function isEditableTarget(target) {
     return target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);

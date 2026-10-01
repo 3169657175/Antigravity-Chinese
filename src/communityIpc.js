@@ -44,8 +44,8 @@ function registerCommunityIpc(options) {
 
   ipcMain.handle('fetch-feedbacks', async (_event, options = {}) => {
     const sort = ['popular', 'unanswered'].includes(options?.sort) ? options.sort : 'newest';
-    const result = await client.request(`/api/feedback?sort=${sort}`, { headers: { 'Cache-Control': 'no-cache' } });
-    return result.success ? { success: true, data: result.data } : { success: false, code: result.code, error: result.message };
+    const result = await client.request(`/api/feedback?sort=${sort}`, { headers: { 'Cache-Control': 'no-cache' }, cacheKey: `feedback:${sort}` });
+    return result.success ? { success: true, data: result.data, stale: Boolean(result.stale), warning: result.warning || '' } : { success: false, code: result.code, error: result.message };
   });
   ipcMain.handle('submit-feedback', async (_event, content, imageUrl) => {
     if (!client.readSession()?.token) return { success: false, code: 'AUTH_REQUIRED', error: '请先登录您的极客账号' };

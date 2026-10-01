@@ -35,3 +35,48 @@ test('auth session is written atomically and authorization is owned by the main 
   assert.equal(calls[1].headers.Authorization, 'Bearer secret');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test('read-only requests fall back to a secondary HTTPS origin and cache the last success', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-community-fallback-'));
+  const calls = [];
+  let failAll = false;
+  const client = new CommunityClient({
+    authFilePath: path.join(dir, 'auth.json'),
+    cacheFilePath: path.join(dir, 'cache.json'),
+    apiBase: 'https://primary.example/api',
+    fallbackApiBase: 'https://backup.example/api',
+    fetch: async url => {
+      calls.push(url);
+      if (failAll) throw new Error('offline');
+      if (url.startsWith('https://primary.example/')) return new Response(JSON.stringify({ error: 'down' }), { status: 503 });
+      return new Response(JSON.stringify([{ id: 1, content: 'cached' }]), { status: 200 });
+    }
+  });
+  const first = await client.request('/api/feedback?sort=newest', { cacheKey: 'feedback:newest' });
+  assert.equal(first.success, true);
+  assert.equal(first.endpoint, 'https://backup.example');
+  assert.equal(calls.length, 2);
+  failAll = true;
+  const cached = await client.request('/api/feedback?sort=newest', { cacheKey: 'feedback:newest' });
+  assert.equal(cached.success, true);
+  assert.equal(cached.stale, true);
+  assert.deepEqual(cached.data, [{ id: 1, content: 'cached' }]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('write requests are never replayed against the fallback origin', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-community-write-'));
+  const calls = [];
+  const client = new CommunityClient({
+    authFilePath: path.join(dir, 'auth.json'),
+    apiBase: 'https://primary.example/api',
+    fallbackApiBase: 'https://backup.example/api',
+    fetch: async url => { calls.push(url); throw new Error('offline'); }
+  });
+  const result = await client.request('/api/reply', { method: 'POST', body: { feedback_id: 1, content: 'x' } });
+  assert.equal(result.success, false);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /^https:\/\/primary\.example\//);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

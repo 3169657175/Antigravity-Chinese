@@ -419,12 +419,12 @@
         <div class="pane-header codex-workspace-header">
           <div>
             <h2>反代接入</h2>
-            <p class="subtitle">统一管理 Codex、Claude Code、本地模型网关与自定义 Provider。</p>
+            <p class="subtitle">统一管理 Codex、本地模型网关与自定义 Provider。</p>
           </div>
           <div class="codex-workspace-header-actions">
             <div class="codex-workspace-tabs">
               <button class="codex-workspace-tab active" type="button" data-codex-page="overview">Codex</button>
-              <button class="codex-workspace-tab" type="button" data-codex-page="claude">Claude Code</button>
+              <button class="codex-workspace-tab" type="button" data-codex-page="claude" data-feature="claudeCodeGateway">Claude Code</button>
               <button class="codex-workspace-tab" type="button" data-codex-page="usage">Token 统计</button>
               <button class="codex-workspace-tab" type="button" data-codex-page="provider">自定义 Provider</button>
             </div>
@@ -1226,7 +1226,7 @@
       <div class="guide-progress" id="guide-progress" hidden><span id="guide-progress-bar"></span></div>
       <div class="guide-body">
         <div class="guide-step-index" id="guide-step-index">第一次打开时只询问一次</div>
-        <p class="guide-description" id="guide-description">引导会依次介绍汉化注入、本地账号、8046 服务、Codex、Claude Code 和自定义 Provider。你可以随时按 Esc 退出，以后也能从左下角重新打开。</p>
+        <p class="guide-description" id="guide-description">引导会依次介绍汉化注入、本地账号、8046 服务、Codex 和自定义 Provider。你可以随时按 Esc 退出，以后也能从左下角重新打开。</p>
         <div class="guide-purpose" id="guide-purpose"><strong>引导不会自动修改配置</strong><span>它只会带你前往对应页面并说明每一步的用途，由你决定是否执行。</span></div>
       </div>
       <footer class="guide-footer">
@@ -1251,6 +1251,11 @@
   <script src="src/gatewayUi.js"></script>
   <script src="src/accountUi.js"></script>
   <script src="src/operationFeedback.js"></script>
+  <script src="src/uiFeedback.js"></script>
+  <script src="src/errorDiagnostics.js"></script>
+  <script src="src/featureFlags.js"></script>
+  <script src="src/communityState.js"></script>
+  <script src="src/pageLifecycle.js"></script>
   <script src="src/safeDom.js"></script>
   <script src="src/communityController.js"></script>
   <script src="src/communityData.js"></script>

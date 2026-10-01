@@ -1137,9 +1137,15 @@ registerAccountIpc({
   getMainWindow: () => mainWindow
 });
 
-const API_BASE = 'https://nhw1029.pages.dev/api';
+const API_BASE = process.env.AGY_COMMUNITY_API_BASE || 'https://nhw1029.pages.dev/api';
 const authFilePath = path.join(app.getPath('userData'), 'auth_config.json');
-const communityClient = new CommunityClient({ fetch, authFilePath, apiBase: API_BASE });
+const communityClient = new CommunityClient({
+  fetch,
+  authFilePath,
+  apiBase: API_BASE,
+  fallbackApiBase: process.env.AGY_COMMUNITY_FALLBACK_API_BASE || '',
+  cacheFilePath: path.join(app.getPath('userData'), 'community-read-cache.json')
+});
 registerCommunityIpc({ ipcMain, client: communityClient, shell });
 
 // Community authentication, uploads and feedback IPC are registered by communityIpc.js.
