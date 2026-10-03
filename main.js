@@ -8,23 +8,24 @@ const vm = require('vm');
 const asar = require('@electron/asar');
 const { exec, execFile, execFileSync, spawn } = require('child_process');
 const { Worker } = require('worker_threads');
-const { startProxy, stopProxy, getInitialStats, getProxyStatus, recordTokenLog } = require('./src/proxy.js');
-const { BrainTokenMonitor } = require('./src/brainMonitor.js');
-const { CodexGateway, MODELS, parseUpstreamEvents, collectParts } = require('./src/codexGateway.js');
-const { probeMcpServer, validateMcpConfig } = require('./src/mcpProbe.js');
-const { registerGatewayIpc } = require('./src/gatewayIpc.js');
-const { registerUpdaterService } = require('./src/updaterService.js');
-const { getGoogleClientId, getGoogleClientSecret, registerAccountIpc } = require('./src/accountIpc.js');
-const { registerThemeIpc } = require('./src/themeIpc.js');
-const { PatchBackupManager } = require('./src/patchBackupManager.js');
-const { LogTailReader, detectLatestRouteState } = require('./src/logTailReader.js');
-const { SkillTranslationService } = require('./src/skillTranslationService.js');
-const { SkillTranslationStore, defaultSkillTranslationPath } = require('./src/skillTranslationStore.js');
-const { CommunityClient } = require('./src/communityClient.js');
-const { registerCommunityIpc } = require('./src/communityIpc.js');
-const { readJsonSafe, writeJsonAtomic: writeJsonAtomicSafe } = require('./src/fsUtils.js');
-const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./src/appShutdown.js');
-const { createSecretCodec } = require('./src/secretCodec.js');
+const { startProxy, stopProxy, getInitialStats, getProxyStatus, recordTokenLog } = require('./proxy.js');
+const { BrainTokenMonitor } = require('./brainMonitor.js');
+const { CodexGateway, MODELS, parseUpstreamEvents, collectParts } = require('./codexGateway.js');
+const { probeMcpServer, validateMcpConfig } = require('./mcpProbe.js');
+const { registerGatewayIpc } = require('./gatewayIpc.js');
+const { registerUpdaterService } = require('./updaterService.js');
+const { getGoogleClientId, getGoogleClientSecret, registerAccountIpc } = require('./accountIpc.js');
+const { registerThemeIpc } = require('./themeIpc.js');
+const { PatchBackupManager } = require('./patchBackupManager.js');
+const { LogTailReader, detectLatestRouteState } = require('./logTailReader.js');
+const { SkillTranslationService } = require('./skillTranslationService.js');
+const { SkillTranslationStore, defaultSkillTranslationPath } = require('./skillTranslationStore.js');
+const { fetchSkillCatalogJson, fetchSkillText } = require('./skillCatalogRemote.js');
+const { CommunityClient } = require('./communityClient.js');
+const { registerCommunityIpc } = require('./communityIpc.js');
+const { readJsonSafe, writeJsonAtomic: writeJsonAtomicSafe } = require('./fsUtils.js');
+const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./appShutdown.js');
+const { createSecretCodec } = require('./secretCodec.js');
 let activePatchInstall = null;
 let skillTranslationService = null;
 let mainWindow = null;
@@ -55,19 +56,53 @@ function getSkillTranslationService() {
       const gateway = requireCodexGateway();
       const status = gateway.status();
       const model = status.codexAntigravityModel || 'agy-auto';
-      const result = await gateway.probeUpstream({
-        model,
-        stream: false,
-        input: [{ role: 'user', content: prompt }]
-      });
-      const parts = collectParts(parseUpstreamEvents(result.text));
-      const text = parts.map(part => part && part.text).filter(Boolean).join('\n').trim();
-      if (!text) throw new Error('Antigravity 翻译模型返回了空内容');
-      return { text, model: result.resolvedModel || result.model || model };
+      let antigravityError = null;
+      try {
+        const accountId = status.codexAntigravityAccountId || '';
+        const result = await gateway.callUpstream({
+          model,
+          stream: false,
+          input: [{ role: 'user', content: prompt }]
+        }, undefined, { accountId, modelOverride: model });
+        const parts = collectParts(parseUpstreamEvents(result.text));
+        const text = parts.map(part => part && part.text).filter(Boolean).join('\n').trim();
+        if (!text) throw new Error('Antigravity 翻译模型返回了空内容');
+        return { text, model: result.resolvedModel || result.model || model, source: 'ai' };
+      } catch (error) {
+        antigravityError = error;
+      }
+
+      try {
+        const upstream = await gateway.openCustomUpstream({
+          stream: false,
+          input: [{ role: 'user', content: prompt }]
+        }, new AbortController().signal);
+        const raw = await upstream.response.text();
+        if (!upstream.response.ok) throw new Error(`自定义 Provider 返回 HTTP ${upstream.response.status}: ${raw.slice(0, 240)}`);
+        const text = extractResponsesText(JSON.parse(raw));
+        if (!text) throw new Error('自定义 Provider 翻译返回了空内容');
+        return { text, model: upstream.resolvedModel || upstream.model || 'custom-provider', source: 'ai' };
+      } catch (customError) {
+        throw new Error(`Antigravity 翻译不可用：${antigravityError.message}；自定义 Provider 也不可用：${customError.message}`);
+      }
     }
   });
   return skillTranslationService;
 }
+
+function extractResponsesText(payload) {
+  const direct = String(payload && payload.output_text || '').trim();
+  if (direct) return direct;
+  const texts = [];
+  for (const item of Array.isArray(payload && payload.output) ? payload.output : []) {
+    for (const part of Array.isArray(item && item.content) ? item.content : []) {
+      const text = String(part && (part.text || part.output_text) || '').trim();
+      if (text) texts.push(text);
+    }
+  }
+  return texts.join('\n').trim();
+}
+
 function writeJsonAtomic(filePath, data) {
   writeJsonAtomicSafe(filePath, data);
 }
@@ -513,7 +548,9 @@ ipcMain.handle('get-token-monitor-status', async () => {
     const tail = await tokenRouteLogReader.read(logPath);
     if (!tail.missing) {
       routed = detectLatestRouteState(tail.text);
-      routeMessage = routed ? 'Antigravity traffic is routed through the monitor.' : 'Restart Antigravity after the monitor is ready.';
+      routeMessage = routed
+        ? '检测到旧版 31000/31001 核心路由；重新注入 1.3.1 补丁后将切换为故障隔离模式。'
+        : 'Token 监控与 Antigravity 核心联网已隔离；监控启停不再要求重启 Antigravity。';
     }
   } catch (error) {
     routeMessage = error.message;
@@ -739,7 +776,8 @@ ipcMain.handle('list-installed-skills', async () => {
 
 ipcMain.handle('fetch-skill-catalog', async () => {
   try {
-    const catalog = await fetchJson(`${SKILL_CATALOG_BASE}/skills_index.json`, 20000);
+    const remote = await fetchSkillCatalogJson('skills_index.json', { fetchImpl: net.fetch, timeoutMs: 20000 });
+    const catalog = remote.data;
     if (!Array.isArray(catalog)) throw new Error('远程技能清单格式无效');
     const skills = catalog
       .filter(item => item && typeof item.id === 'string' && typeof item.path === 'string')
@@ -763,9 +801,14 @@ ipcMain.handle('fetch-skill-catalog', async () => {
       // 捕获缓存写入异常，不影响同步操作的返回
     }
 
-    return { success: true, source: 'sickn33/agentic-awesome-skills', total: skills.length, skills };
+    return { success: true, source: `sickn33/agentic-awesome-skills · ${remote.source.label}`, total: skills.length, skills };
   } catch (error) {
-    return { success: false, error: error.name === 'AbortError' ? '连接 GitHub 超时' : error.message, skills: [] };
+    const cachePath = path.join(os.homedir(), '.gemini', 'config', 'skills_catalog_cache.json');
+    const cached = readJsonSafe(cachePath, [], { preserveCorrupted: true });
+    if (Array.isArray(cached) && cached.length) {
+      return { success: true, stale: true, warning: error.message, source: '本地缓存', total: cached.length, skills: cached };
+    }
+    return { success: false, error: error.message, skills: [] };
   }
 });
 
@@ -826,7 +869,8 @@ ipcMain.handle('install-community-skill', async (event, skill) => {
     if (/critical|offensive|high/i.test(String(trusted.risk || ''))) {
       throw new Error('该技能被标记为高风险，已阻止自动安装');
     }
-    const content = validateSkillContent(await fetchText(`${SKILL_CATALOG_BASE}/${remotePath}/SKILL.md`, 20000));
+    const remote = await fetchSkillText(`${remotePath}/SKILL.md`, { fetchImpl: net.fetch, timeoutMs: 20000 });
+    const content = validateSkillContent(remote.data);
     const sha256 = crypto.createHash('sha256').update(content, 'utf8').digest('hex');
     const targetDir = path.join(getGlobalSkillsDir(), skillId);
     fs.mkdirSync(targetDir, { recursive: true });
@@ -834,7 +878,7 @@ ipcMain.handle('install-community-skill', async (event, skill) => {
     const tempPath = `${skillPath}.tmp-${process.pid}-${Date.now()}`;
     fs.writeFileSync(tempPath, content, 'utf8');
     fs.renameSync(tempPath, skillPath);
-    return { success: true, skillId, path: skillPath, verified: true, sha256, source: trusted.source || 'community' };
+    return { success: true, skillId, path: skillPath, verified: true, sha256, source: `${trusted.source || 'community'} · ${remote.source.label}` };
   } catch (error) {
     return { success: false, error: error.name === 'AbortError' ? '下载 SKILL.md 超时' : error.message };
   }
@@ -871,7 +915,7 @@ ipcMain.handle('install-patch', async (event, { asarPath, sourceAsar }) => {
     }
   };
 
-  const worker = new Worker(path.join(__dirname, 'src', 'patchWorker.js'), {
+  const worker = new Worker(path.join(__dirname, 'patchWorker.js'), {
     workerData: {
       asarPath,
       sourceAsar: finalSourceAsar,
@@ -1098,6 +1142,37 @@ ipcMain.handle('get-network-config', async (event) => {
     }
   } catch (e) {}
   return { success: true, data: { mode: 'bypass', active: true, port: 7890 } };
+});
+
+function getIntegrationConfigPath() {
+  return path.join(app.getPath('appData'), 'Antigravity', 'agy-hub-integration.json');
+}
+
+ipcMain.handle('get-integration-config', async () => {
+  try {
+    const configPath = getIntegrationConfigPath();
+    const data = fs.existsSync(configPath)
+      ? readJsonSafe(configPath, null, { preserveCorrupted: true })
+      : null;
+    return { success: true, data: { developerMode: Boolean(data && data.developerMode) } };
+  } catch (error) {
+    return { success: false, error: error.message, data: { developerMode: false } };
+  }
+});
+
+ipcMain.handle('save-integration-config', async (_event, settings = {}) => {
+  try {
+    const configPath = getIntegrationConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    const data = {
+      developerMode: Boolean(settings.developerMode),
+      updatedAt: new Date().toISOString()
+    };
+    writeJsonAtomicSafe(configPath, data);
+    return { success: true, data, path: configPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 // 新增版本读取：安全提取官方客户端 asar 并在界面呈现与管家同步的补丁版本

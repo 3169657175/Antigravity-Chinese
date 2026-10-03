@@ -4,14 +4,14 @@
   "officialVersion": "2.19.1",
   "officialSha256": "341234faf45bd1776fd5418a3c288dedc5487ebfcf153f53d75de17cfe15c1de",
   "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5114434,
-  "outputSha256": "cee6fa3c265592fbc0df3f1ac6aa62bf71386ee891a7a376ad42e0236fd91996",
+  "outputSize": 5093023,
+  "outputSha256": "0906cc218f68640f68d519e5355a5a484fd4560cb1390ef1370cf33331f2e192",
   "compatibility": {
     "files": [
       {
         "file": "dist/preload.js",
         "officialBytes": 5337,
-        "rebuiltBytes": 368444
+        "rebuiltBytes": 359906
       },
       {
         "file": "dist/main.js",
@@ -31,12 +31,12 @@
       {
         "file": "dist/ipcHandlers.js",
         "officialBytes": 16557,
-        "rebuiltBytes": 113454
+        "rebuiltBytes": 101863
       },
       {
         "file": "dist/languageServer.js",
         "officialBytes": 18804,
-        "rebuiltBytes": 21514
+        "rebuiltBytes": 20232
       },
       {
         "file": "dist/accountVault.js",

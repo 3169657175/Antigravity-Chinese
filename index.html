@@ -6,8 +6,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: https:; font-src 'self' data:; connect-src 'self' http: https: ws: wss:; object-src 'none'; base-uri 'none'">
   <title>Antigravity 桌面管家 (AGY Hub)</title>
   <link rel="stylesheet" href="style.css?t=1784441755">
-  <link rel="stylesheet" href="styles/gatewayUi.css?t=1785033600">
-  <link rel="stylesheet" href="styles/accountUi.css?t=1785033600">
+  <link rel="stylesheet" href="gatewayUi.css?t=1785033600">
+  <link rel="stylesheet" href="accountUi.css?t=1785033600">
 </head>
 <body>
 
@@ -189,6 +189,14 @@
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"></path><path d="M22 11.5A10 10 0 0 0 9.5 3.5L2.5 8M2 12.5a10 10 0 0 0 12.5 8L21.5 16"></path></svg>
                 还原官方英文原版
               </button>
+            </div>
+            <div class="patch-compatibility-strip" id="patch-developer-mode-row" data-state="ready" style="margin-top: 12px;">
+              <span class="patch-compatibility-dot"></span>
+              <div style="min-width:0; flex:1;">
+                <strong>开发者模式</strong>
+                <small>默认关闭。开启后才在 Antigravity 中显示“汉化覆盖检查”等维护信息。</small>
+              </div>
+              <button class="btn btn-secondary" id="btn-toggle-patch-developer-mode" type="button" style="margin-left:auto; min-width:72px; padding:5px 10px;">已关闭</button>
             </div>
           </div>
         </div>
@@ -1248,29 +1256,29 @@
 
   <div id="operation-toast-host" class="operation-toast-host" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="src/gatewayUi.js"></script>
-  <script src="src/accountUi.js"></script>
-  <script src="src/operationFeedback.js"></script>
-  <script src="src/uiFeedback.js"></script>
-  <script src="src/errorDiagnostics.js"></script>
-  <script src="src/featureFlags.js"></script>
-  <script src="src/communityState.js"></script>
-  <script src="src/pageLifecycle.js"></script>
-  <script src="src/safeDom.js"></script>
-  <script src="src/communityController.js"></script>
-  <script src="src/communityData.js"></script>
-  <script src="src/adminCommunityController.js"></script>
-  <script src="src/navigationController.js"></script>
-  <script src="src/patchController.js"></script>
-  <script src="src/themeController.js"></script>
-  <script src="src/localAccountsController.js"></script>
-  <script src="src/tokenMonitorController.js"></script>
-  <script src="src/marketplace/marketplacePresenter.js"></script>
-  <script src="src/marketplace/marketplaceLayout.js"></script>
-  <script src="src/marketplaceController.js"></script>
-  <script src="src/gatewayController.js"></script>
-  <script src="src/appShellController.js"></script>
-  <script src="src/onboardingController.js"></script>
+  <script src="gatewayUi.js"></script>
+  <script src="accountUi.js"></script>
+  <script src="operationFeedback.js"></script>
+  <script src="uiFeedback.js"></script>
+  <script src="errorDiagnostics.js"></script>
+  <script src="featureFlags.js"></script>
+  <script src="communityState.js"></script>
+  <script src="pageLifecycle.js"></script>
+  <script src="safeDom.js"></script>
+  <script src="communityController.js"></script>
+  <script src="communityData.js"></script>
+  <script src="adminCommunityController.js"></script>
+  <script src="navigationController.js"></script>
+  <script src="patchController.js"></script>
+  <script src="themeController.js"></script>
+  <script src="localAccountsController.js"></script>
+  <script src="tokenMonitorController.js"></script>
+  <script src="marketplace/marketplacePresenter.js"></script>
+  <script src="marketplace/marketplaceLayout.js"></script>
+  <script src="marketplaceController.js"></script>
+  <script src="gatewayController.js"></script>
+  <script src="appShellController.js"></script>
+  <script src="onboardingController.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

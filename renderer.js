@@ -19,6 +19,7 @@ function notifyUiError(input, fallbackTitle = '操作失败') { const info = err
 // 网络配置
 const switchNetworkBypass = document.getElementById('switch-network-bypass');
 const btnSaveNetwork = document.getElementById('btn-save-network');
+const btnTogglePatchDeveloperMode = document.getElementById('btn-toggle-patch-developer-mode');
 
 // 本地账号
 const btnRefreshLocalAccounts = document.getElementById('btn-refresh-local-accounts');
@@ -183,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 【性能优化】：将原本阻塞首屏渲染的串行磁盘/IO检测重构为并发异步非阻塞加载，首屏秒开！
-  initPatchPage().then(() => initNetworkStatus()).then(() => {
+  initPatchPage().then(() => Promise.all([initNetworkStatus(), initPatchDeveloperMode()])).then(() => {
     logToTerminal('[System] 核心管理组件并发初始化就绪，冷工业极简模式载入成功。');
   }).catch(err => {
     logToTerminal(`组件载入异常: ${err.message}`, 'error');
@@ -229,6 +230,43 @@ async function initPatchPage() {
   if (!controller || typeof controller.init !== 'function') throw new Error('汉化补丁控制器未加载');
   appPaths = await controller.init({ logToTerminal });
   return appPaths;
+}
+
+let patchDeveloperModeEnabled = false;
+
+function renderPatchDeveloperMode() {
+  if (!btnTogglePatchDeveloperMode) return;
+  btnTogglePatchDeveloperMode.textContent = patchDeveloperModeEnabled ? '已开启' : '已关闭';
+  btnTogglePatchDeveloperMode.setAttribute('aria-pressed', patchDeveloperModeEnabled ? 'true' : 'false');
+  btnTogglePatchDeveloperMode.title = patchDeveloperModeEnabled
+    ? '关闭后隐藏 Antigravity 中的汉化维护信息'
+    : '开启后显示 Antigravity 中的汉化维护信息';
+}
+
+async function initPatchDeveloperMode() {
+  if (!btnTogglePatchDeveloperMode || !window.agyHubAPI.getIntegrationConfig) return;
+  try {
+    const result = await window.agyHubAPI.getIntegrationConfig();
+    patchDeveloperModeEnabled = Boolean(result?.success && result.data?.developerMode);
+  } catch (_) {
+    patchDeveloperModeEnabled = false;
+  }
+  renderPatchDeveloperMode();
+}
+
+if (btnTogglePatchDeveloperMode) {
+  btnTogglePatchDeveloperMode.addEventListener('click', async () => {
+    const next = !patchDeveloperModeEnabled;
+    try {
+      const result = await window.agyHubAPI.saveIntegrationConfig({ developerMode: next });
+      if (!result?.success) throw new Error(result?.error || '保存失败');
+      patchDeveloperModeEnabled = next;
+      renderPatchDeveloperMode();
+      logToTerminal(`[Patch] 开发者模式已${next ? '开启' : '关闭'}；Antigravity 维护入口会自动同步。`, 'success');
+    } catch (error) {
+      notifyUiError(error, '开发者模式保存失败');
+    }
+  });
 }
 
 // 4. 极简免 TUN 分流网络状态初始化与激活

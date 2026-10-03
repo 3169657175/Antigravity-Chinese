@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   checkProxyPort: (port) => ipcRenderer.invoke('check-proxy-port', port),
   saveNetworkConfig: (settings) => ipcRenderer.invoke('save-network-config', settings),
   getNetworkConfig: () => ipcRenderer.invoke('get-network-config'),
+  getIntegrationConfig: () => ipcRenderer.invoke('get-integration-config'),
+  saveIntegrationConfig: (settings) => ipcRenderer.invoke('save-integration-config', settings),
   getAsarVersions: (asarPath) => ipcRenderer.invoke('get-asar-versions', asarPath),
   listLocalAccounts: () => ipcRenderer.invoke('list-local-accounts'),
   listThemes: () => ipcRenderer.invoke('list-themes'),

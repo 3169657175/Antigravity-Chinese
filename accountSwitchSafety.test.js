@@ -1,0 +1,4 @@
+const test=require('node:test'); const assert=require('node:assert/strict'); const fs=require('fs');
+function read(f){return fs.readFileSync(f,'utf8');}
+test('AGY Hub account switching never kills language_server.exe by itself',()=>{const s=read('accountIpc.js');assert.doesNotMatch(s,/taskkill[^\n]*language_server\.exe/i);assert.match(s,/restartAntigravityClient/);assert.match(s,/Antigravity\.exe/);});
+test('Skill translation path cannot invoke account switching, credentials or Antigravity lifecycle actions',()=>{const s=read('main.js');const a=s.indexOf('function getSkillTranslationService()');const b=s.indexOf('function extractResponsesText',a);assert.ok(a>=0&&b>a);const x=s.slice(a,b);assert.doesNotMatch(x,/accounts:switch|switch-local-account|WriteGenericCred|taskkill|language_server\.exe|app\.relaunch|app\.exit/i);assert.match(x,/accountId/);assert.match(x,/modelOverride:/);});

@@ -75,9 +75,75 @@ function applyLiteralRules(source, rules, relativePath) {
   return { source: output, applied };
 }
 
+function stripLegacyPatchUpdater(source) {
+  let output = String(source || '');
+  const callPattern = /^[ \t]*setupVersionUpdater\(\);[ \t]*\r?\n/gm;
+  const calls = output.match(callPattern) || [];
+  if (calls.length === 0) throw new Error('Legacy patch updater call marker is missing');
+  output = output.replace(callPattern, '');
+
+  const updaterPattern = /  function setupVersionUpdater\(\) \{[\s\S]*?setInterval\(injectVersionElement, 2000\);\r?\n  \}\r?\n/;
+  const updaterMatches = output.match(new RegExp(updaterPattern.source, 'g')) || [];
+  if (updaterMatches.length !== 1) {
+    throw new Error(`Legacy patch updater block expected exactly once but found ${updaterMatches.length}`);
+  }
+  return output.replace(updaterPattern, '');
+}
+
+function stripLegacyPatchUpdaterIpc(source) {
+  const output = String(source || '');
+  const startAnchor = "    electron_1.ipcMain.handle('patch:check-update'";
+  const restartAnchor = "    electron_1.ipcMain.handle('patch:restart-app'";
+  const start = output.indexOf(startAnchor);
+  const restart = output.indexOf(restartAnchor, start + 1);
+  if (start < 0 || restart < 0) throw new Error('Legacy patch updater IPC markers are missing');
+  const handlerEndMarker = '\n    });';
+  const end = output.indexOf(handlerEndMarker, restart);
+  if (end < 0) throw new Error('Legacy patch updater restart handler end marker is missing');
+  return `${output.slice(0, start)}${output.slice(end + handlerEndMarker.length)}`;
+}
+
+function addDeveloperModeGate(source) {
+  let output = String(source || '');
+  const widgetAnchor = '  function injectQuotaWidget() {';
+  requireSingleAnchor(output, widgetAnchor, 'quota widget developer-mode gate');
+  output = insertBefore(output, widgetAnchor, [
+    '  let agyDeveloperModeCache = { checkedAt: 0, enabled: false };',
+    '  function isAgyDeveloperModeEnabled() {',
+    '    const now = Date.now();',
+    '    if (now - agyDeveloperModeCache.checkedAt < 1500) return agyDeveloperModeCache.enabled;',
+    '    agyDeveloperModeCache.checkedAt = now;',
+    '    try {',
+    "      const fs = require('fs');",
+    "      const path = require('path');",
+    "      const os = require('os');",
+    "      const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');",
+    "      const configPath = path.join(appData, 'Antigravity', 'agy-hub-integration.json');",
+    "      const config = JSON.parse(fs.readFileSync(configPath, 'utf8').replace(/^\\uFEFF/, ''));",
+    '      agyDeveloperModeCache.enabled = Boolean(config && config.developerMode === true);',
+    '    } catch (_) {',
+    '      agyDeveloperModeCache.enabled = false;',
+    '    }',
+    '    return agyDeveloperModeCache.enabled;',
+    '  }',
+    ''
+  ].join('\n'), 'quota widget developer-mode helper');
+
+  const themeAnchor = '      const quotaTheme = readQuotaTheme(settingsBtn);';
+  requireSingleAnchor(output, themeAnchor, 'quota widget theme anchor');
+  output = insertBefore(output, themeAnchor, [
+    "      const translationAuditRow = root && root.querySelector('.translation-audit-row');",
+    "      if (translationAuditRow) translationAuditRow.style.display = isAgyDeveloperModeEnabled() ? 'flex' : 'none';",
+    ''
+  ].join('\n'), 'quota widget developer-mode visibility');
+  return output;
+}
+
 function buildPreload(official, legacy) {
-  const payload = legacy.slice(legacy.indexOf("electron_1.contextBridge.exposeInMainWorld('mcpLogger'"));
+  let payload = legacy.slice(legacy.indexOf("electron_1.contextBridge.exposeInMainWorld('mcpLogger'"));
   if (!payload || payload === legacy) throw new Error('Legacy preload payload marker is missing');
+  payload = stripLegacyPatchUpdater(payload);
+  payload = addDeveloperModeGate(payload);
   const anchor = "electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);";
   const output = insertAfter(official, anchor, payload, 'preload extension point');
   return output;
@@ -192,13 +258,41 @@ function buildIpcHandlers(official, legacy) {
   const suffixIndex = legacy.indexOf(suffixStart);
   const finalBrace = legacy.lastIndexOf('\n}');
   if (suffixIndex < 0 || finalBrace <= suffixIndex) throw new Error('Legacy ipc suffix markers are missing');
-  const suffix = legacy.slice(suffixIndex, finalBrace).trim();
+  const suffix = stripLegacyPatchUpdaterIpc(legacy.slice(suffixIndex, finalBrace).trim());
   let output = insertAfter(official, 'const electron_1 = require("electron");', top, 'ipc imports');
   output = insertAfter(output, 'function registerIpcHandlers(storageManager) {', prefix, 'ipc register prefix');
   const outputFinalBrace = output.lastIndexOf('\n}');
   if (outputFinalBrace < 0) throw new Error('Official ipcHandlers final brace is missing');
   output = `${output.slice(0, outputFinalBrace)}\n${suffix}\n${output.slice(outputFinalBrace)}`;
+  output = hardenAccountSwitch(output);
   return output;
+}
+
+function hardenAccountSwitch(source) {
+  const output = String(source || '');
+  const startMarker = '            // Kill old language_server.exe immediately to free up gRPC ports before relaunch';
+  const returnMarker = '            return { success: true };';
+  const start = output.indexOf(startMarker);
+  if (start < 0) {
+    if (output.includes('[Account Switch] Relaunching the full Antigravity process')) return output;
+    throw new Error('Legacy accounts:switch lifecycle block is missing');
+  }
+  const end = output.indexOf(returnMarker, start);
+  if (end < 0) throw new Error('Legacy accounts:switch return marker is missing');
+  const safeLifecycle = [
+    '            // Restart the whole Electron process so the Language Server crash counter is reset.',
+    "            console.log('[Account Switch] Relaunching the full Antigravity process after credential update.');",
+    '            setTimeout(() => {',
+    '                global.isQuitting = true;',
+    '                electron_1.app.relaunch();',
+    '                electron_1.app.exit(0);',
+    '            }, 250);',
+    '            '
+  ].join('\n');
+  let hardened = `${output.slice(0, start)}${safeLifecycle}${output.slice(end)}`;
+  hardened = hardened.replace(/\s*try \{\s*execSync\('taskkill \/F \/IM language_server\.exe'\);\s*\} catch \(e\) \{\}/g, '');
+  hardened = hardened.replace(/win\.reload\(\);/g, "global.isQuitting = true;\n                    electron_1.app.relaunch();\n                    electron_1.app.exit(0);");
+  return hardened;
 }
 
 function buildLanguageServerStartOverlay(officialStart) {
@@ -209,8 +303,6 @@ function buildLanguageServerStartOverlay(officialStart) {
   const cloudEndpoint = "            'https://daily-cloudcode-pa.googleapis.com',";
   requireSingleAnchor(output, apiEndpoint, 'languageServer API endpoint');
   requireSingleAnchor(output, cloudEndpoint, 'languageServer Cloud Code endpoint');
-  output = output.replace(apiEndpoint, '            apiServerUrl,');
-  output = output.replace(cloudEndpoint, '            cloudCodeEndpoint,');
 
   output = output.replace('function startLanguageServer(', 'async function startLanguageServer(');
   const signatureEnd = output.indexOf('\n');
@@ -218,36 +310,27 @@ function buildLanguageServerStartOverlay(officialStart) {
   const signature = output.slice(0, signatureEnd);
   output = insertAfter(output, signature, [
     '    let proxyString = null;',
-    '    let tokenMonitorAvailable = false;',
     '    try {',
-    '        [proxyString, tokenMonitorAvailable] = await Promise.all([',
-    "            electron_1.session.defaultSession.resolveProxy('https://generativelanguage.googleapis.com').catch(() => null),",
-    '            isTokenMonitorAvailable(),',
-    '        ]);',
+    "        proxyString = await electron_1.session.defaultSession.resolveProxy('https://generativelanguage.googleapis.com').catch(() => null);",
     '    } catch (err) {',
-    "        console.error('[Proxy Auto-Detect] Failed to resolve system proxy, proceeding with direct connection. Error:', err);",
+    "        console.warn('[Proxy Auto-Detect] Failed to resolve system proxy; official endpoints remain active:', err && err.message ? err.message : err);",
     '    }',
-    '    const apiServerUrl = tokenMonitorAvailable',
-    '        ? `http://${TOKEN_MONITOR_HOST}:${TOKEN_MONITOR_API_PORT}`',
-    "        : 'https://generativelanguage.googleapis.com';",
-    '    const cloudCodeEndpoint = tokenMonitorAvailable',
-    '        ? `http://${TOKEN_MONITOR_HOST}:${TOKEN_MONITOR_CLOUD_PORT}`',
-    "        : 'https://daily-cloudcode-pa.googleapis.com';",
-    '    console.log(tokenMonitorAvailable',
-    '        ? `[Token Monitor] Routing model traffic through ${TOKEN_MONITOR_HOST}:${TOKEN_MONITOR_API_PORT}/${TOKEN_MONITOR_CLOUD_PORT}`',
-    "        : '[Token Monitor] AGY Hub is unavailable; using official endpoints directly.');"
+    "    console.log('[Network] Language Server keeps official API endpoints; token monitoring is out-of-band.');"
   ].join('\n'), 'languageServer routing overlay');
 
   const envAnchor = '        const env = { ...process.env, ...(0, shell_env_1.shellEnvSync)() };';
   output = insertAfter(output, envAnchor, [
     "        if (proxyString && typeof proxyString === 'string') {",
-    "            const proxyPart = proxyString.split(';').find(part => part.trim().startsWith('PROXY'));",
+    "            const proxyPart = proxyString.split(';').map(part => part.trim()).find(part => /^(?:PROXY|HTTPS?)\\s+/i.test(part));",
     '            if (proxyPart) {',
-    "                const addr = proxyPart.replace('PROXY', '').trim();",
-    '                if (addr) {',
+    "                const match = /^(?:PROXY|HTTPS?)\\s+(.+)$/i.exec(proxyPart);",
+    "                const addr = match && match[1] ? match[1].trim() : '';",
+    "                if (addr && !/(?:^|:)3100[01]$/.test(addr)) {",
     "                    env['HTTP_PROXY'] = `http://${addr}`;",
     "                    env['HTTPS_PROXY'] = `http://${addr}`;",
     "                    console.log(`[Proxy Auto-Detect] Set HTTP_PROXY/HTTPS_PROXY = http://${addr}`);",
+    '                } else if (addr) {',
+    "                    console.warn(`[Proxy Auto-Detect] Ignored token-monitor endpoint ${addr}; keeping core networking independent.`);",
     '                }',
     '            }',
     '        }'
@@ -257,17 +340,9 @@ function buildLanguageServerStartOverlay(officialStart) {
 
 function buildLanguageServer(official, legacy) {
   let output = insertAfter(official, 'exports.getLsPort = getLsPort;', 'exports.getLsCsrf = getLsCsrf;', 'languageServer export');
-  output = insertAfter(output, 'const stream_1 = require("stream");', 'const net_1 = __importDefault(require("net"));', 'languageServer net import');
-  output = insertAfter(output, 'const MAX_STDERR_BUFFER = 100000;', [
-    "const TOKEN_MONITOR_HOST = '127.0.0.1';",
-    'const TOKEN_MONITOR_API_PORT = 31000;',
-    'const TOKEN_MONITOR_CLOUD_PORT = 31001;'
-  ].join('\n'), 'languageServer monitor constants');
   output = insertAfter(output, 'let _lsPort = 0;', "let _lsCsrf = '';", 'languageServer csrf state');
   const getter = extractBetween(legacy, 'function getLsCsrf() {', '/** Clears the language server process reference', 'languageServer csrf getter');
   output = insertBefore(output, '/** Clears the language server process reference', getter, 'languageServer csrf getter target');
-  const monitorHelpers = extractBetween(legacy, 'function isLocalPortAvailable(', '/**\n * Spawn the language server', 'languageServer monitor helpers');
-  output = insertBefore(output, '/**\n * Spawn the language server', monitorHelpers, 'languageServer helper target');
   const officialStart = extractBetween(output, 'function startLanguageServer(', '/** Sets whether the termination was intentional', 'official startLanguageServer');
   const overlaidStart = buildLanguageServerStartOverlay(officialStart);
   output = replaceBetween(output, 'function startLanguageServer(', '/** Sets whether the termination was intentional', overlaidStart, 'official startLanguageServer');
@@ -335,11 +410,15 @@ module.exports = {
   applyLiteralRules,
   buildCompatibleTree,
   buildPreload,
+  stripLegacyPatchUpdater,
+  stripLegacyPatchUpdaterIpc,
+  addDeveloperModeGate,
   buildMain,
   buildTray,
   assertTrayModuleLoads,
   buildUtils,
   buildIpcHandlers,
+  hardenAccountSwitch,
   buildLanguageServer,
   buildLanguageServerStartOverlay,
   assertUniqueIpcHandlers
