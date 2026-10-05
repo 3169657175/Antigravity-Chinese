@@ -11,15 +11,19 @@ function normalizeAccountEmail(value) {
 }
 
 function getGoogleClientId() {
-  const p1 = 'MTA3MTAwNjA2MDU5MS10bWhzc2lu';
-  const p2 = 'MmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ==';
-  return Buffer.from(p1 + p2, 'base64').toString('utf8');
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('缺少环境变量 GOOGLE_OAUTH_CLIENT_ID，请配置后重试');
+  }
+  return clientId;
 }
 
 function getGoogleClientSecret() {
-  const s1 = 'R09DU1BYLUs1';
-  const s2 = 'OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=';
-  return Buffer.from(s1 + s2, 'base64').toString('utf8');
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!clientSecret) {
+    throw new Error('缺少环境变量 GOOGLE_OAUTH_CLIENT_SECRET，请配置后重试');
+  }
+  return clientSecret;
 }
 
 function registerAccountIpc(options) {
@@ -42,15 +46,11 @@ function registerAccountIpc(options) {
   }
 
 function getGoogleClientId() {
-    const p1 = 'MTA3MTAwNjA2MDU5MS10bWhzc2lu';
-    const p2 = 'MmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ==';
-    return Buffer.from(p1 + p2, 'base64').toString('utf8');
+    return module.exports.getGoogleClientId();
   }
   
   function getGoogleClientSecret() {
-    const s1 = 'R09DU1BYLUs1';
-    const s2 = 'OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=';
-    return Buffer.from(s1 + s2, 'base64').toString('utf8');
+    return module.exports.getGoogleClientSecret();
   }
   
   // 读取 Antigravity 本地账号元数据。Token 永远不会离开主进程。
