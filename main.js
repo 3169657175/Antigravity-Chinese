@@ -26,6 +26,7 @@ const { registerCommunityIpc } = require('./communityIpc.js');
 const { readJsonSafe, writeJsonAtomic: writeJsonAtomicSafe } = require('./fsUtils.js');
 const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./appShutdown.js');
 const { createSecretCodec } = require('./secretCodec.js');
+const { configureTranslationCatalog } = require('./translationCatalog.js');
 let activePatchInstall = null;
 let skillTranslationService = null;
 let mainWindow = null;
@@ -399,6 +400,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    try { configureTranslationCatalog(app); }
+    catch (error) { console.warn('[Localization] Catalog registration failed:', error.message); }
     // Be explicit about using the OS proxy.  The Antigravity desktop client
     // follows the system proxy, while relying on Electron's implicit fallback
     // can leave main-process net.fetch requests going direct after a restart.
@@ -1165,6 +1168,7 @@ ipcMain.handle('save-integration-config', async (_event, settings = {}) => {
     const configPath = getIntegrationConfigPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     const data = {
+      ...readJsonSafe(configPath, {}, { preserveCorrupted: true }),
       developerMode: Boolean(settings.developerMode),
       updatedAt: new Date().toISOString()
     };

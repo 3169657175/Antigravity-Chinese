@@ -1,6 +1,6 @@
 {
   "name": "agy-hub",
-  "version": "1.3.5",
+  "version": "1.3.7",
   "description": "AGY Hub 桌面管家：管理 Antigravity 汉化注入、账号额度、Codex / 自定义 Provider 接入、本地反向代理、社区与自动更新。",
   "author": "niu1029",
   "homepage": "https://github.com/3169657175/Antigravity-Chinese",
@@ -10,6 +10,7 @@
     "dist:sync": "npm run release:build && node sync-d.js",
     "patch:rebuild": "node patch-workbench/build-patch.js",
     "patch:verify": "node patch-workbench/verify-patch.js",
+    "localization:audit": "node patch-workbench/audit-localization.js",
     "test:token-usage": "node --test tokenUsage.test.js",
     "test:codex-gateway": "node --test codexGateway.test.js",
     "test:codex-lifecycle": "node --test codexAppLifecycle.test.js",
@@ -65,11 +66,14 @@
       "gatewayDiagnostics.js",
       "gatewayHttp.js",
       "gatewayIpc.js",
+      "gatewayCompatibilityController.js",
+      "inboundProtocolAdapters.js",
       "gatewayProfiles.js",
       "gatewayTestRunner.js",
       "gatewayUi.js",
       "localAccountsController.js",
       "logTailReader.js",
+      "localApiCapabilities.js",
       "main.js",
       "marketplaceController.js",
       "mcpLaunchConfig.js",
@@ -84,6 +88,11 @@
       "patchRuntimeBuilder.js",
       "patchWorker.js",
       "patch-workbench/compatibility.js",
+      "patch-workbench/localization.js",
+      "patch-workbench/audit-localization.js",
+      "patch-workbench/locales/zh-CN.json",
+      "patch-workbench/injections/translation-enhancement.js",
+      "patch-workbench/injections/native-localization.js",
       "preload.js",
       "proxy.js",
       "renderer.js",
@@ -99,6 +108,7 @@
       "tokenMonitorController.js",
       "tokenStatsStore.js",
       "tokenUsage.js",
+      "translationCatalog.js",
       "updaterService.js",
       "updateUtils.js",
       "urlPolicy.js",
@@ -118,6 +128,10 @@
       "output": "dist"
     },
     "extraResources": [
+      {
+        "from": "patch-workbench/locales/zh-CN.json",
+        "to": "patch/zh-CN.json"
+      },
       {
         "from": "assets/app.asar",
         "to": "patch/app.asar"

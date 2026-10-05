@@ -37,24 +37,29 @@ test('all packaged main-process local dependencies exist', () => {
 test('NSIS updater uses the dedicated graceful shutdown include', () => {
   const packageJson = require('./package.json');
   assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
-  const builderVersion = packageJson.devDependencies['electron-builder'].replace(/^[^\d]*/, '').split('.').map(Number);
-  assert.ok(
-    builderVersion[0] > 26 || (builderVersion[0] === 26 && (builderVersion[1] > 15 || (builderVersion[1] === 15 && builderVersion[2] >= 3))),
-    'electron-builder 26.15.3+ is required for install-directory-scoped process detection'
-  );
   const installerScript = fs.readFileSync(path.join(__dirname, 'build', 'installer.nsh'), 'utf8');
   assert.match(installerScript, /--quit-for-update/);
   assert.match(installerScript, /\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}/);
   assert.match(installerScript, /IS_POWERSHELL_AVAILABLE/);
-  assert.match(installerScript, /KILL_PROCESS/);
-  assert.match(installerScript, /Sleep 4000/);
-  assert.ok(
-    (installerScript.match(/FIND_PROCESS/g) || []).length <= 4,
-    'installer must not repeatedly launch PowerShell/CIM while waiting for shutdown'
-  );
+  assert.match(installerScript, /AGY_FIND_MAIN_PROCESS/);
+  assert.match(installerScript, /AGY_FORCE_CLOSE_MAIN_PROCESS/);
+  assert.match(installerScript, /AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER/);
+  assert.match(installerScript, /DisplayVersion/);
+  assert.match(installerScript, /\$R9 == "\$\{VERSION\}"/);
+  assert.match(installerScript, /1\.3\.5/);
+  assert.match(installerScript, /1\.3\.7/);
+  assert.match(installerScript, /DeleteRegKey/);
+  assert.match(installerScript, /\$\$_\.Name -eq '\$\{APP_EXECUTABLE_FILENAME\}'/);
+  assert.match(installerScript, /\$\$_\.ExecutablePath/);
+  assert.match(installerScript, /继续安装将自动关闭程序/);
+  assert.match(installerScript, /MB_OKCANCEL/);
+  assert.doesNotMatch(installerScript, /!insertmacro FIND_PROCESS/);
+  assert.doesNotMatch(installerScript, /!insertmacro KILL_PROCESS/);
+  assert.doesNotMatch(installerScript, /MB_RETRYCANCEL/);
+  assert.doesNotMatch(installerScript, /agy_retry_shutdown/);
+  assert.doesNotMatch(installerScript, /无法关闭安装目录中的/);
   assert.doesNotMatch(installerScript, /agy_wait_for_exit/);
-  assert.doesNotMatch(installerScript, /AGY Hub\*/i);
-  assert.doesNotMatch(installerScript, /taskkill/i);
+  assert.match(installerScript, /taskkill/);
 });
 
 test('renderer entry files required by BrowserWindow exist', () => {

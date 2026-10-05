@@ -190,7 +190,7 @@
     ["Dismiss error", "关闭错误提示"],
     ["Unknown: Agent execution terminated due to error.", "未知：智能体执行因错误而终止。"],
     ["Sent input to", "已向以下目标发送输入"],
-    ["Sending input to", "正在向以下目标发送输入"]
+    ["Sending input to", "正在向以下目标发送输入"],
     ["Refresh","刷新"],
     ["Failed to stop agent","停止智能体失败"],
     ["Plugin Operation Error:","插件操作错误："]

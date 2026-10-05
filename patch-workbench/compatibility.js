@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { buildLocalizationOverlay } = require('./localization');
 
 function normalizeVersion(value) {
   const match = String(value || '').trim().match(/^(\d+)\.(\d+)\.(\d+)/);
@@ -139,17 +140,101 @@ function addDeveloperModeGate(source) {
   return output;
 }
 
+function enhanceThemeSemanticCoverage(source) {
+  let output = String(source || '');
+  const viewPattern = /    function detectView\(\) \{[\s\S]*?        return 'new-chat';\r?\n    \}/;
+  const viewMatches = output.match(new RegExp(viewPattern.source, 'g')) || [];
+  if (viewMatches.length !== 1) throw new Error(`Theme detectView block expected exactly once but found ${viewMatches.length}`);
+  output = output.replace(viewPattern, [
+    '    function detectView() {',
+    "        const settings = document.querySelector('.settings-modal-container');",
+    "        if (visible(settings)) return 'settings';",
+    "        const mainSignals = Array.from(document.querySelectorAll('h1,h2,h3,input[placeholder],button,p'))",
+    '            .filter(element => visible(element) && element.getBoundingClientRect().x > 280)',
+    "            .slice(0, 160).map(element => compactText(element)).join(' | ');",
+    "        if (/(?:历史对话|Conversation History|Search conversations|搜索对话)/i.test(mainSignals)) return 'history';",
+    "        if (/(?:计划任务|Scheduled Tasks|Search tasks|No scheduled tasks configured|搜索任务)/i.test(mainSignals)) return 'scheduled';",
+    "        if (/(?:自定义功能|Customizations|Add MCP Servers|Search customizations|添加 MCP 服务)/i.test(mainSignals)) return 'customizations';",
+    "        const reviewText = Array.from(document.querySelectorAll('button')).filter(visible).map(compactText).join(' ');",
+    "        if (/审核|批准|拒绝|Approve|Reject/.test(reviewText) && document.querySelector('[role=\"article\"]')) return 'review';",
+    "        if (/^\\/c\\//.test(location.pathname) || document.querySelector('[role=\"article\"][aria=\"Agent response\"]')) return 'conversation';",
+    "        return 'new-chat';",
+    '    }'
+  ].join('\n'));
+
+  const backdropAnchor = "        const backdrop = document.querySelector('.settings-modal-backdrop');";
+  requireSingleAnchor(output, backdropAnchor, 'theme main surface fallback');
+  output = insertBefore(output, backdropAnchor, [
+    "        if (!document.querySelector('[data-agy-surface=\"main\"]')) {",
+    "            const sidebarRect = sidebar && sidebar.getBoundingClientRect();",
+    "            const minX = sidebarRect ? Math.max(240, sidebarRect.right - 4) : Math.max(240, innerWidth * .16);",
+    "            const candidates = Array.from(document.querySelectorAll('#root main, #root [role=\"main\"], #root [class*=\"flex-1\"]')).filter(element => {",
+    "                if (!visible(element) || sidebar?.contains(element) || element.closest('.settings-modal-container,[role=\"dialog\"]')) return false;",
+    "                const rect = element.getBoundingClientRect();",
+    "                return rect.x >= minX && rect.width >= innerWidth * .48 && rect.height >= innerHeight * .52;",
+    "            }).sort((a, b) => {",
+    "                const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();",
+    "                return (br.width * br.height) - (ar.width * ar.height);",
+    "            });",
+    "            mark(candidates[0], 'surface', 'main');",
+    "        }",
+    ''
+  ].join('\n'), 'theme main surface fallback');
+
+  const cssAnchor = '          #agy-theme-switcher-v2 {';
+  requireSingleAnchor(output, cssAnchor, 'theme auxiliary views CSS');
+  output = insertBefore(output, cssAnchor, [
+    '          /* Non-chat product views keep the wallpaper visible behind a calm glass surface. */',
+    '          html.agy-theme-active-v2[data-agy-view="history"] #agy-theme-wallpaper-v2,',
+    '          html.agy-theme-active-v2[data-agy-view="scheduled"] #agy-theme-wallpaper-v2,',
+    '          html.agy-theme-active-v2[data-agy-view="customizations"] #agy-theme-wallpaper-v2 { opacity: .72; filter: saturate(.88) brightness(1.015); }',
+    '          html.agy-theme-active-v2[data-agy-view="history"] #agy-theme-wallpaper-v2::after,',
+    '          html.agy-theme-active-v2[data-agy-view="scheduled"] #agy-theme-wallpaper-v2::after,',
+    '          html.agy-theme-active-v2[data-agy-view="customizations"] #agy-theme-wallpaper-v2::after { background: rgba(250,252,250,.14); }',
+    '          html.agy-theme-active-v2[data-agy-view="history"] [data-agy-surface="main"],',
+    '          html.agy-theme-active-v2[data-agy-view="scheduled"] [data-agy-surface="main"],',
+    '          html.agy-theme-active-v2[data-agy-view="customizations"] [data-agy-surface="main"] {',
+    '            background: linear-gradient(105deg, color-mix(in srgb, var(--agy-content) 42%, transparent), color-mix(in srgb, var(--agy-warm) 28%, transparent)) !important;',
+    '            backdrop-filter: blur(10px) saturate(.98) !important;',
+    '            -webkit-backdrop-filter: blur(10px) saturate(.98) !important;',
+    '            box-shadow: inset 1px 0 0 color-mix(in srgb, var(--agy-border) 55%, transparent);',
+    '          }',
+    '          html.agy-theme-active-v2[data-agy-view="history"] [data-agy-surface="main"] [class~="bg-background"],',
+    '          html.agy-theme-active-v2[data-agy-view="scheduled"] [data-agy-surface="main"] [class~="bg-background"],',
+    '          html.agy-theme-active-v2[data-agy-view="customizations"] [data-agy-surface="main"] [class~="bg-background"] { background-color: transparent !important; }',
+    ''
+  ].join('\n'), 'theme auxiliary views CSS');
+  return output;
+}
+
 function buildPreload(official, legacy) {
   let payload = legacy.slice(legacy.indexOf("electron_1.contextBridge.exposeInMainWorld('mcpLogger'"));
   if (!payload || payload === legacy) throw new Error('Legacy preload payload marker is missing');
   payload = stripLegacyPatchUpdater(payload);
   payload = addDeveloperModeGate(payload);
+  payload = enhanceThemeSemanticCoverage(payload);
+  payload = buildLocalizationOverlay(payload);
   const anchor = "electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);";
   const output = insertAfter(official, anchor, payload, 'preload extension point');
   return output;
 }
 
-function buildMain(official, legacy) {
+function buildNativeLocalization(legacy = '') {
+  const normalized = legacy.replace(/\r\n/g, '\n');
+  const begin = normalized.indexOf('  const dictionary = {'), end = normalized.indexOf('\n  };', begin);
+  const context = {dictionary:{}};
+  if (legacy) {
+    if (begin < 0 || end < begin) throw new Error('Native localization legacy dictionary is missing');
+    vm.runInNewContext(normalized.slice(begin,end+5)+'\nglobalThis.dictionary=dictionary;',context,{timeout:1000});
+  }
+  const messages = {...context.dictionary, ...JSON.parse(fs.readFileSync(path.join(__dirname,'locales/zh-CN.json'),'utf8')).messages};
+  const native = fs.readFileSync(path.join(__dirname,'injections/native-localization.js'),'utf8');
+  const marker = '/*__AGY_NATIVE_MESSAGES__*/ {}';
+  requireSingleAnchor(native,marker,'native localization catalog');
+  return native.replace(marker,JSON.stringify(messages));
+}
+
+function buildMain(official, legacy, legacyPreload = '') {
   const header = extractBetween(legacy, 'const agyThemePath = require("path");', 'const gotTheLock = electron_1.app.requestSingleInstanceLock();', 'main AGY header');
   const autoProxy = extractBetween(
     legacy,
@@ -158,6 +243,7 @@ function buildMain(official, legacy) {
     'main auto proxy'
   );
   let output = insertBefore(official, 'const gotTheLock = electron_1.app.requestSingleInstanceLock();', header, 'main imports');
+  output = insertBefore(output, 'const gotTheLock = electron_1.app.requestSingleInstanceLock();', buildNativeLocalization(legacyPreload), 'native dialog and menu localization');
   output = insertBefore(output, '    // Initialize electron-log and override console', autoProxy, 'main whenReady');
   output = insertAfter(
     output,
@@ -384,7 +470,7 @@ function buildCompatibleTree(options) {
     if (!fs.existsSync(legacyPath)) throw new Error(`Legacy payload is missing: ${relativePath}`);
     const official = fs.readFileSync(officialPath, 'utf8');
     const legacy = fs.readFileSync(legacyPath, 'utf8');
-    let rebuilt = builder(official, legacy);
+    let rebuilt = builder(official, legacy, relativePath === 'dist/main.js' ? fs.readFileSync(path.join(legacyDir,'dist/preload.js'),'utf8') : undefined);
     const ruled = applyLiteralRules(rebuilt, runtimeRules, relativePath);
     rebuilt = ruled.source;
     syntaxCheck(relativePath, rebuilt);
@@ -414,6 +500,7 @@ module.exports = {
   stripLegacyPatchUpdaterIpc,
   addDeveloperModeGate,
   buildMain,
+  buildNativeLocalization,
   buildTray,
   assertTrayModuleLoads,
   buildUtils,

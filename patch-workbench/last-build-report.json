@@ -4,19 +4,19 @@
   "officialVersion": "2.19.1",
   "officialSha256": "341234faf45bd1776fd5418a3c288dedc5487ebfcf153f53d75de17cfe15c1de",
   "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5093023,
-  "outputSha256": "0906cc218f68640f68d519e5355a5a484fd4560cb1390ef1370cf33331f2e192",
+  "outputSize": 5541961,
+  "outputSha256": "85074ab142d44bbafb3fc849cce0c64c2111f5fdab056ba0f353424b2ddc1e7c",
   "compatibility": {
     "files": [
       {
         "file": "dist/preload.js",
         "officialBytes": 5337,
-        "rebuiltBytes": 359906
+        "rebuiltBytes": 568377
       },
       {
         "file": "dist/main.js",
         "officialBytes": 20023,
-        "rebuiltBytes": 31990
+        "rebuiltBytes": 272393
       },
       {
         "file": "dist/tray.js",

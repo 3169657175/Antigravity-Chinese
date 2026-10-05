@@ -72,6 +72,10 @@ try {
   const languageServer = asar.extractFile(archivePath, 'dist/languageServer.js').toString('utf8');
   requireText(preload, 'AGYCustomThemeLibraryBridge', 'dist/preload.js');
   requireText(preload, 'AGYSupplementalTranslations', 'dist/preload.js');
+  requireSingleText(preload, '(function AGYTranslationEnhancement()', 'dist/preload.js');
+  if (/AGYActivityFeedback|__agyProgress|agy-activity-feedback/.test(preload)) throw new Error('Removed activity card is still bundled');
+  requireText(preload, "ipcRenderer.invoke('agent:update-active-count', count)", 'dist/preload.js');
+  rejectText(preload, 'replacedText.replaceAll(rule.search, rule.replace)', 'dist/preload.js');
   requireText(preload, "ipcRenderer.send('token:report'", 'dist/preload.js');
   requireText(preload, 'showOpenMultipleFolderDialog', 'dist/preload.js');
   requireText(preload, 'revealInFilePicker', 'dist/preload.js');
@@ -79,6 +83,10 @@ try {
   requireSingleText(main, "ipcMain.handle('agy-theme:set-custom'", 'dist/main.js');
   requireText(main, "ipcMain.on('token:report'", 'dist/main.js');
   requireText(main, 'global.isQuitting = true;', 'dist/main.js');
+  requireSingleText(main, '(function AGYNativeLocalization()', 'dist/main.js');
+  requireText(main, "wrap(electron.Menu,'buildFromTemplate'", 'dist/main.js');
+  requireSingleText(main, "ipcMain.handle('agy:i18n:catalog'", 'dist/main.js');
+  requireText(preload, "ipc.invoke('agy:i18n:catalog')", 'dist/preload.js');
   requireText(tray, "tray.on('click'", 'dist/tray.js');
   requireText(tray, "tray.on('double-click'", 'dist/tray.js');
   requireText(tray, '打开 Antigravity', 'dist/tray.js');

@@ -2,31 +2,48 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.3.5-0A7D5A.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.3.7-0A7D5A.svg)
 ![Antigravity](https://img.shields.io/badge/Antigravity-2.19.1-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
 当前源码基线已经与本机实际运行版本 `D:\ang\agy-hub\resources\app.asar` 对齐；Antigravity 汉化补丁构建基线为 **2.19.1**。
 
-## 1.3.5 重点更新
+## 1.3.7 重点更新
 
-- 注入链路恢复到 1.3.0 已验证的稳定实现，同时保留 Antigravity 2.19.1 的当前兼容补丁。
-- 账号切换不再单独强杀 `language_server.exe`，避免连续触发 Language Server 崩溃计数。
-- Skill 市场同步支持 GitHub Raw、jsDelivr 与 GitHub API 多源回退；简介翻译与 Antigravity 运行态隔离，并支持失败降级。
-- 更新链统一到 `3169657175/Antigravity-Chinese`，当前 Release 使用 `1.3.5` / `v1.3.5` 标签。
-- Windows 自动更新关闭 blockmap 差分下载，改为完整安装包单次下载，保留 SHA512 校验、进度与自动安装。
-- Claude Code 入口改由 Feature Flag 控制，默认隐藏，底层实现继续保留。
-- 社区反馈、回复、点赞和删除改为本地乐观更新，失败自动回滚；搜索只做本地过滤，不再重复闪骨架屏。
-- 社区 GET 支持可配置备用 HTTPS 源与最后成功数据缓存；写操作绝不自动重放到备用源。
-- 反代、社区、市场等重型页面改为首次打开时再加载。
-- 新增统一 Toast / 确认框 / 错误诊断和 Release Guard，避免版本、仓库、安装包再次分叉。
+- 本地 8046 反代升级为统一多协议兼容网关，同时支持 **OpenAI Responses、OpenAI Chat Completions、Anthropic Messages、Gemini Native**。
+- 新增 `/v1/chat/completions`，兼容文本、图片 `image_url`、system/developer 消息、Tools / Function Calling、工具结果、JSON 与 SSE 流式输出。
+- 新增 Gemini Native `generateContent` / `streamGenerateContent`、`/v1beta/models` 模型发现，兼容 `systemInstruction`、`inlineData`、`fileData`、`functionCall` / `functionResponse`。
+- 公共 OpenAI `/v1/models` 返回真实 Antigravity 模型 ID（`gemini-*` / `claude-*`）；Codex 专用 `gpt-*` 兼容别名只保留在 Codex 私有 `model_catalog_json`，不再污染普通 API 客户端的模型发现。
+- 对 embeddings、audio、images、moderations、files、batches、fine-tuning 等当前上游不具备的能力返回明确的结构化 `501`，不再伪装成模型或 API Key 错误。
+- API 接入页同步展示四套真实协议、对应 Base URL 与可用路由，移除“Chat Completions 不支持”的旧提示。
+- 新增协议适配层与真实 HTTP 路由回归测试，主网关继续保持模块化和 1650 行维护预算。
+- 固定 UI 汉化改为“小型静态界面即时翻译、大型动态 DOM 分片处理”，修复项目/复杂内容展开时数秒延迟，同时保持 Thought / Analyzed 等思考与工具过程原文不做实时翻译。
+- 修复历史对话、计划任务、自定义功能页面的主题语义识别与主内容毛玻璃背景，并补齐 MCP 目录中的固定描述汉化。
+- 修复 Windows 同版本覆盖安装：1.3.0～1.3.7 旧卸载链路和任意同版本重装均走安全覆盖迁移，避免错误的“应用无法关闭”循环提示。
+- 保留 1.3.6 已验证的账号、注入、Token、MCP / Skill、社区、更新和回滚能力。
+- 当前 Release 使用 `1.3.7` / `v1.3.7` 标签。
+
+## 第三方 Agent / API 接入
+
+本地网关默认监听 `127.0.0.1:8046`，API Key 在 AGY Hub 的“反代接入 → API 接入”页面查看。1.3.7 已在本机真实网关上验证模型发现、非流式、SSE 流式与 Function/Tool Calling。
+
+| 客户端协议 | Base URL | 主要端点 | Agent 能力 |
+| --- | --- | --- | --- |
+| OpenAI Chat Completions | `http://127.0.0.1:8046/v1` | `/v1/chat/completions` | 文本、图片、SSE、Tools / Function Calling |
+| OpenAI Responses | `http://127.0.0.1:8046/v1` | `/v1/responses` | 非流式、SSE、Function Calling、上下文压缩 |
+| Anthropic Messages | `http://127.0.0.1:8046` | `/v1/messages` | Messages、SSE、tool_use、`count_tokens` |
+| Gemini Native | `http://127.0.0.1:8046/v1beta` | `models/{model}:generateContent` | generate/stream、functionCall / functionResponse |
+
+公共模型发现：`GET /v1/models`；Gemini 模型发现：`GET /v1beta/models`。当前 live catalog 包含 Gemini 3.8 / 3.7 / 3.6 Flash High/Medium/Low、Gemini 3.1 Pro High/Low、Claude Opus 4.6 Thinking 与 Claude Sonnet 4.6。
+
+> Codex 为了适配自身模型白名单仍使用 `gpt-*` 兼容槽位，但这些别名只写入 Codex 私有模型目录；普通 API 客户端始终看到并使用真实 Gemini / Claude 模型 ID。
 
 ## 主要能力
 
 - **汉化补丁与安全回退**：基于当前官方 `app.asar` 构建兼容补丁，支持注入、退回上一版汉化和恢复官方英文原版。
 - **本地账号与额度**：读取 Antigravity 本地账号，展示额度、状态与重置时间，并提供账号切换和异常分类。
-- **Codex 接入**：本地 `127.0.0.1:8046` 提供 OpenAI Responses 兼容接口，支持流式输出、工具调用、长上下文与模型映射。
+- **统一 API 反代**：本地 `127.0.0.1:8046` 同时提供 OpenAI Responses、OpenAI Chat Completions、Anthropic Messages 与 Gemini Native，支持流式输出、工具调用、图片、长上下文与模型映射。
 - **Claude Code 底层兼容（暂时隐藏入口）**：相关实现仍保留在源码中，当前版本默认通过 Feature Flag 关闭 UI，待链路完善后可直接重新开放。
 - **当前模型目录**：支持 Gemini 3.8 / 3.7 / 3.6 Flash 的 High / Medium / Low、Gemini 3.1 Pro High / Low，以及 Claude Opus 4.6 / Sonnet 4.6。
 - **自定义 Provider**：支持 OpenAI Responses 兼容服务，测试不会改变当前已连接线路。
@@ -114,8 +131,8 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.3.5.exe
-agy-hub-setup-1.3.5.exe.blockmap
+agy-hub-setup-1.3.7.exe
+agy-hub-setup-1.3.7.exe.blockmap
 latest.yml
 ```
 
