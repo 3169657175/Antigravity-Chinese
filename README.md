@@ -86,10 +86,18 @@ agy-hub/
 ├─ tokenUsage.js                   Token 统计
 ├─ marketplaceController.js        MCP / Skill 市场
 ├─ patch-workbench/                Antigravity 补丁构建与兼容验证
-├─ assets/                         图标、主题和发布用补丁资源
+├─ assets/                         图标、主题、截图和发布用补丁资源
+│  └─ screenshots/                 社区界面预览截图
 ├─ docs/                           架构、维护与兼容文档
-└─ *.test.js                       Node.js 自动化测试
+├─ tests/
+│  └─ unit/                       单元测试、协议与回归测试（65 个文件）
+└─ scripts/
+   └─ smoke/                      Electron 页面、UI 和注入冒烟验证脚本
 ```
+
+### 源码目录整理说明
+
+测试源码统一放在 `tests/unit/`，Electron 冒烟测试放在 `scripts/smoke/`，社区预览图片放在 `assets/screenshots/`，避免占据 GitHub 仓库首页。Electron 主进程、渲染进程和网关模块保留原有路径，确保 **1.3.8 运行与安装包资源布局不受影响**。目录整理不会改变现有 Release 安装包。
 
 ## 开发与验证
 
