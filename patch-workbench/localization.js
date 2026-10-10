@@ -12,9 +12,9 @@ function replaceSection(source, start, end, replacement) {
 }
 function buildLocalizationOverlay(payload) {
   let source = payload.replace(/\r\n/g, '\n');
-  const catalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'locales', 'zh-CN.json'), 'utf8'));
+  const catalog = JSON.parse(require('../patchResourceResolver').readPatchWorkbenchResource('locales/zh-CN.json'));
   if (catalog.schemaVersion !== 1 || !catalog.messages) throw new Error('Invalid built-in localization catalog');
-  const engine = fs.readFileSync(path.join(__dirname, 'injections', 'translation-enhancement.js'), 'utf8');
+  const engine = require('../patchResourceResolver').readPatchWorkbenchResource('injections/translation-enhancement.js');
   // Preserve legacy dynamic templates, removing blind substring/word replacements.
   source = replaceSection(source, '    let replacedText = text;', '    const trimmed = text.trim();', '');
   const declaration = '    let dynamicMatch = trimmed;\n    let isDynamic = false;';

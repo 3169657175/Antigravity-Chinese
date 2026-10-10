@@ -153,7 +153,7 @@ function runMcpHandshake(launch, timeoutMs, protocolVersion, onProgress) {
       params: {
         protocolVersion,
         capabilities: {},
-        clientInfo: { name: 'agy-hub-validator', version: '1.3.7' }
+        clientInfo: { name: 'agy-hub-validator', version: '1.3.8' }
       }
     })}\n`);
   });

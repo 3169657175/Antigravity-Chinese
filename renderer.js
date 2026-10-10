@@ -498,13 +498,19 @@ function initFeedbackBoard() {
   if (detailModalCloseBtn && detailModal) {
     detailModalCloseBtn.addEventListener('click', () => {
       detailModal.classList.remove('active');
-      setTimeout(() => { detailModal.style.display = 'none'; }, 280);
+      clearTimeout(detailModal._agyHideTimer);
+      detailModal._agyHideTimer = setTimeout(() => {
+        if (!detailModal.classList.contains('active')) detailModal.style.display = 'none';
+      }, 280);
       // 不触发全量 loadFeedbacks，保留当前卡片的点赞状态
     });
     detailModal.addEventListener('click', (e) => {
       if (e.target === detailModal) {
         detailModal.classList.remove('active');
-        setTimeout(() => { detailModal.style.display = 'none'; }, 280);
+        clearTimeout(detailModal._agyHideTimer);
+        detailModal._agyHideTimer = setTimeout(() => {
+          if (!detailModal.classList.contains('active')) detailModal.style.display = 'none';
+        }, 280);
         // 不触发全量 loadFeedbacks，保留当前卡片的点赞状态
       }
     });
@@ -1297,10 +1303,12 @@ async function openFeedbackDetailDesktop(id) {
   const modalBody = document.getElementById('detail-modal-body');
   if (!modal || !modalBody) return;
 
-  const fb = window.currentFeedbacksDesktop ? window.currentFeedbacksDesktop.find(f => f.id === id) : null;
+  const fb = window.currentFeedbacksDesktop ? window.currentFeedbacksDesktop.find(f => String(f.id) === String(id)) : null;
   if (!fb) return;
 
   renderDetailModalContentDesktop(fb);
+  clearTimeout(modal._agyHideTimer);
+  modal.classList.add('active');
   modal.style.display = 'flex';
 }
 window.openFeedbackDetailDesktop = openFeedbackDetailDesktop;
@@ -1330,8 +1338,6 @@ function renderDetailModalContentDesktop(fb) {
         ? `<button type="button" class="action-text-btn delete-btn" data-feedback-detail-action="delete-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" style="font-size:9px; margin-left:6px; color: #ef4444; border:none; background:transparent;">✕ 删除</button>`
         : '';
       const isAdminReply = r.role === 'admin' ? 'admin' : '';
-      const replyActions = r.pending ? '<span style="font-size:10px;color:var(--text-muted);">正在同步…</span>' : `
-            ${replyActions}`;
 
       return `
         <div class="reply-item" style="border-left: 2px solid var(--accent-pink); padding: 8px 12px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 8px; text-align: left;">

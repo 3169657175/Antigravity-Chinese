@@ -6,6 +6,8 @@ const os = require('os');
 const crypto = require('crypto');
 const vm = require('vm');
 const asar = require('@electron/asar');
+const { withDetachedArchive } = require('./archiveReadIsolation');
+const { createAntigravityInstallMonitor } = require('./antigravityInstallMonitor');
 const { exec, execFile, execFileSync, spawn } = require('child_process');
 const { Worker } = require('worker_threads');
 const { startProxy, stopProxy, getInitialStats, getProxyStatus, recordTokenLog } = require('./proxy.js');
@@ -28,6 +30,12 @@ const { hasQuitForUpdateArgument, createAppShutdownCoordinator } = require('./ap
 const { createSecretCodec } = require('./secretCodec.js');
 const { configureTranslationCatalog } = require('./translationCatalog.js');
 let activePatchInstall = null;
+const officialInstallMonitor = createAntigravityInstallMonitor({ onChange: active => {
+  if (active) {
+    console.log('[Patch] Official Antigravity installer detected: suspend patch injection and release ASAR cache.');
+    try { asar.uncacheAll(); } catch (_) {}
+  }
+} });
 let skillTranslationService = null;
 let mainWindow = null;
 let tray = null;
@@ -230,15 +238,16 @@ function hashFileSync(filePath) {
 }
 
 function inspectPatchArchive(archivePath, requiredFiles) {
-  const entries = new Set(asar.listPackage(archivePath).map(entry =>
+  return withDetachedArchive(archivePath, snapshotPath => {
+  const entries = new Set(asar.listPackage(snapshotPath).map(entry =>
     String(entry).replace(/^[/\\]+/, '').replace(/\\/g, '/')
   ));
-  const packageJson = JSON.parse(asar.extractFile(archivePath, 'package.json').toString('utf8').replace(/^\uFEFF/, ''));
+  const packageJson = JSON.parse(asar.extractFile(snapshotPath, 'package.json').toString('utf8').replace(/^\uFEFF/, ''));
   const syntaxErrors = [];
   for (const entry of ['dist/main.js', 'dist/preload.js']) {
     if (!entries.has(entry)) continue;
     try {
-      const source = asar.extractFile(archivePath, entry).toString('utf8');
+      const source = asar.extractFile(snapshotPath, entry).toString('utf8');
       new vm.Script(source, { filename: entry });
     } catch (error) {
       syntaxErrors.push(`${entry}: ${error.message}`);
@@ -249,6 +258,7 @@ function inspectPatchArchive(archivePath, requiredFiles) {
     missingFiles: requiredFiles.filter(file => !entries.has(String(file).replace(/\\/g, '/'))),
     syntaxErrors
   };
+  });
 }
 
 function getDirectoryStats(directory) {
@@ -400,6 +410,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    officialInstallMonitor.start();
     try { configureTranslationCatalog(app); }
     catch (error) { console.warn('[Localization] Catalog registration failed:', error.message); }
     // Be explicit about using the OS proxy.  The Antigravity desktop client
@@ -889,6 +900,10 @@ ipcMain.handle('install-community-skill', async (event, skill) => {
 
 // 一键装配汉化补丁：重型哈希、目录遍历、复制和完整性校验全部在 Worker 中执行。
 ipcMain.handle('install-patch', async (event, { asarPath, sourceAsar }) => {
+  const officialInstallActive = await officialInstallMonitor.poll();
+  if (officialInstallActive) {
+    return { success: false, code: 'OFFICIAL_INSTALL_IN_PROGRESS', error: '检测到 Antigravity 官方安装/更新正在运行。已暂停汉化注入并释放文件占用；请等待官方更新完成。' };
+  }
   if (activePatchInstall) {
     return { success: false, code: 'PATCH_ALREADY_RUNNING', error: '已有汉化注入任务正在执行，请等待完成或先取消。' };
   }

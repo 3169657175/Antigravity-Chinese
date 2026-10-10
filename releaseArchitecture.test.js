@@ -7,11 +7,11 @@ const flags = require('./featureFlags.js');
 const communityState = require('./communityState.js');
 const lifecycle = require('./pageLifecycle.js');
 
-test('1.3.7 release identity and updater repository cannot drift', () => {
-  assert.equal(packageJson.version, '1.3.7');
+test('1.3.8 release identity and updater repository cannot drift', () => {
+  assert.equal(packageJson.version, '1.3.8');
   assert.deepEqual(packageJson.build.publish[0], { provider: 'github', owner: release.RELEASE_REPOSITORY.owner, repo: release.RELEASE_REPOSITORY.repo });
   assert.equal(release.RELEASE_REPOSITORY.repo, 'Antigravity-Chinese');
-  assert.deepEqual(release.releaseTagCandidates('v1.3.7'), ['1.3.7', 'v1.3.7']);
+  assert.deepEqual(release.releaseTagCandidates('v1.3.8'), ['1.3.8', 'v1.3.8']);
   const updater = fs.readFileSync('updaterService.js', 'utf8');
   assert.match(updater, /disableDifferentialDownload = true/);
   assert.match(updater, /releaseTagCandidates/);

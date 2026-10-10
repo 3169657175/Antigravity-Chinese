@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { buildLocalizationOverlay } = require('./localization');
+const { readPatchWorkbenchResource } = require('../patchResourceResolver');
 
 function normalizeVersion(value) {
   const match = String(value || '').trim().match(/^(\d+)\.(\d+)\.(\d+)/);
@@ -227,8 +228,8 @@ function buildNativeLocalization(legacy = '') {
     if (begin < 0 || end < begin) throw new Error('Native localization legacy dictionary is missing');
     vm.runInNewContext(normalized.slice(begin,end+5)+'\nglobalThis.dictionary=dictionary;',context,{timeout:1000});
   }
-  const messages = {...context.dictionary, ...JSON.parse(fs.readFileSync(path.join(__dirname,'locales/zh-CN.json'),'utf8')).messages};
-  const native = fs.readFileSync(path.join(__dirname,'injections/native-localization.js'),'utf8');
+  const messages = {...context.dictionary, ...JSON.parse(readPatchWorkbenchResource('locales/zh-CN.json')).messages};
+  const native = readPatchWorkbenchResource('injections/native-localization.js');
   const marker = '/*__AGY_NATIVE_MESSAGES__*/ {}';
   requireSingleAnchor(native,marker,'native localization catalog');
   return native.replace(marker,JSON.stringify(messages));

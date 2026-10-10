@@ -1,17 +1,17 @@
 {
   "ok": true,
   "officialAsar": "C:\\Users\\niu\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar.original",
-  "officialVersion": "2.19.1",
-  "officialSha256": "341234faf45bd1776fd5418a3c288dedc5487ebfcf153f53d75de17cfe15c1de",
+  "officialVersion": "2.22.0",
+  "officialSha256": "259c83ffa266088dda6ede520a601bbf06cc5c34985cdf56c5d68549c98dbb0e",
   "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5541961,
-  "outputSha256": "85074ab142d44bbafb3fc849cce0c64c2111f5fdab056ba0f353424b2ddc1e7c",
+  "outputSize": 5395012,
+  "outputSha256": "99a192664fcfc1f963228a627e7c2850a7aef0f5ee0e4c1220f6f4f7d59b8591",
   "compatibility": {
     "files": [
       {
         "file": "dist/preload.js",
-        "officialBytes": 5337,
-        "rebuiltBytes": 568377
+        "officialBytes": 5409,
+        "rebuiltBytes": 568449
       },
       {
         "file": "dist/main.js",

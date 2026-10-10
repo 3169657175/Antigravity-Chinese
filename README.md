@@ -2,12 +2,19 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.3.7-0A7D5A.svg)
-![Antigravity](https://img.shields.io/badge/Antigravity-2.19.1-5B5BD6.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.3.8-0A7D5A.svg)
+![Antigravity](https://img.shields.io/badge/Antigravity-2.22.0-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
-当前源码基线已经与本机实际运行版本 `D:\ang\agy-hub\resources\app.asar` 对齐；Antigravity 汉化补丁构建基线为 **2.19.1**。
+当前稳定版本为 **AGY Hub 1.3.8**；汉化补丁基于 **Antigravity 2.22.0** 构建与验证。未来官方版本若调整内部结构，仍须先通过兼容性检查，不能保证所有新版无需适配即可注入。
+
+## 1.3.8 重点更新
+
+- 修复新版本 Antigravity（已在 2.22.0 上做兼容构建检查）注入时找不到汉化词典和运行资源的问题，统一从安装包外置 patch 资源读取。
+- 官方更新期间避免 AGY Hub 直接锁住安装目录的 app.asar，新增独立快照扫描和安装器检测，检测到更新将暂停汉化注入。
+- 修复反馈帖已有评论时因 `replyActions` 自引用触发 `ReferenceError`、导致评论区无法打开的问题；已在 Electron 页面中验证同一帖子连续三次打开/关闭均正常。
+- 完善评论弹窗关闭计时与再次打开状态，并补充无评论、已有评论、多条评论及发送中评论的回归测试。
 
 ## 1.3.7 重点更新
 
@@ -22,11 +29,11 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 - 修复历史对话、计划任务、自定义功能页面的主题语义识别与主内容毛玻璃背景，并补齐 MCP 目录中的固定描述汉化。
 - 修复 Windows 同版本覆盖安装：1.3.0～1.3.7 旧卸载链路和任意同版本重装均走安全覆盖迁移，避免错误的“应用无法关闭”循环提示。
 - 保留 1.3.6 已验证的账号、注入、Token、MCP / Skill、社区、更新和回滚能力。
-- 当前 Release 使用 `1.3.7` / `v1.3.7` 标签。
+- 当前稳定 Release 使用 `1.3.8` / `v1.3.8` 标签。
 
 ## 第三方 Agent / API 接入
 
-本地网关默认监听 `127.0.0.1:8046`，API Key 在 AGY Hub 的“反代接入 → API 接入”页面查看。1.3.7 已在本机真实网关上验证模型发现、非流式、SSE 流式与 Function/Tool Calling。
+本地网关默认监听 `127.0.0.1:8046`，API Key 在 AGY Hub 的“反代接入 → API 接入”页面查看。四套协议于 1.3.7 引入并在本机真实网关上验证模型发现、非流式、SSE 流式与 Function/Tool Calling；1.3.8 继续保留这些能力。
 
 | 客户端协议 | Base URL | 主要端点 | Agent 能力 |
 | --- | --- | --- | --- |
@@ -56,8 +63,8 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 
 | 路径 | 用途 |
 | --- | --- |
-| `C:\Users\niu\.gemini\antigravity\scratch\agy-hub` | 正式开发源码，后续修改的唯一基准 |
-| `D:\ang\agy-hub` | 已构建应用的实际安装 / 运行目录，不应直接作为长期开发目录 |
+| `<仓库克隆目录>` | 开发源码和构建目录 |
+| `<AGY Hub 安装目录>` | 应用安装与运行目录，不建议直接作为长期开发目录 |
 | `dist\` | Windows 安装包、blockmap 和 `latest.yml` 发布产物 |
 
 开发时请先阅读 `AGENTS.md`、`AI_PROJECT_GUIDE.md` 和 `docs/MAINTENANCE_GUIDE.md`。
@@ -118,7 +125,7 @@ Windows 安装包：
 .\node_modules\.bin\electron-builder.cmd
 ```
 
-需要同时同步到 `D:\ang\agy-hub` 时才执行：
+需要将构建产物同步到本机的应用运行目录时才执行：
 
 ```powershell
 npm run dist:sync
@@ -131,8 +138,8 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.3.7.exe
-agy-hub-setup-1.3.7.exe.blockmap
+agy-hub-setup-1.3.8.exe
+agy-hub-setup-1.3.8.exe.blockmap
 latest.yml
 ```
 
