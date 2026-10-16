@@ -2,12 +2,22 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.3.8-0A7D5A.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.3.9-0A7D5A.svg)
 ![Antigravity](https://img.shields.io/badge/Antigravity-2.22.0-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
-当前稳定版本为 **AGY Hub 1.3.8**；汉化补丁基于 **Antigravity 2.22.0** 构建与验证。未来官方版本若调整内部结构，仍须先通过兼容性检查，不能保证所有新版无需适配即可注入。
+当前稳定版本为 **AGY Hub 1.3.9**；汉化补丁基于 **Antigravity 2.22.0** 构建与验证。未来官方版本若调整内部结构，仍须先通过兼容性检查，不能保证所有新版无需适配即可注入。
+
+[下载 1.3.9 安装包与查看完整更新说明](https://github.com/3169657175/Antigravity-Chinese/releases/tag/v1.3.9)
+
+## 1.3.9 重点更新
+
+- 修复多账号额度读取：先通过各账号的 `loadCodeAssist` 查询真实项目，再获取 Gemini / Claude 的 5 小时与每周额度，避免固定虚拟项目返回不完整数据。
+- Hub 与 Antigravity 账号弹窗共用额度查询模块；缺失字段显示未知，不再伪造 100% 或导致所有额度无法查看。
+- 反代 Gemini 列表更新为 3.8 Flash High / Medium / Low，清理旧缓存与默认列表中的停用版本，保留 Claude 与 GPT-OSS。
+- 查询和验证不会切换当前账号、Provider 或网关模式。
+- 修复从 1.3.8 升级时误报“无法关闭”的安装问题；覆盖安装按目录识别，不再依赖版本名单，检测到程序运行时自动关闭并继续。
 
 ## 1.3.8 重点更新
 
@@ -130,8 +140,10 @@ npm test
 Windows 安装包：
 
 ```powershell
-.\node_modules\.bin\electron-builder.cmd
+npm run release:build
 ```
+
+发布流程包含 `npm run test:installer-upgrade`，会用独立应用身份验证全新安装、覆盖升级、同版本重装、自动退出和强制关闭兜底，并清理测试注册表与缓存。
 
 需要将构建产物同步到本机的应用运行目录时才执行：
 
@@ -146,8 +158,8 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.3.8.exe
-agy-hub-setup-1.3.8.exe.blockmap
+agy-hub-setup-1.3.9.exe
+agy-hub-setup-1.3.9.exe.blockmap
 latest.yml
 ```
 

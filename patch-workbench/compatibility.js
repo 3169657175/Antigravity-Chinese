@@ -352,6 +352,12 @@ function buildIpcHandlers(official, legacy) {
   if (outputFinalBrace < 0) throw new Error('Official ipcHandlers final brace is missing');
   output = `${output.slice(0, outputFinalBrace)}\n${suffix}\n${output.slice(outputFinalBrace)}`;
   output = hardenAccountSwitch(output);
+  output = replaceBetween(output, '            // B. 获取配额数据', '        } catch (err) {\n            return { success: false, error: err.message };\n        }\n    });\n\n    // 注入：export-local-account', [
+    '            return await require("./accountQuota").fetchAccountQuota({',
+    '                fetch: net.fetch.bind(net), accessToken,',
+    '                projectId: tokenObj.project_id || detail.project_id',
+    '            });'
+  ].join('\n'), 'shared per-account quota query');
   return output;
 }
 
@@ -488,6 +494,10 @@ function buildCompatibleTree(options) {
     syntaxCheck('dist/accountVault.js', fs.readFileSync(targetVault, 'utf8'));
     report.files.push({ file: 'dist/accountVault.js', addedByPatch: true, rebuiltBytes: fs.statSync(targetVault).size });
   }
+  const quotaSource = fs.readFileSync(path.join(__dirname, '..', 'accountQuota.js'), 'utf8');
+  syntaxCheck('dist/accountQuota.js', quotaSource);
+  fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuota.js'), quotaSource, 'utf8');
+  report.files.push({ file: 'dist/accountQuota.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaSource) });
   return report;
 }
 

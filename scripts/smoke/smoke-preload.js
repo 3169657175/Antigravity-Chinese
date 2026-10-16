@@ -3,6 +3,8 @@ const { contextBridge } = require('electron');
 const ok = async () => ({ success: true });
 let updaterCallback = null;
 let claudeDesktopConnected = false;
+const partialQuota = process.argv.includes('--smoke-partial-quota');
+const currentModels = ['agy-auto', 'gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low', 'claude-opus-4-6-thinking', 'claude-sonnet-4-6', 'gpt-oss-120b-medium'];
 const mockSkills = Array.from({ length: 60 }, (_, index) => ({
   id: `responsive-skill-${String(index + 1).padStart(2, '0')}`,
   name: `Responsive Skill ${index + 1}`,
@@ -39,11 +41,11 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   getAsarVersions: async () => ({ success: true, originalVersion: '2.3.1', patchVersion: '2.3.1' }),
   getNetworkConfig: async () => ({}), checkProxyPort: async () => true,
   listLocalAccounts: async () => ({ success: true, currentAccountId: 'demo', accounts: [{ id: 'demo', email: 'demo@example.com', name: 'Demo', current: true, storageState: 'encrypted' }] }),
-  fetchAccountQuota: async () => ({ success: true, quota: { gemini5h: '71%', geminiWeekly: '89%', claude5h: '100%', claudeWeekly: '77%', gemini5hReset: new Date(Date.now() + 3600000).toISOString(), geminiWeeklyReset: new Date(Date.now() + 86400000).toISOString(), claude5hReset: new Date(Date.now() + 7200000).toISOString(), claudeWeeklyReset: new Date(Date.now() + 172800000).toISOString() } }),
+  fetchAccountQuota: async () => ({ success: true, quota: { gemini5h: '71%', geminiWeekly: partialQuota ? '--' : '89%', claude5h: '100%', claudeWeekly: '77%', gemini5hReset: new Date(Date.now() + 3600000).toISOString(), geminiWeeklyReset: new Date(Date.now() + 86400000).toISOString(), claude5hReset: new Date(Date.now() + 7200000).toISOString(), claudeWeeklyReset: new Date(Date.now() + 172800000).toISOString() } }),
   getTokenStats: async () => ({ logs: mockUsageLogs, totalTokens: 6476004, promptTokens: 6447411, completionTokens: 28593, cachedTokens: 4588497, cachePromptTokens: 6447411, cacheDataAvailable: true }),
   getTokenMonitorStatus: async () => ({ ready: true, routed: true, localMonitor: { ready: true, watchedFiles: 12 } }),
-  getCodexGatewayStatus: async () => ({ running: true, host: '127.0.0.1', port: 8046, apiKey: 'sk-demo', accountId: 'demo', model: 'agy-auto', autoResolvedModel: 'claude-sonnet-4-6', baseUrl: 'http://127.0.0.1:8046/v1', models: ['agy-auto','gemini-3.5-flash-lite','gemini-3.6-flash-high','gemini-3.1-pro-high','claude-sonnet-4-6'] }),
-  startCodexGateway: async settings => ({ success: true, status: { running: true, host: '127.0.0.1', port: settings.port || 8046, apiKey: 'sk-demo', accountId: settings.accountId || 'demo', model: settings.model || 'agy-auto', baseUrl: 'http://127.0.0.1:8046/v1', models: ['agy-auto','gemini-3.5-flash-lite','gemini-3.6-flash-high','gemini-3.1-pro-high','claude-sonnet-4-6'] } }),
+  getCodexGatewayStatus: async () => ({ running: true, host: '127.0.0.1', port: 8046, apiKey: 'sk-demo', accountId: 'demo', model: 'agy-auto', autoResolvedModel: 'claude-sonnet-4-6', baseUrl: 'http://127.0.0.1:8046/v1', models: currentModels }),
+  startCodexGateway: async settings => ({ success: true, status: { running: true, host: '127.0.0.1', port: settings.port || 8046, apiKey: 'sk-demo', accountId: settings.accountId || 'demo', model: settings.model || 'agy-auto', baseUrl: 'http://127.0.0.1:8046/v1', models: currentModels } }),
   listThemes: async () => ({ success: true, themes: [], palettes: [] }),
   getActiveTheme: async () => ({ enabled: false }),
   setActiveTheme: ok, disableTheme: ok, pickThemeImage: ok, saveThemeDesign: ok,

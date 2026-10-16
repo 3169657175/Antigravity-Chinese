@@ -1,9 +1,9 @@
 {
-  "verifiedAt": "2026-10-10T01:29:18.438Z",
+  "verifiedAt": "2026-10-16T08:42:48.737Z",
   "ok": true,
   "archivePath": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "archiveSize": 5395012,
-  "archiveSha256": "99a192664fcfc1f963228a627e7c2850a7aef0f5ee0e4c1220f6f4f7d59b8591",
+  "archiveSize": 5397087,
+  "archiveSha256": "975ccf7d5a3a5f485a3be45f4140e6b184151aaeb28976da82eecca281d161b7",
   "packageVersion": "2.22.0",
   "formatVersion": 2,
   "unpackedMode": "preserve-official",
@@ -14,7 +14,9 @@
     "dist/main.js",
     "dist/tray.js",
     "dist/utils.js",
-    "dist/ipcHandlers.js"
+    "dist/ipcHandlers.js",
+    "dist/accountVault.js",
+    "dist/accountQuota.js"
   ],
   "checkedSyntax": [
     "dist/languageServer.js",
@@ -23,7 +25,8 @@
     "dist/tray.js",
     "dist/utils.js",
     "dist/ipcHandlers.js",
-    "dist/accountVault.js"
+    "dist/accountVault.js",
+    "dist/accountQuota.js"
   ],
   "checkedTrayModuleExports": [
     "createTray",

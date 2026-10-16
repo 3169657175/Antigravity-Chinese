@@ -128,19 +128,16 @@ test('relaxes only the rejected Claude tool schema and retries automatically', a
 });
 
 test('publishes the currently available Antigravity model catalog', () => {
-  assert.equal(MODELS.length, 14);
+  assert.equal(MODELS.length, 7);
   assert.deepEqual(MODELS, [
     'agy-auto',
     'gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low',
-    'gemini-3.7-flash-high', 'gemini-3.7-flash-medium', 'gemini-3.7-flash-low',
-    'gemini-3.6-flash-high', 'gemini-3.6-flash-medium', 'gemini-3.6-flash-low',
-    'gemini-3.1-pro-high', 'gemini-3.1-pro-low',
-    'claude-opus-4-6-thinking', 'claude-sonnet-4-6'
+    'claude-opus-4-6-thinking', 'claude-sonnet-4-6', 'gpt-oss-120b-medium'
   ]);
   const catalog = buildCodexModelsResponse();
-  assert.equal(catalog.models.length, 14);
+  assert.equal(catalog.models.length, 7);
   assert.equal(catalog.models[0].display_name, 'AGY 自动路由（按额度）');
-  assert.equal(catalog.models[13].display_name, 'Claude Sonnet 4.6 (Thinking)');
+  assert.equal(catalog.models[5].display_name, 'Claude Sonnet 4.6 (Thinking)');
   assert.equal(catalog.models[0].minimal_client_version, '0.144.0');
   assert.equal(catalog.models[0].multi_agent_version, 'v2');
   assert.equal(catalog.models[0].supports_reasoning_summaries, true);
@@ -148,8 +145,8 @@ test('publishes the currently available Antigravity model catalog', () => {
   assert.ok(catalog.models[0].available_in_plans.includes('k12'));
 
   const visibleCatalog = buildAntigravityCodexModelsResponse();
-  assert.equal(visibleCatalog.models.length, 8);
-  assert.deepEqual(visibleCatalog.models.map(item => item.slug), Object.keys(CODEX_VISIBLE_MODEL_ALIASES));
+  assert.equal(visibleCatalog.models.length, 6);
+  assert.equal(visibleCatalog.models.some(item => /Gemini 3\.[167]/.test(item.display_name)), false);
   assert.equal(visibleCatalog.models[0].display_name, 'Gemini 3.8 Flash (High)');
   assert.equal(codexAliasForModel('gemini-3.1-pro-high'), 'gpt-5.5');
   assert.equal(codexAliasForModel('gemini-3.5-flash-lite'), 'gpt-5.6-luna');
@@ -163,12 +160,12 @@ test('publishes the currently available Antigravity model catalog', () => {
 });
 
 test('supports explicit gateway and Codex model control modes', () => {
-  assert.equal(selectRequestedModel('gemini-3.6-flash-high', {
-    model: 'gemini-3.1-pro-high', modelControl: 'gateway'
-  }), 'gemini-3.1-pro-high');
-  assert.equal(selectRequestedModel('gemini-3.6-flash-high', {
-    model: 'gemini-3.1-pro-high', modelControl: 'client'
-  }), 'gemini-3.6-flash-high');
+  assert.equal(selectRequestedModel('gemini-3.8-flash-high', {
+    model: 'gemini-3.8-flash-low', modelControl: 'gateway'
+  }), 'gemini-3.8-flash-low');
+  assert.equal(selectRequestedModel('gemini-3.8-flash-high', {
+    model: 'gemini-3.8-flash-low', modelControl: 'client'
+  }), 'gemini-3.8-flash-high');
   assert.equal(selectRequestedModel('gpt-5.6-sol', {
     model: 'gemini-3.1-pro-high', modelControl: 'client'
   }), 'gemini-3.8-flash-high');
@@ -948,7 +945,7 @@ test('serves Claude Messages through Antigravity even while Codex uses a custom 
       method: 'POST',
       headers: { 'x-api-key': status.apiKey, 'x-agy-account-id': 'claude-selected-account', 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-agy-36fh', max_tokens: 1024, stream: false,
+        model: 'gemini-3.8-flash-high', max_tokens: 1024, stream: false,
         messages: [{ role: 'user', content: 'Read a.txt' }],
         tools: [{ name: 'read_file', input_schema: {
           type: 'object',
@@ -971,7 +968,7 @@ test('serves Claude Messages through Antigravity even while Codex uses a custom 
     assert.equal(selectedAccountId, 'claude-selected-account');
     assert.match(requestedUrl, /cloudcode-pa/);
     assert.doesNotMatch(requestedUrl, /provider\.example/);
-    assert.equal(forwarded.model, 'gemini-3.6-flash-high');
+    assert.equal(forwarded.model, 'gemini-3.8-flash-tiered');
     assert.equal(forwarded.request.contents[0].parts[0].text, 'Read a.txt');
     const forwardedSchema = forwarded.request.tools[0].functionDeclarations[0].parameters;
     assert.equal(JSON.stringify(forwardedSchema).includes('propertyNames'), false);

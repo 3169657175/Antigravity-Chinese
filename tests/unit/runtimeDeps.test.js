@@ -40,26 +40,26 @@ test('NSIS updater uses the dedicated graceful shutdown include', () => {
   const installerScript = fs.readFileSync(path.join(__dirname, '..', '..', 'build', 'installer.nsh'), 'utf8');
   assert.match(installerScript, /--quit-for-update/);
   assert.match(installerScript, /\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}/);
-  assert.match(installerScript, /IS_POWERSHELL_AVAILABLE/);
+  assert.match(installerScript, /QueryFullProcessImageNameW/);
   assert.match(installerScript, /AGY_FIND_MAIN_PROCESS/);
   assert.match(installerScript, /AGY_FORCE_CLOSE_MAIN_PROCESS/);
   assert.match(installerScript, /AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER/);
-  assert.match(installerScript, /DisplayVersion/);
-  assert.match(installerScript, /\$R9 == "\$\{VERSION\}"/);
-  assert.match(installerScript, /1\.3\.5/);
-  assert.match(installerScript, /1\.3\.7/);
+  assert.match(installerScript, /\$\{INSTALL_REGISTRY_KEY\}.*InstallLocation/);
+  assert.match(installerScript, /GetFullPathName \$R9 "\$INSTDIR/);
+  assert.doesNotMatch(installerScript, /\$R\d == "\d+\.\d+\.\d+"/);
   assert.match(installerScript, /DeleteRegKey/);
-  assert.match(installerScript, /\$\$_\.Name -eq '\$\{APP_EXECUTABLE_FILENAME\}'/);
-  assert.match(installerScript, /\$\$_\.ExecutablePath/);
-  assert.match(installerScript, /继续安装将自动关闭程序/);
-  assert.match(installerScript, /MB_OKCANCEL/);
+  assert.match(installerScript, /\$4 == "\$\{APP_EXECUTABLE_FILENAME\}"/);
+  assert.match(installerScript, /\$4 == \$8/);
+  assert.match(installerScript, /正在自动关闭程序以继续安装/);
+  assert.doesNotMatch(installerScript, /MB_OKCANCEL/);
   assert.doesNotMatch(installerScript, /!insertmacro FIND_PROCESS/);
   assert.doesNotMatch(installerScript, /!insertmacro KILL_PROCESS/);
   assert.doesNotMatch(installerScript, /MB_RETRYCANCEL/);
   assert.doesNotMatch(installerScript, /agy_retry_shutdown/);
   assert.doesNotMatch(installerScript, /无法关闭安装目录中的/);
   assert.doesNotMatch(installerScript, /agy_wait_for_exit/);
-  assert.match(installerScript, /taskkill/);
+  assert.match(installerScript, /TerminateProcess/);
+  assert.doesNotMatch(installerScript, /nsExec::Exec/);
 });
 
 test('renderer entry files required by BrowserWindow exist', () => {

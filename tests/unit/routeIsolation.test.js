@@ -25,10 +25,10 @@ test('probeUpstream restores the exact active custom route if probe code mutates
     customModels: ['gpt-5.6-sol']
   });
   gateway.callUpstream = async () => {
-    gateway.configure({ mode: 'antigravity', model: 'gemini-3.6-flash-high' });
-    return { text: '{}', model: 'gemini-3.6-flash-high' };
+    gateway.configure({ mode: 'antigravity', model: 'gemini-3.8-flash-high' });
+    return { text: '{}', model: 'gemini-3.8-flash-high' };
   };
-  await gateway.probeUpstream({ model: 'gemini-3.6-flash-high' });
+  await gateway.probeUpstream({ model: 'gemini-3.8-flash-high' });
   assert.equal(gateway.status().mode, 'custom');
   assert.equal(gateway.status().model, 'gpt-5.6-sol');
   const persisted = JSON.parse(fs.readFileSync(path.join(root, 'codex-gateway.json'), 'utf8'));
@@ -52,14 +52,14 @@ test('Codex Antigravity, Codex Custom and Claude keep independent accounts and m
     profileId: PROFILE_IDS.CODEX_ANTIGRAVITY,
     activateCodexProfile: 'antigravity',
     accountId: 'codex-account',
-    model: 'gemini-3.6-flash-high',
-    autoResolvedModel: 'gemini-3.1-pro-high'
+    model: 'gemini-3.8-flash-high',
+    autoResolvedModel: 'gemini-3.8-flash-low'
   });
   gateway.configure({
     profileId: PROFILE_IDS.CLAUDE_ANTIGRAVITY,
     accountId: 'claude-account',
     claudeModel: 'claude-opus-4-6-thinking',
-    autoResolvedModel: 'gemini-3.6-flash-medium'
+    autoResolvedModel: 'gemini-3.8-flash-medium'
   });
   gateway.configure({
     profileId: PROFILE_IDS.CODEX_CUSTOM,
@@ -75,8 +75,8 @@ test('Codex Antigravity, Codex Custom and Claude keep independent accounts and m
   assert.equal(status.mode, 'custom');
   assert.deepEqual(status.profiles.codexAntigravity, {
     accountId: 'codex-account',
-    model: 'gemini-3.6-flash-high',
-    autoResolvedModel: 'gemini-3.1-pro-high',
+    model: 'gemini-3.8-flash-high',
+    autoResolvedModel: 'gemini-3.8-flash-low',
     modelControl: 'gateway'
   });
   assert.equal(status.profiles.codexCustom.providerId, 'provider-1');

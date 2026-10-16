@@ -2,8 +2,8 @@
   "formatVersion": 2,
   "clientVersion": "2.22.0",
   "supportedClientRange": ">=2.4.3 <3.0.0",
-  "patchVersion": "1.3.8",
-  "pluginVersion": "1.3.8",
+  "patchVersion": "1.3.9",
+  "pluginVersion": "1.3.9",
   "buildStrategy": "official-baseline-with-declarative-overlay",
   "unpackedMode": "preserve-official",
   "requiredCapabilities": [
@@ -13,12 +13,12 @@
     "dist/main.js",
     "dist/tray.js",
     "dist/utils.js",
-    "dist/ipcHandlers.js"
+    "dist/ipcHandlers.js",
+    "dist/accountVault.js",
+    "dist/accountQuota.js"
   ],
-  "optionalCapabilities": [
-    "dist/accountVault.js"
-  ],
+  "optionalCapabilities": [],
   "officialSha256": "259c83ffa266088dda6ede520a601bbf06cc5c34985cdf56c5d68549c98dbb0e",
-  "patchSha256": "99a192664fcfc1f963228a627e7c2850a7aef0f5ee0e4c1220f6f4f7d59b8591",
-  "builtAt": "2026-10-10T01:29:17.690Z"
+  "patchSha256": "975ccf7d5a3a5f485a3be45f4140e6b184151aaeb28976da82eecca281d161b7",
+  "builtAt": "2026-10-16T08:19:26.117Z"
 }

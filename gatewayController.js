@@ -362,22 +362,6 @@
         if (claudeDesktopModel && [...claudeDesktopModel.options].some(option => option.value === status.claudeModel)) {
           claudeDesktopModel.value = status.claudeModel;
         }
-        const fallbackAgyModels = [
-          'agy-auto',
-          'gemini-3.8-flash-high',
-          'gemini-3.8-flash-medium',
-          'gemini-3.8-flash-low',
-          'gemini-3.7-flash-high',
-          'gemini-3.7-flash-medium',
-          'gemini-3.7-flash-low',
-          'gemini-3.6-flash-high',
-          'gemini-3.6-flash-medium',
-          'gemini-3.6-flash-low',
-          'gemini-3.1-pro-high',
-          'gemini-3.1-pro-low',
-          'claude-opus-4-6-thinking',
-          'claude-sonnet-4-6'
-        ];
         const fallbackGroup = id => id === 'agy-auto'
           ? '自动路由'
           : id.startsWith('gemini-') ? 'Gemini'
@@ -385,13 +369,14 @@
               : id.startsWith('gpt-oss-') ? 'GPT-OSS' : '其他模型';
         const fallbackModels = Array.isArray(status.antigravityModels) && status.antigravityModels.length
           ? status.antigravityModels
-          : fallbackAgyModels;
+          : status.mode !== 'custom' && Array.isArray(status.models) ? status.models : [];
         const agyModelEntries = Array.isArray(status.antigravityModelEntries) && status.antigravityModelEntries.length
           ? status.antigravityModelEntries
           : fallbackModels.map(id => ({ id, label: id, group: fallbackGroup(id) }));
         const agyModels = agyModelEntries.map(entry => entry.id);
         const selectedModel = codexProfile.model || status.codexAntigravityModel || status.model;
-        const selected = agyModels.includes(selectedModel) ? selectedModel : (model.value || 'gemini-3.1-pro-high');
+        const selected = agyModels.includes(selectedModel) ? selectedModel
+          : agyModels.includes(model.value) ? model.value : agyModels[0] || '';
         const groupedModels = new Map();
         for (const entry of agyModelEntries) {
           const group = entry.group || fallbackGroup(entry.id);
@@ -435,12 +420,14 @@
       function renderQuotaItemIn(targetGrid, key, value, reset) {
         const item = targetGrid?.querySelector(`[data-quota="${key}"]`);
         if (!item) return;
-        const percent = Math.max(0, Math.min(100, Number.parseInt(value, 10) || 0));
-        item.querySelector('strong').textContent = `${percent}%`;
+        const parsed = Number.parseInt(value, 10);
+        const known = Number.isFinite(parsed);
+        const percent = known ? Math.max(0, Math.min(100, parsed)) : 0;
+        item.querySelector('strong').textContent = known ? `${percent}%` : '--';
         item.querySelector('i').style.width = `${percent}%`;
-        item.querySelector('small').textContent = formatQuotaReset(reset);
+        item.querySelector('small').textContent = known ? formatQuotaReset(reset) : '上游暂未返回此项额度';
         item.classList.toggle('warning', percent > 0 && percent <= 25);
-        item.classList.toggle('empty', percent === 0);
+        item.classList.toggle('empty', known && percent === 0);
       }
     
       function renderQuotaItem(key, value, reset) {
@@ -485,7 +472,7 @@
           const modelOptions = [...model.options].map(option => option.value).filter(Boolean);
           const preferredGemini = modelOptions.find(value => /^gemini-.*-high$/i.test(value))
             || modelOptions.find(value => value.startsWith('gemini-'))
-            || 'gemini-3.1-pro-high';
+            || 'gemini-3.8-flash-high';
           const preferredClaude = modelOptions.find(value => value.startsWith('claude-sonnet-'))
             || modelOptions.find(value => value.startsWith('claude-'))
             || 'claude-sonnet-4-6';

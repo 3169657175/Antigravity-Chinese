@@ -75,7 +75,7 @@ test('writes Claude local files and the real HKCU managed gateway configuration'
   assert.equal(profile.inferenceGatewayAuthScheme, 'bearer');
   assert.equal(profile.inferenceCredentialKind, 'static');
   assert.equal(profile.inferenceGatewayUrl, undefined);
-  assert.equal(profile.inferenceModels.length, 10);
+  assert.equal(profile.inferenceModels.length, 7);
   assert.deepEqual(profile.inferenceModels[0], {
     name: 'claude-opus-4-6',
     labelOverride: 'Claude Opus 4.6 Thinking',
@@ -88,7 +88,7 @@ test('writes Claude local files and the real HKCU managed gateway configuration'
   assert.equal(env.registry.value('HKCU', 'inferenceGatewayBaseUrl'), 'http://127.0.0.1:8046');
   assert.equal(env.registry.value('HKCU', 'inferenceProvider'), 'gateway');
   const registryModels = JSON.parse(env.registry.value('HKCU', 'inferenceModels'));
-  assert.equal(registryModels.length, 10);
+  assert.equal(registryModels.length, 7);
   assert.equal(registryModels[0].name, 'claude-opus-4-6');
   assert.equal(registryModels[0].labelOverride, 'Claude Opus 4.6 Thinking');
   assert.equal(getClaudeDesktopStatus({ ...env, baseUrl: 'http://127.0.0.1:8046', tcpProbe: () => false }).modelCatalogReady, true);

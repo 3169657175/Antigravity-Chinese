@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const { verify, parseLatestYaml } = require('../../releaseGuard.js');
 
 test('release guard keeps package version and publish repository unified', () => {
-  const result = verify({ expectedVersion: '1.3.8' });
-  assert.equal(result.version, '1.3.8');
+  const result = verify({ expectedVersion: require('../../package.json').version });
+  assert.equal(result.version, '1.3.9');
   assert.equal(result.repository, '3169657175/Antigravity-Chinese');
 });
 

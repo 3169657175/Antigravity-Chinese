@@ -17,11 +17,10 @@ jobs:
       - run: npm ci
       - run: npm run patch:verify
       - name: Run Windows test suite
-        shell: pwsh
-        run: |
-          $tests = Get-ChildItem tests/*.test.js | Where-Object { $_.Name -notin @('patchWorker.test.js', 'trayBackgroundCompatibility.test.js') } | ForEach-Object { $_.FullName }
-          node --test --test-concurrency=1 $tests
+        run: npm test
       - run: npm run test:architecture
+      - name: Verify NSIS in-place upgrades and automatic shutdown
+        run: npm run test:installer-upgrade
 
   asar:
     runs-on: ubuntu-latest
@@ -34,4 +33,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run patch:verify
-      - run: node --test tests/patchWorker.test.js tests/trayBackgroundCompatibility.test.js
+      - run: node --test tests/unit/patchWorker.test.js tests/unit/trayBackgroundCompatibility.test.js

@@ -9,10 +9,11 @@ const {
 } = require('../../claudeModelRoutes');
 
 test('Claude picker routes display real models but send Anthropic-compatible aliases', () => {
-  const picker = claudePickerModels('gemini-3.6-flash-high');
-  assert.equal(picker.length, CLAUDE_MODEL_ROUTES.length);
-  assert.equal(picker[0].labelOverride, 'Gemini 3.6 Flash (High)');
-  assert.equal(picker[0].name, 'claude-haiku-4-5-agy-36fh');
+  const picker = claudePickerModels('gemini-3.8-flash-high');
+  assert.equal(picker.length, 7);
+  assert.equal(picker[0].labelOverride, 'Gemini 3.8 Flash (High)');
+  assert.equal(picker[0].name, routeForClaudeModel('gemini-3.8-flash-high'));
+  assert.equal(claudeRoutesForModels().some(entry => /gemini-3\.[167]-/.test(entry.model)), false);
   assert.equal(picker[0].isFamilyDefault, true);
   for (const entry of picker) {
     assert.match(entry.name, /^claude-(?:haiku|sonnet|opus)-/);

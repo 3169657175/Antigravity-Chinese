@@ -4,8 +4,8 @@
   "officialVersion": "2.22.0",
   "officialSha256": "259c83ffa266088dda6ede520a601bbf06cc5c34985cdf56c5d68549c98dbb0e",
   "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5395012,
-  "outputSha256": "99a192664fcfc1f963228a627e7c2850a7aef0f5ee0e4c1220f6f4f7d59b8591",
+  "outputSize": 5397087,
+  "outputSha256": "975ccf7d5a3a5f485a3be45f4140e6b184151aaeb28976da82eecca281d161b7",
   "compatibility": {
     "files": [
       {
@@ -31,7 +31,7 @@
       {
         "file": "dist/ipcHandlers.js",
         "officialBytes": 16557,
-        "rebuiltBytes": 101863
+        "rebuiltBytes": 98668
       },
       {
         "file": "dist/languageServer.js",
@@ -42,34 +42,25 @@
         "file": "dist/accountVault.js",
         "addedByPatch": true,
         "rebuiltBytes": 3402
+      },
+      {
+        "file": "dist/accountQuota.js",
+        "addedByPatch": true,
+        "rebuiltBytes": 5014
       }
     ],
     "appliedRuntimeRules": [
       {
-        "index": 3,
+        "index": 1,
         "file": "dist/preload.js",
         "description": "Restore the original glass sidebar when Antigravity 2.4.3 changes sidebar dimensions or wrapper names",
         "hits": 1
       },
       {
-        "index": 4,
+        "index": 2,
         "file": "dist/preload.js",
         "description": "Remove only opaque Antigravity 2.4.3 sidebar wrapper backgrounds while preserving the established glass gradient",
         "hits": 1
-      },
-      {
-        "index": 1,
-        "file": "dist/ipcHandlers.js",
-        "description": "Use the current Cloud Code quota service in the Antigravity account dialog",
-        "hits": 0,
-        "alreadyApplied": true
-      },
-      {
-        "index": 2,
-        "file": "dist/ipcHandlers.js",
-        "description": "Do not turn missing quota fields into fake 100 percent values",
-        "hits": 0,
-        "alreadyApplied": true
       }
     ]
   },

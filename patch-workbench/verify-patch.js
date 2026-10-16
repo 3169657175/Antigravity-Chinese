@@ -41,7 +41,7 @@ try {
   if (manifest.unpackedMode !== 'preserve-official') throw new Error(`Unexpected unpacked mode: ${manifest.unpackedMode}`);
   if (manifest.patchSha256 !== sha256(archivePath)) throw new Error('Patch manifest SHA-256 does not match assets/app.asar');
 
-  const requiredFiles = manifest.requiredCapabilities || [];
+  const requiredFiles = [...new Set([...(manifest.requiredCapabilities || []), 'dist/accountVault.js', 'dist/accountQuota.js'])];
   const entries = new Set(asar.listPackage(archivePath).map(entry => String(entry).replace(/^[/\\]+/, '').replace(/\\/g, '/')));
   const missingFiles = requiredFiles.filter(relativePath => !entries.has(relativePath));
   if (missingFiles.length) throw new Error(`Patch archive is missing required capabilities: ${missingFiles.join(', ')}`);
@@ -53,7 +53,8 @@ try {
     'dist/tray.js',
     'dist/utils.js',
     'dist/ipcHandlers.js',
-    'dist/accountVault.js'
+    'dist/accountVault.js',
+    'dist/accountQuota.js'
   ].filter(relativePath => entries.has(relativePath));
   for (const relativePath of syntaxFiles) {
     new vm.Script(asar.extractFile(archivePath, relativePath).toString('utf8'), { filename: relativePath });
@@ -94,7 +95,10 @@ try {
   requireText(utils, 'event.preventDefault();', 'dist/utils.js');
   requireText(utils, 'win.hide();', 'dist/utils.js');
   requireText(utils, 'function shouldRunInBackground()', 'dist/utils.js');
-  requireText(ipc, 'https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary', 'dist/ipcHandlers.js');
+  requireText(ipc, 'require("./accountQuota").fetchAccountQuota', 'dist/ipcHandlers.js');
+  const quota = asar.extractFile(archivePath, 'dist/accountQuota.js').toString('utf8');
+  requireText(quota, "'loadCodeAssist'", 'dist/accountQuota.js');
+  requireText(quota, "'retrieveUserQuotaSummary'", 'dist/accountQuota.js');
   rejectText(ipc, 'if (gemini5hVal === null) gemini5hVal = 100;', 'dist/ipcHandlers.js');
   rejectText(preload, 'antigravity-version-widget', 'dist/preload.js');
   rejectText(preload, "ipcRenderer.invoke('patch:check-update'", 'dist/preload.js');

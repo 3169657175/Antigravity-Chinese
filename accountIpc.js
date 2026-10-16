@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const { classifyAccountError } = require('./accountErrorClassifier.js');
 const { readJsonSafe, writeJsonAtomic } = require('./fsUtils.js');
+const { fetchAccountQuota } = require('./accountQuota.js');
 
 function normalizeAccountEmail(value) {
   return String(value || '')
@@ -254,41 +255,11 @@ function getGoogleClientId() {
   let oauthServer = null;
   let currentOauthState = null;
   
-  const QUOTA_API_HOSTS = [
-    'daily-cloudcode-pa.googleapis.com',
-    'cloudcode-pa.googleapis.com'
-  ];
-  
-  async function fetchQuotaApi(net, endpoint, accessToken, projects) {
-    let lastError = 'No quota endpoint responded successfully';
-    for (const host of QUOTA_API_HOSTS) {
-      for (const project of projects) {
-        try {
-          const response = await net.fetch(`https://${host}/v1internal:${endpoint}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'User-Agent': 'Antigravity-Quota-Watcher'
-            },
-            body: JSON.stringify({ project })
-          });
-          if (response.ok) {
-            return { data: await response.json(), host, project };
-          }
-          lastError = `${host}/${endpoint} returned HTTP ${response.status}`;
-        } catch (error) {
-          lastError = `${host}/${endpoint}: ${error.message}`;
-        }
-      }
-    }
-    throw new Error(lastError);
-  }
-  
   // A. 注入 fetch-account-quota 用以向小助手卡片拉取配额
   ipcMain.handle('fetch-account-quota', async (event, accountId) => {
     try {
-      const userHome = os.homedir();
+      if (typeof accountId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(accountId)) throw new Error('无效账号 ID');
+      const userHome = app.getPath('home');
       const accountRoot = path.join(userHome, '.gemini/antigravity/tools');
       const detailPath = path.join(accountRoot, 'accounts', `${accountId}.json`);
       if (!fs.existsSync(detailPath)) {
@@ -332,109 +303,10 @@ function getGoogleClientId() {
       const tokenData = await tokenRes.json();
       const accessToken = tokenData.access_token;
   
-      // 2. 优先调用旧接口 retrieveUserQuotaSummary 获取真实的全局 Bucket 额度
-      let gemini5hVal = null, gemini5hReset = null;
-      let geminiWeeklyVal = null, geminiWeeklyReset = null;
-      let claude5hVal = null, claude5hReset = null;
-      let claudeWeeklyVal = null, claudeWeeklyReset = null;
-  
-      const quotaProjects = [...new Set([
-        'gemini_virtual_primary',
-        tokenObj.project_id,
-        'bamboo-precept-lgxtn'
-      ].filter(Boolean))];
-      let projectId = quotaProjects[0];
-      let quotaSourceHost = null;
-      try {
-        const quotaResult = await fetchQuotaApi(net, 'retrieveUserQuotaSummary', accessToken, quotaProjects);
-        projectId = quotaResult.project;
-        quotaSourceHost = quotaResult.host;
-        const quotaSummaryData = quotaResult.data;
-        if (quotaSummaryData) {
-          if (quotaSummaryData && Array.isArray(quotaSummaryData.groups)) {
-            for (const group of quotaSummaryData.groups) {
-              if (!Array.isArray(group.buckets)) continue;
-              for (const bucket of group.buckets) {
-                const frac = bucket.remainingFraction !== undefined ? bucket.remainingFraction : 1.0;
-                const percent = Math.round(Math.max(0, Math.min(1, frac)) * 100);
-  
-                if (bucket.bucketId === 'gemini-5h') {
-                  gemini5hVal = percent;
-                  gemini5hReset = bucket.resetTime || null;
-                } else if (bucket.bucketId === 'gemini-weekly') {
-                  geminiWeeklyVal = percent;
-                  geminiWeeklyReset = bucket.resetTime || null;
-                } else if (bucket.bucketId === '3p-5h') {
-                  claude5hVal = percent;
-                  claude5hReset = bucket.resetTime || null;
-                } else if (bucket.bucketId === '3p-weekly') {
-                  claudeWeeklyVal = percent;
-                  claudeWeeklyReset = bucket.resetTime || null;
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[fetch-quota] Quota summary failed:', e.message);
-      }
-  
-      // 3. 如果获取不到真实的全局 Bucket，才用新接口 fetchAvailableModels 的单模型额度兜底
-      if (gemini5hVal === null || claude5hVal === null || geminiWeeklyVal === null || claudeWeeklyVal === null) {
-        try {
-          const modelsResult = await fetchQuotaApi(net, 'fetchAvailableModels', accessToken, quotaProjects);
-          if (!quotaSourceHost) {
-            quotaSourceHost = modelsResult.host;
-            projectId = modelsResult.project;
-          }
-          const modelsJson = modelsResult.data;
-          if (modelsJson) {
-            if (modelsJson && modelsJson.models) {
-              const gModel = modelsJson.models['gemini-3.6-flash-tiered'] || modelsJson.models['gemini-3.6-flash-high'] || modelsJson.models['gemini-3.6-flash-medium'] || modelsJson.models['gemini-3.6-flash-low'] || modelsJson.models['gemini-3-flash-agent'] || modelsJson.models['gemini-pro-agent'] || modelsJson.models['gemini-3.5-flash-low'] || modelsJson.models['gemini-2.5-pro'];
-              if (gModel && gModel.quotaInfo) {
-                const frac = gModel.quotaInfo.remainingFraction !== undefined ? gModel.quotaInfo.remainingFraction : 1.0;
-                const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
-                if (gemini5hVal === null) { gemini5hVal = pct; gemini5hReset = gModel.quotaInfo.resetTime || null; }
-              }
-  
-              const cModel = modelsJson.models['claude-sonnet-4-6'] || modelsJson.models['claude-opus-4-6-thinking'];
-              if (cModel && cModel.quotaInfo) {
-                const frac = cModel.quotaInfo.remainingFraction !== undefined ? cModel.quotaInfo.remainingFraction : 1.0;
-                const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
-                if (claude5hVal === null) { claude5hVal = pct; claude5hReset = cModel.quotaInfo.resetTime || null; }
-              }
-            }
-          }
-        } catch (e) {
-          console.error('[fetch-quota] Available models failed:', e.message);
-        }
-      }
-  
-      const missingQuotaFields = [
-        ['gemini5h', gemini5hVal],
-        ['geminiWeekly', geminiWeeklyVal],
-        ['claude5h', claude5hVal],
-        ['claudeWeekly', claudeWeeklyVal]
-      ].filter(([, value]) => value === null).map(([name]) => name);
-      if (missingQuotaFields.length > 0) {
-        throw new Error(`Quota response is incomplete: ${missingQuotaFields.join(', ')}`);
-      }
-  
-      return {
-        success: true,
-        projectId,
-        quotaSourceHost,
-        quota: {
-          gemini5h: `${gemini5hVal}%`,
-          geminiWeekly: `${geminiWeeklyVal}%`,
-          claude5h: `${claude5hVal}%`,
-          claudeWeekly: `${claudeWeeklyVal}%`,
-          gemini5hReset,
-          geminiWeeklyReset,
-          claude5hReset,
-          claudeWeeklyReset
-        }
-      };
+      return await fetchAccountQuota({
+        fetch: net.fetch.bind(net), accessToken,
+        projectId: tokenObj.project_id || detail.project_id
+      });
     } catch (err) {
       const accountError = classifyAccountError(err);
       console.warn(`[fetch-quota] ${accountError.code}: ${accountError.diagnosticCode}`);

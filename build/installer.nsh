@@ -1,78 +1,135 @@
 !include "LogicLib.nsh"
-!include "getProcessInfo.nsh"
 
-Var pid
+!ifdef BUILD_UNINSTALLER
+  !define AGY_PROCESS_FUNCTION "un.AgyMainProcesses"
+!else
+  !define AGY_PROCESS_FUNCTION "AgyMainProcesses"
+!endif
 
-# Only the actual AGY Hub desktop executable counts as "the app is running".
-# Installer helpers (elevate.exe, uninstaller, updater helpers) under $INSTDIR
-# must never block an installation.
+# Enumerate processes natively, including 64-bit Electron from 32-bit NSIS.
+# QueryFullProcessImageNameW checks the executable's complete path. Installer
+# helpers and another installation with the same filename must be left alone.
+# No PowerShell policy, shell quoting, or taskkill process-tree dependency.
+# Input: "find" or "close". Output: 0 if a matching process exists, else 1.
+!macro customHeader
+Function ${AGY_PROCESS_FUNCTION}
+  Exch $0
+  Push $1
+  Push $2
+  Push $3
+  Push $4
+  Push $5
+  Push $6
+  Push $7
+  Push $8
+  Push $9
+  StrCpy $9 1
+  GetFullPathName $8 "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  System::Call 'kernel32::CreateToolhelp32Snapshot(i 2, i 0) p.r1'
+  ${If} $1 == -1
+    Goto agy_process_return
+  ${EndIf}
+  # PROCESSENTRY32W is 556 bytes in the x86 NSIS process (9 DWORDs + WCHAR[260]).
+  System::Alloc 556
+  Pop $2
+  System::Call '*$2(i 556)'
+  IntOp $7 ${NSIS_MAX_STRLEN} * 2
+  System::Alloc $7
+  Pop $3
+  System::Call 'kernel32::Process32FirstW(p r1, p r2) i.r7'
+
+  agy_process_loop:
+    ${If} $7 == 0
+      Goto agy_process_cleanup
+    ${EndIf}
+    System::Call '*$2(i, i, i .r6, i, i, i, i, i, i, &w260 .r4)'
+    ${If} $4 == "${APP_EXECUTABLE_FILENAME}"
+      StrCpy $7 0x1000 ; PROCESS_QUERY_LIMITED_INFORMATION
+      ${If} $0 == "close"
+        IntOp $7 $7 | 0x100001 ; SYNCHRONIZE | PROCESS_TERMINATE
+      ${EndIf}
+      System::Call 'kernel32::OpenProcess(i r7, i 0, i r6) p.r5'
+      ${If} $5 != 0
+        System::Call 'kernel32::QueryFullProcessImageNameW(p r5, i 0, p r3, *i ${NSIS_MAX_STRLEN}) i.r7'
+        ${If} $7 != 0
+          System::Call '*$3(&w${NSIS_MAX_STRLEN} .r4)'
+          ${If} $4 == $8
+            StrCpy $9 0
+            ${If} $0 == "close"
+              System::Call 'kernel32::TerminateProcess(p r5, i 0)'
+              System::Call 'kernel32::WaitForSingleObject(p r5, i 5000)'
+            ${EndIf}
+          ${EndIf}
+        ${EndIf}
+        System::Call 'kernel32::CloseHandle(p r5)'
+      ${EndIf}
+    ${EndIf}
+    System::Call 'kernel32::Process32NextW(p r1, p r2) i.r7'
+    Goto agy_process_loop
+
+  agy_process_cleanup:
+    System::Free $3
+    System::Free $2
+    System::Call 'kernel32::CloseHandle(p r1)'
+  agy_process_return:
+    StrCpy $0 $9
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Exch $0
+FunctionEnd
+!macroend
+
 !macro AGY_FIND_MAIN_PROCESS _RETURN
-  ${if} $IsPowerShellAvailable == 0
-    nsExec::Exec `"$PowerShellPath" -NoProfile -C "$$target = [System.IO.Path]::GetFullPath('$INSTDIR\${APP_EXECUTABLE_FILENAME}'); $$found = Get-CimInstance -ClassName Win32_Process | ? {$$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ExecutablePath -and [string]::Equals([System.IO.Path]::GetFullPath($$_.ExecutablePath), $$target, [System.StringComparison]::OrdinalIgnoreCase) }; if ($$found) { exit 0 } else { exit 1 }"`
-    Pop ${_RETURN}
-  ${else}
-    !ifdef INSTALL_MODE_PER_ALL_USERS
-      nsExec::Exec `"$CmdPath" /C tasklist /FI "IMAGENAME eq ${APP_EXECUTABLE_FILENAME}" /FO CSV /NH | "$SYSDIR\findstr.exe" /B /I /C:"\"${APP_EXECUTABLE_FILENAME}\""`
-      Pop ${_RETURN}
-    !else
-      nsExec::Exec `"$CmdPath" /C tasklist /FI "USERNAME eq %USERNAME%" /FI "IMAGENAME eq ${APP_EXECUTABLE_FILENAME}" /FO CSV /NH | "$SYSDIR\findstr.exe" /B /I /C:"\"${APP_EXECUTABLE_FILENAME}\""`
-      Pop ${_RETURN}
-    !endif
-  ${endIf}
+  Push "find"
+  Call ${AGY_PROCESS_FUNCTION}
+  Pop ${_RETURN}
 !macroend
 
 !macro AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER ROOT_KEY
-  ReadRegStr $R9 ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY}" "DisplayVersion"
-  # Same-version repair installs must never invoke the already-installed
-  # uninstaller. electron-builder retries a non-zero old uninstaller result
-  # and eventually reports the misleading appCannotBeClosed message even
-  # after the AGY Hub process has already exited.
-  ${If} $R9 == "${VERSION}"
-  ${OrIf} $R9 == "1.3.0"
-  ${OrIf} $R9 == "1.3.1"
-  ${OrIf} $R9 == "1.3.2"
-  ${OrIf} $R9 == "1.3.3"
-  ${OrIf} $R9 == "1.3.4"
-  ${OrIf} $R9 == "1.3.5"
-  ${OrIf} $R9 == "1.3.6"
-  ${OrIf} $R9 == "1.3.7"
-    DetailPrint "Migrating legacy AGY Hub $R9 without invoking its broken uninstaller."
-    DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY}"
-    !ifdef UNINSTALL_REGISTRY_KEY_2
-      DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY_2}"
-    !endif
+  # In-place upgrades and repairs replace the application files directly.
+  # Never tie this to a list of versions: forgetting the next version makes
+  # electron-builder run the old uninstaller and report appCannotBeClosed
+  # after five unsuccessful attempts, even when the app has already exited.
+  # Only migrate this app's registration for the selected installation path.
+  # A different installation directory still uses the normal uninstall flow.
+  ReadRegStr $R8 ${ROOT_KEY} "${INSTALL_REGISTRY_KEY}" "InstallLocation"
+  ${If} $R8 != ""
+    GetFullPathName $R8 "$R8\."
+    GetFullPathName $R9 "$INSTDIR\."
+    ${If} $R8 == $R9
+      DetailPrint "Updating AGY Hub in place without running the old uninstaller."
+      DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY}"
+      !ifdef UNINSTALL_REGISTRY_KEY_2
+        DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY_2}"
+      !endif
+    ${EndIf}
   ${EndIf}
+  ClearErrors
 !macroend
 !macro AGY_FORCE_CLOSE_MAIN_PROCESS
-  ${if} $IsPowerShellAvailable == 0
-    nsExec::Exec `"$PowerShellPath" -NoProfile -C "$$target = [System.IO.Path]::GetFullPath('$INSTDIR\${APP_EXECUTABLE_FILENAME}'); Get-CimInstance -ClassName Win32_Process | ? {$$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ExecutablePath -and [string]::Equals([System.IO.Path]::GetFullPath($$_.ExecutablePath), $$target, [System.StringComparison]::OrdinalIgnoreCase) } | % { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }"`
-  ${else}
-    !ifdef INSTALL_MODE_PER_ALL_USERS
-      nsExec::Exec `taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}" /FI "PID ne $pid"`
-    !else
-      nsExec::Exec `"$CmdPath" /C taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}" /FI "PID ne $pid" /FI "USERNAME eq %USERNAME%"`
-    !endif
-  ${endIf}
+  Push "close"
+  Call ${AGY_PROCESS_FUNCTION}
+  Pop $R0
 !macroend
 
 # Standard installer behaviour:
 # - app not running: install immediately
-# - app running: one confirmation; OK closes it and continues, Cancel exits
+# - app running: close it automatically and continue the requested install
 !macro customCheckAppRunning
-  ${GetProcessInfo} 0 $pid $1 $2 $3 $4
-  !insertmacro IS_POWERSHELL_AVAILABLE
   !insertmacro AGY_FIND_MAIN_PROCESS $R0
 
   ${If} $R0 != 0
     Goto agy_migrate_legacy_uninstaller
   ${EndIf}
 
-  MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
-    "${PRODUCT_NAME} 正在运行。继续安装将自动关闭程序。$\r$\n$\r$\n点击“确定”继续安装，点击“取消”退出安装。" \
-    /SD IDOK IDOK agy_close_running_app
-  Quit
-
-  agy_close_running_app:
+    DetailPrint "${PRODUCT_NAME} 正在运行，正在自动关闭程序以继续安装。"
     IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 agy_force_close_if_needed
     Exec '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --quit-for-update'
     Sleep 2500
@@ -83,9 +140,16 @@ Var pid
       !insertmacro AGY_FORCE_CLOSE_MAIN_PROCESS
       Sleep 750
     ${EndIf}
+    !insertmacro AGY_FIND_MAIN_PROCESS $R0
+    ${If} $R0 == 0
+      MessageBox MB_OK|MB_ICONSTOP "${PRODUCT_NAME} 仍在运行，自动关闭失败，安装已停止。"
+      SetErrorLevel 2
+      Quit
+    ${EndIf}
 
   agy_migrate_legacy_uninstaller:
-    !insertmacro AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER HKEY_CURRENT_USER
-    !insertmacro AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER HKEY_LOCAL_MACHINE
+    !ifndef BUILD_UNINSTALLER
+      !insertmacro AGY_BYPASS_BROKEN_LEGACY_UNINSTALLER SHELL_CONTEXT
+    !endif
 
 !macroend

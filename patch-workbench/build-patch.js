@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const asar = require('@electron/asar');
 const { normalizeVersion } = require('./compatibility');
-const { buildPatchForTarget } = require('../src/patchRuntimeBuilder');
+const { buildPatchForTarget } = require('../patchRuntimeBuilder');
 
 const workbenchDir = __dirname;
 const root = path.resolve(workbenchDir, '..');
@@ -61,7 +61,9 @@ async function main() {
       'dist/main.js',
       'dist/tray.js',
       'dist/utils.js',
-      'dist/ipcHandlers.js'
+      'dist/ipcHandlers.js',
+      'dist/accountVault.js',
+      'dist/accountQuota.js'
     ];
   const manifest = {
       formatVersion: 2,
@@ -72,7 +74,7 @@ async function main() {
       buildStrategy: 'official-baseline-with-declarative-overlay',
       unpackedMode: 'preserve-official',
       requiredCapabilities,
-      optionalCapabilities: ['dist/accountVault.js'],
+      optionalCapabilities: [],
       officialSha256: sha256(officialAsar),
       patchSha256: sha256(outputAsar),
       builtAt: new Date().toISOString()
