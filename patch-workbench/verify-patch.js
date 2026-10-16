@@ -137,7 +137,7 @@ try {
     requireText(languageServer, '--host_bridge_token=${hostBridgeToken}', 'dist/languageServer.js');
     rejectText(languageServer, 'function startLanguageServer(port, csrf, headless)', 'dist/languageServer.js');
   }
-  const unpackedProbe = 'node_modules\\chrome-devtools-mcp\\package.json';
+  const unpackedProbe = path.join('node_modules', 'chrome-devtools-mcp', 'package.json');
   const unpackedStat = asar.statFile(archivePath, unpackedProbe);
   if (!unpackedStat.unpacked) throw new Error('Official chrome-devtools-mcp files were incorrectly packed back into app.asar');
 

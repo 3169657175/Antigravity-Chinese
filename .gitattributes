@@ -1,0 +1,5 @@
+# Compatibility fixtures and exact source anchors must retain LF on Windows.
+*.js text eol=lf
+*.cjs text eol=lf
+*.js.txt text eol=lf
+*.nsh text eol=lf
