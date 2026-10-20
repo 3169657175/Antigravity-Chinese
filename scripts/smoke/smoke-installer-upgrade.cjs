@@ -142,7 +142,7 @@ class Fixture { static int Main(string[] args) {
 
   cleanupRegistry();
   report.cases.push({ name: 'clean install', ms: await install() });
-  for (const oldVersion of ['1.3.8', version, '9.9.9']) {
+  for (const oldVersion of new Set(['1.3.8', '1.3.9', version, '9.9.9'])) {
     seed(oldVersion);
     report.cases.push({ name: `in-place ${oldVersion} (failing old uninstaller)`, ms: await install() });
     assert.equal(fs.readFileSync(path.join(installDir, 'keep-user-data.txt'), 'utf8'), 'keep me');

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { RELEASE_REPOSITORY, cleanVersion } = require('./releaseConfig.js');
+const { PACKAGED_NAMES, resolvePatchWorkbenchResource } = require('./patchResourceResolver');
 
 function fail(message) { throw new Error(`[release-guard] ${message}`); }
 function readPackage() { return JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')); }
@@ -42,6 +43,16 @@ function verify(options = {}) {
     const installer = path.join(__dirname, 'dist', latest.path || `agy-hub-setup-${version}.exe`);
     if (!fs.existsSync(installer)) fail(`installer missing: ${path.basename(installer)}`);
     if (!fs.existsSync(`${installer}.blockmap`)) fail(`blockmap missing: ${path.basename(installer)}.blockmap`);
+    const resources = path.join(__dirname, 'dist', 'win-unpacked', 'resources');
+    const asar = require('@electron/asar');
+    if (!asar.extractFile(path.join(resources, 'app.asar'), 'accountQuota.js').equals(fs.readFileSync(path.join(__dirname, 'accountQuota.js')))) fail('Hub quota module missing or differs from source');
+    for (const [name, file] of Object.entries(PACKAGED_NAMES)) {
+      const source = resolvePatchWorkbenchResource(name, { resourcesPath: '' });
+      const built = path.join(resources, 'patch', file);
+      if (!fs.existsSync(built)) fail(`missing external runtime build resource: patch/${file}`);
+      if (sha256(source) !== sha256(built)) fail(`external runtime resource differs from source: ${file}`);
+    }
+    if (sha256(path.join(resources, 'patch', 'app.asar')) !== actualPatchSha256) fail('built patch differs from source patch');
   }
   return { version, repository: `${RELEASE_REPOSITORY.owner}/${RELEASE_REPOSITORY.repo}` };
 }

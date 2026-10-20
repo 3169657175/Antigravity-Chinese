@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const asar = require('@electron/asar');
 const { PatchBackupManager } = require('./patchBackupManager.js');
-const { buildPatchForTarget } = require('./patchRuntimeBuilder.js');
+const { buildPatchForTarget, planPatchBuild } = require('./patchRuntimeBuilder.js');
 const { assertTrayModuleLoads } = require('./patch-workbench/compatibility');
 
 function hashFile(filePath) {
@@ -36,7 +36,7 @@ function inspectPatchArchive(archivePath, requiredFiles = []) {
   ));
   const packageJson = JSON.parse(asar.extractFile(archivePath, 'package.json').toString('utf8').replace(/^\uFEFF/, ''));
   const syntaxErrors = [];
-  for (const entry of ['dist/main.js', 'dist/preload.js', 'dist/ipcHandlers.js', 'dist/languageServer.js', 'dist/tray.js', 'dist/utils.js', 'dist/accountVault.js']) {
+  for (const entry of ['dist/main.js', 'dist/preload.js', 'dist/ipcHandlers.js', 'dist/languageServer.js', 'dist/tray.js', 'dist/utils.js', 'dist/accountVault.js', 'dist/accountQuota.js']) {
     if (!entries.has(entry)) continue;
     try {
       new vm.Script(asar.extractFile(archivePath, entry).toString('utf8'), { filename: entry });
@@ -58,9 +58,12 @@ function inspectPatchArchive(archivePath, requiredFiles = []) {
   const preload = entries.has('dist/preload.js')
     ? asar.extractFile(archivePath, 'dist/preload.js').toString('utf8')
     : '';
+  const dependencies = entries.has('dist/ipcHandlers.js')
+    ? [...asar.extractFile(archivePath, 'dist/ipcHandlers.js').toString('utf8').matchAll(/require\(['"]\.\/(accountQuota|accountVault)(?:\.js)?['"]\)/g)].map(match => `dist/${match[1]}.js`)
+    : [];
   return {
     version: normalizeClientVersion(packageJson.version),
-    missingFiles: requiredFiles.filter(file => !entries.has(String(file).replace(/\\/g, '/'))),
+    missingFiles: [...new Set([...requiredFiles, ...dependencies])].filter(file => !entries.has(String(file).replace(/\\/g, '/'))),
     syntaxErrors,
     patched: ['AGYCustomThemeLibraryBridge', 'AGYSupplementalTranslations', '__agyAuditEnhanced']
       .some(marker => preload.includes(marker))
@@ -187,16 +190,15 @@ async function runWorker(data) {
     const targetInspection = inspectPatchArchive(asarPath, ['package.json', 'dist/main.js', 'dist/preload.js']);
     const targetVersion = targetInspection.version || normalizeClientVersion(data.originalVersion);
     if (!targetVersion) throw new Error('无法识别当前 Antigravity 客户端版本。');
+    const targetSha256 = hashFile(asarPath);
+    const buildPlan = planPatchBuild(asarPath, targetInspection, manifest);
 
-    if (patchVersion !== targetVersion) {
-      if (targetInspection.patched) {
-        throw new Error(`当前 app.asar 已是 v${targetVersion} 汉化版，但离线补丁是 v${patchVersion}。请先恢复当前版本官方原版再重试。`);
-      }
+    if (buildPlan.dynamicallyBuild) {
       progress(`检测到 Antigravity v${targetVersion}，正在基于当前官方版本自动生成兼容补丁`, 12);
       generatedSourceAsar = path.join(os.tmpdir(), `agy-generated-patch-${process.pid}-${Date.now()}.asar`);
       const patchResourceDir = path.dirname(sourceAsar);
       const runtimeBuild = await buildPatchForTarget({
-        targetAsar: asarPath,
+        targetAsar: buildPlan.officialAsar,
         legacyPayloadAsar: data.legacyPayloadAsar || path.join(patchResourceDir, 'legacy-payload.asar'),
         runtimeRulesPath: data.runtimeRulesPath || path.join(patchResourceDir, 'runtime-rules.json'),
         outputAsar: generatedSourceAsar
@@ -233,6 +235,7 @@ async function runWorker(data) {
 
     progress('正在等待 Antigravity 释放文件句柄', 24);
     waitForFileRelease(asarPath);
+    if (hashFile(asarPath) !== targetSha256) throw new Error('校验期间客户端文件已变化，已取消注入。请等待官方更新完成后重试。');
     const backupManager = createBackupManager(data);
     progress('正在保存当前版本官方原版或上一版汉化', 36);
     transaction = backupManager.beginInstall(asarPath, targetVersion);

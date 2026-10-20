@@ -285,6 +285,12 @@
           processed++;
           continue;
         }
+        // React can remove/reparent the current node between slices. TreeWalker
+        // then stays in that detached subtree and reports completion, skipping
+        // still-connected controls after it. Resume from the root; written-node
+        // records avoid translating completed text again, and slice limits still
+        // bound each pass.
+        if (!job.root.contains(job.walker.currentNode)) job.walker.currentNode = job.root;
         const node = job.walker.nextNode();
         if (!node) { scanJobs.shift(); continue; }
         if (node.nodeType === 3) textNode(node);

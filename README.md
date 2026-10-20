@@ -2,14 +2,25 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.3.9-0A7D5A.svg)
-![Antigravity](https://img.shields.io/badge/Antigravity-2.22.0-5B5BD6.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.4.0-0A7D5A.svg)
+![Antigravity](https://img.shields.io/badge/Antigravity-2.24.0-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
-当前稳定版本为 **AGY Hub 1.3.9**；汉化补丁基于 **Antigravity 2.22.0** 构建与验证。未来官方版本若调整内部结构，仍须先通过兼容性检查，不能保证所有新版无需适配即可注入。
+当前发布版本为 **AGY Hub 1.4.0**；汉化补丁基于 **Antigravity 2.24.0** 构建与验证。客户端更新后按版本、官方文件哈希与结构自动构建并校验；如果官方移除必要能力，会在写入前停止，不能保证未知结构的任意未来版本均兼容。
 
-[下载 1.3.9 安装包与查看完整更新说明](https://github.com/3169657175/Antigravity-Chinese/releases/tag/v1.3.9)
+[下载 1.4.0 安装包](https://github.com/3169657175/Antigravity-Chinese/releases/download/v1.4.0/agy-hub-setup-1.4.0.exe) · [最新版 Release](https://github.com/3169657175/Antigravity-Chinese/releases/latest) · [完整更新说明](docs/RELEASE_NOTES_1.4.0.md)
+
+安装后打开 AGY Hub，点击“注入中文汉化补丁”应用新版汉化。覆盖安装会按安装目录识别并关闭正在运行的管家。
+
+## 1.4.0 重点更新
+
+- 修复动态页面更新时分片扫描提前结束造成的汉化遗漏，并加入实际 Chromium 页面与成品汉化引擎的回归验证。
+- 修复成品安装后自动适配新版时找不到 `accountQuota.js` 的问题；额度模块同时保留在 Hub 主包、外置构建资源和汉化包中，并校验三处内容一致。
+- Hub 与注入窗口使用相同的多账号额度代码；4 个真实账号的两套额度接口均完整返回 Gemini / Claude 的 5 小时与每周额度。
+- 修复注入后立即显示 `unknown`：版本检测改用物理 ASAR 快照，独立读取客户端与补丁版本，完成注入后刷新选定的客户端，无需重启管家。
+- 自动适配比较官方文件哈希，支持同版本官方文件变化、不同换行格式及基于同版本原版备份的重复注入；结构不支持时，在关闭客户端和写入前拒绝。
+- 新增成品 Worker 冒烟门禁，验证当前 2.24.0、模拟新版本、重复注入、同版本文件变化与失败保护；继续保留覆盖安装自动关闭功能。
 
 ## 1.3.9 重点更新
 
@@ -39,7 +50,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 - 修复历史对话、计划任务、自定义功能页面的主题语义识别与主内容毛玻璃背景，并补齐 MCP 目录中的固定描述汉化。
 - 修复 Windows 同版本覆盖安装：1.3.0～1.3.7 旧卸载链路和任意同版本重装均走安全覆盖迁移，避免错误的“应用无法关闭”循环提示。
 - 保留 1.3.6 已验证的账号、注入、Token、MCP / Skill、社区、更新和回滚能力。
-- 当前稳定 Release 使用 `1.3.8` / `v1.3.8` 标签。
+- 此版本的历史 Release 使用 `1.3.8` / `v1.3.8` 标签；当前版本见页面顶部。
 
 ## 第三方 Agent / API 接入
 
@@ -143,7 +154,7 @@ Windows 安装包：
 npm run release:build
 ```
 
-发布流程包含 `npm run test:installer-upgrade`，会用独立应用身份验证全新安装、覆盖升级、同版本重装、自动退出和强制关闭兜底，并清理测试注册表与缓存。
+发布流程包含 `npm run test:installer-upgrade`，会用独立应用身份验证全新安装、覆盖升级、同版本重装、自动退出和强制关闭兜底，并清理测试注册表与缓存。成品构建后还会执行 `npm run test:packaged-patch`，直接使用安装包内的 Worker 在官方副本上验证，以及 `npm run test:translation-dom -- --packaged`，验证动态页面汉化与聊天内容保护。
 
 需要将构建产物同步到本机的应用运行目录时才执行：
 
@@ -158,8 +169,8 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.3.9.exe
-agy-hub-setup-1.3.9.exe.blockmap
+agy-hub-setup-1.4.0.exe
+agy-hub-setup-1.4.0.exe.blockmap
 latest.yml
 ```
 

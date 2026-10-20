@@ -475,8 +475,9 @@ function buildCompatibleTree(options) {
     const legacyPath = path.join(legacyDir, ...relativePath.split('/'));
     if (!fs.existsSync(officialPath)) throw new Error(`Official client is missing required capability: ${relativePath}`);
     if (!fs.existsSync(legacyPath)) throw new Error(`Legacy payload is missing: ${relativePath}`);
-    const official = fs.readFileSync(officialPath, 'utf8');
-    const legacy = fs.readFileSync(legacyPath, 'utf8');
+    const normalizeSource = source => source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    const official = normalizeSource(fs.readFileSync(officialPath, 'utf8'));
+    const legacy = normalizeSource(fs.readFileSync(legacyPath, 'utf8'));
     let rebuilt = builder(official, legacy, relativePath === 'dist/main.js' ? fs.readFileSync(path.join(legacyDir,'dist/preload.js'),'utf8') : undefined);
     const ruled = applyLiteralRules(rebuilt, runtimeRules, relativePath);
     rebuilt = ruled.source;
@@ -494,7 +495,7 @@ function buildCompatibleTree(options) {
     syntaxCheck('dist/accountVault.js', fs.readFileSync(targetVault, 'utf8'));
     report.files.push({ file: 'dist/accountVault.js', addedByPatch: true, rebuiltBytes: fs.statSync(targetVault).size });
   }
-  const quotaSource = fs.readFileSync(path.join(__dirname, '..', 'accountQuota.js'), 'utf8');
+  const quotaSource = readPatchWorkbenchResource('accountQuota.js');
   syntaxCheck('dist/accountQuota.js', quotaSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuota.js'), quotaSource, 'utf8');
   report.files.push({ file: 'dist/accountQuota.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaSource) });

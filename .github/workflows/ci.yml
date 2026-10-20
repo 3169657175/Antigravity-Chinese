@@ -21,6 +21,8 @@ jobs:
       - run: npm run test:architecture
       - name: Verify NSIS in-place upgrades and automatic shutdown
         run: npm run test:installer-upgrade
+      - name: Verify localization while React updates the DOM
+        run: npm run test:translation-dom
 
   asar:
     runs-on: ubuntu-latest

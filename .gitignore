@@ -4,6 +4,7 @@ dist-*/
 .release-dist-*/
 .codex-stage/
 release-backups/
+build/generated/
 smoke-light/
 .claude/
 *.log

@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const asar = require('@electron/asar');
 const { withDetachedArchive } = require('./archiveReadIsolation');
+const { getPatchVersionInfo } = require('./patchVersionInfo');
 const { createAntigravityInstallMonitor } = require('./antigravityInstallMonitor');
 const { exec, execFile, execFileSync, spawn } = require('child_process');
 const { Worker } = require('worker_threads');
@@ -1196,31 +1197,11 @@ ipcMain.handle('save-integration-config', async (_event, settings = {}) => {
 
 // 新增版本读取：安全提取官方客户端 asar 并在界面呈现与管家同步的补丁版本
 ipcMain.handle('get-asar-versions', async (event, asarPath) => {
-  let originalVersion = 'unknown';
-  let patchVersion = 'unknown';
-  
   const defaultSourceAsar = app.isPackaged
     ? path.join(process.resourcesPath, 'patch', 'app.asar')
     : path.join(app.getAppPath(), 'assets', 'app.asar');
 
-  try {
-    if (fs.existsSync(asarPath)) {
-      const pkgOriginal = JSON.parse(fs.readFileSync(path.join(asarPath, 'package.json'), 'utf8').replace(/^\uFEFF/, ''));
-      originalVersion = pkgOriginal.version || 'unknown';
-    }
-    if (fs.existsSync(defaultSourceAsar)) {
-      const manifestPath = path.join(path.dirname(defaultSourceAsar), 'patch-manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
-        patchVersion = manifest.pluginVersion || manifest.clientVersion || 'unknown';
-      } else {
-        const pkgPatch = JSON.parse(fs.readFileSync(path.join(defaultSourceAsar, 'package.json'), 'utf8').replace(/^\uFEFF/, ''));
-        patchVersion = pkgPatch.version || 'unknown';
-      }
-    }
-  } catch (e) {}
-
-  return { success: true, originalVersion, patchVersion };
+  return getPatchVersionInfo(asarPath, defaultSourceAsar);
 });
 
 registerAccountIpc({

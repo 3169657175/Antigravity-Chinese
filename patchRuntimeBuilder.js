@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const asar = require('@electron/asar');
 const { buildCompatibleTree, normalizeVersion } = require('./patch-workbench/compatibility');
+const { inspectArchive } = require('./patchBackupManager');
 
 const RUNTIME_TEMP_PREFIX = 'agy-runtime-patch-';
 const RETRYABLE_REMOVE_CODES = new Set(['ENOTEMPTY', 'EBUSY', 'EPERM', 'EACCES']);
@@ -115,6 +116,25 @@ function resolveUnpackedSource(archivePath) {
   return candidates.find(candidate => fs.existsSync(candidate)) || '';
 }
 
+function planPatchBuild(targetAsar, targetInspection, manifest) {
+  let officialAsar = targetAsar;
+  if (targetInspection.patched) {
+    officialAsar = `${targetAsar}.original`;
+    if (!fs.existsSync(officialAsar)) throw new Error('当前客户端已汉化，但缺少同版本官方原版备份，已在写入前取消。请先恢复或重新安装官方客户端。');
+    const original = inspectArchive(officialAsar);
+    if (!original.valid || original.patched || original.version !== targetInspection.version) {
+      throw new Error(`官方原版备份与当前客户端 v${targetInspection.version} 不匹配，已取消自动适配。`);
+    }
+  }
+  const officialSha256 = hashFile(officialAsar);
+  return {
+    officialAsar, officialSha256,
+    // Same version numbers do not prove identical official builds.
+    dynamicallyBuild: normalizeVersion(manifest.clientVersion) !== targetInspection.version
+      || Boolean(manifest.officialSha256 && manifest.officialSha256 !== officialSha256)
+  };
+}
+
 async function buildPatchForTarget(options) {
   const { targetAsar, legacyPayloadAsar, runtimeRulesPath, outputAsar } = options;
   if (!fs.existsSync(targetAsar)) throw new Error('当前 Antigravity app.asar 不存在');
@@ -182,5 +202,6 @@ module.exports = {
   resolveUnpackedSource,
   isSafeRuntimeTempDir,
   removeRuntimeTempDir,
-  cleanupStaleRuntimeTempDirs
+  cleanupStaleRuntimeTempDirs,
+  planPatchBuild
 };

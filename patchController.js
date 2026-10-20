@@ -17,6 +17,9 @@
     const compatibilityTitle = document.getElementById('patch-compatibility-title');
     const compatibilityDetail = document.getElementById('patch-compatibility-detail');
     let appPaths = null;
+    let versionRequest = 0;
+    let canInstall = false;
+    let installing = false;
     const feedback = window.AgyOperationFeedback;
 
     const resolveAsarPath = () => {
@@ -42,6 +45,34 @@
       }
     }
 
+    async function refreshVersions(asarPath) {
+      const request = ++versionRequest;
+      try {
+        const version = await window.agyHubAPI.getAsarVersions(asarPath);
+        if (request !== versionRequest) return;
+        if (!version.success) throw new Error(version.error || '版本信息读取失败');
+        const format = value => value && value !== 'unknown' ? `v${value}` : '读取失败';
+        textOriginalVersion.textContent = format(version.originalVersion);
+        textPatchVersion.textContent = format(version.patchVersion);
+        const known = version.originalVersion && version.originalVersion !== 'unknown'
+          && version.patchVersion && version.patchVersion !== 'unknown';
+        canInstall = Boolean(known && version.clientStructureReady !== false && version.runtimeResourcesReady !== false);
+        if (compatibilityStrip) compatibilityStrip.dataset.state = canInstall ? 'ready' : 'warning';
+        if (compatibilityTitle) compatibilityTitle.textContent = canInstall ? '运行资源就绪，可自动适配' : '注入条件不完整';
+        if (compatibilityDetail) compatibilityDetail.textContent = canInstall
+          ? `Antigravity ${version.originalVersion} · 汉化包 ${version.patchVersion} · 注入前将基于当前官方版本执行完整构建和校验`
+          : (version.warnings || []).join('；') || '请检查客户端安装和汉化包资源后重试。';
+        if (btnInstallPatch) btnInstallPatch.disabled = installing || !canInstall;
+        logToTerminal(`[Version] 官方客户端: ${format(version.originalVersion)} | 管家补丁: ${format(version.patchVersion)}`);
+        await refreshBackupStatus(asarPath);
+      } catch (error) {
+        if (request !== versionRequest) return;
+        canInstall = false;
+        if (btnInstallPatch) btnInstallPatch.disabled = true;
+        logToTerminal(`版本检测出错: ${error.message}`, 'error');
+      }
+    }
+
     async function detect() {
       try {
         appPaths = await window.agyHubAPI.detectPaths();
@@ -50,21 +81,7 @@
           pathStatusText.style.color = 'var(--accent-green)';
           inputInstallDir.value = appPaths.installDir;
           logToTerminal(`[Path] 自动检测安装目录成功，位置：${appPaths.asarPath}`, 'success');
-          const version = await window.agyHubAPI.getAsarVersions(appPaths.asarPath);
-          if (version.success) {
-            textOriginalVersion.textContent = `v${version.originalVersion}`;
-            textPatchVersion.textContent = `v${version.patchVersion}`;
-            logToTerminal(`[Version] 官方原版: v${version.originalVersion} | 管家补丁: v${version.patchVersion}`);
-            if (compatibilityStrip) {
-              const known = version.originalVersion !== 'unknown' && version.patchVersion !== 'unknown';
-              compatibilityStrip.dataset.state = known ? 'ready' : 'warning';
-              compatibilityTitle.textContent = known ? '兼容性预检通过' : '版本信息不完整';
-              compatibilityDetail.textContent = known
-                ? `Antigravity ${version.originalVersion} · 补丁目标 ${version.patchVersion} · 注入前仍会执行完整结构校验`
-                : '可以继续检测，但注入前请确认客户端和补丁版本。';
-            }
-          }
-          await refreshBackupStatus(appPaths.asarPath);
+          await refreshVersions(appPaths.asarPath);
         } else {
           pathStatusText.textContent = '未找到默认安装路径，请手动选择或覆盖。';
           pathStatusText.style.color = 'var(--accent-pink)';
@@ -86,6 +103,7 @@
       if (!asarPath) return feedback?.fail('patch-install', '请选择正确的 Antigravity 安装路径');
       logToTerminal(`[Patch] 正在为 ${inputInstallDir.value.trim()} 注入汉化补丁...`);
       feedback?.begin('patch-install', '注入中文汉化补丁', '正在检查客户端和补丁文件');
+      installing = true;
       btnInstallPatch.disabled = true;
       btnInstallPatch.textContent = '正在校验并注入...';
       if (btnCancelPatch) {
@@ -98,12 +116,13 @@
         if (!result.success) throw new Error(result.error);
         logToTerminal(result.msg, 'success');
         feedback?.succeed('patch-install', result.msg);
-        await detect();
+        await refreshVersions(asarPath);
       } catch (error) {
         logToTerminal(error.message, 'error');
         feedback?.fail('patch-install', `注入失败：${error.message}`);
       } finally {
-        btnInstallPatch.disabled = false;
+        installing = false;
+        btnInstallPatch.disabled = !canInstall;
         btnInstallPatch.textContent = '注入中文汉化补丁';
         if (btnCancelPatch) btnCancelPatch.style.display = 'none';
       }
@@ -146,7 +165,7 @@
         if (!result.success) throw new Error(result.error);
         logToTerminal(result.msg, 'success');
         feedback?.succeed('patch-previous', '已退回上一版汉化');
-        await detect();
+        await refreshVersions(asarPath);
       } catch (error) {
         logToTerminal(error.message, 'error');
         feedback?.fail('patch-previous', `回滚失败：${error.message}`);
@@ -166,7 +185,7 @@
         if (!result.success) throw new Error(result.error);
         logToTerminal(result.msg, 'success');
         feedback?.succeed('patch-original', '还原官方英文原版成功');
-        await detect();
+        await refreshVersions(asarPath);
       } catch (error) {
         logToTerminal(error.message, 'error');
         feedback?.fail('patch-original', `还原失败：${error.message}`);
@@ -175,6 +194,10 @@
       }
     });
 
+    inputInstallDir?.addEventListener('change', () => {
+      const asarPath = resolveAsarPath();
+      if (asarPath && !installing) void refreshVersions(asarPath);
+    });
     return detect();
   }
 
