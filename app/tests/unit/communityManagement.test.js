@@ -2,6 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');
 const data = require('../../communityData');
+const path = require('node:path');
+const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
+const projectRoot = path.resolve(__dirname, '../..');
+const backendRoot = [path.join(projectRoot, 'community-backend'), path.resolve(projectRoot, '../community-backend')]
+  .find(directory => fs.existsSync(path.join(directory, 'functions/api/auth/_management.js')));
+const importBackend = file => import(pathToFileURL(path.join(backendRoot, 'functions/api', file)).href);
 
 test('community ordering uses real creation dates and stable ids, popularity is opt-in', () => {
   const rows = [{ id: 1, username: 'old', content: 'a', created_at: 1700000000, likes_count: 99, replies: [{}] }, { id: 3, username: 'new', content: 'b', created_at: 1800000000000, likes_count: 0, replies: [] }, { id: 2, username: 'same', content: 'c', created_at: '1800000000000', replies: [] }];
@@ -16,9 +23,9 @@ test('community ordering uses real creation dates and stable ids, popularity is 
 });
 
 async function fixture() {
-  const management = await import('../../community-backend/functions/api/auth/_management.js');
-  const auth = await import('../../community-backend/functions/api/auth/_utils.js');
-  const users = await import('../../community-backend/functions/api/auth/users.js');
+  const management = await importBackend('auth/_management.js');
+  const auth = await importBackend('auth/_utils.js');
+  const users = await importBackend('auth/users.js');
   const sql = new DatabaseSync(':memory:');
   const db = {
     prepare(query) {
@@ -52,7 +59,7 @@ test('disable, role changes and password resets invalidate existing sessions, in
   const req = new Request('https://example.test/api', { headers: { Authorization: `Bearer ${token}` } });
   assert.ok(await f.auth.authenticateRequest(req, f.env.JWT_SECRET, f.env));
   for (const action of ['disable', 'enable']) { const res = await f.users.onRequestPost({ request: f.request({ username: 'member', action }), env: f.env }); assert.equal(res.status, 200); assert.equal(await f.auth.authenticateRequest(req, f.env.JWT_SECRET, f.env), null); }
-  const reset = await import('../../community-backend/functions/api/auth/reset-password.js');
+  const reset = await importBackend('auth/reset-password.js');
   const before = f.sql.prepare('SELECT session_version FROM user_management WHERE username = ?').get('member').session_version;
   const res = await reset.onRequestPost({ request: f.request({ username: 'member', new_password: 'test-new-password' }), env: f.env });
   assert.equal(res.status, 200); assert.equal(f.sql.prepare('SELECT session_version FROM user_management WHERE username = ?').get('member').session_version, before + 1);
@@ -76,7 +83,7 @@ test('self-management and admin deletion are rejected and content cleanup is com
 test('feedback server selects newest, popular and unanswered before applying the row limit', async () => {
   const f = await fixture();
   f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','old',NULL,1),(2,'member','new',NULL,2); INSERT INTO replies VALUES (1,1,'owner','answered',1); INSERT INTO feedback_likes VALUES ('owner',1)");
-  const handler = await import('../../community-backend/functions/api/feedback.js');
+  const handler = await importBackend('feedback.js');
   for (const [sort, ids] of [['newest', [2,1]], ['popular', [1,2]], ['unanswered', [2]]]) { const res = await handler.onRequestGet({ request: new Request('https://example.test/api/feedback?sort=' + sort), env: f.env }); assert.equal(res.status, 200); assert.deepEqual((await res.json()).map(r => r.id), ids); }
   f.sql.close();
 });

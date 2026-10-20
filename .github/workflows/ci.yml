@@ -4,16 +4,25 @@ on:
   push:
   pull_request:
 
+defaults:
+  run:
+    working-directory: app
+
 jobs:
   windows:
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Verify repository layout
+        working-directory: .
+        run: |
+          node -e "const fs=require('fs'),assert=require('assert/strict');assert.ok(fs.existsSync('app/package.json'));assert.equal(fs.existsSync('src'),false);assert.deepEqual(fs.readdirSync('.').filter(f=>/\.(?:js|cjs|html|css)$/.test(f)),[]);"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm run patch:verify
       - name: Run Windows test suite
@@ -33,6 +42,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm run patch:verify
       - run: node --test tests/unit/patchWorker.test.js tests/unit/trayBackgroundCompatibility.test.js

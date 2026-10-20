@@ -84,48 +84,43 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 
 | 路径 | 用途 |
 | --- | --- |
-| `<仓库克隆目录>` | 开发源码和构建目录 |
+| `<仓库克隆目录>\app\` | 桌面端完整工程；在此安装依赖、运行测试和构建 |
 | `<AGY Hub 安装目录>` | 应用安装与运行目录，不建议直接作为长期开发目录 |
-| `dist\` | Windows 安装包、blockmap 和 `latest.yml` 发布产物 |
+| `app\dist\` | Windows 安装包、blockmap 和 `latest.yml` 发布产物 |
 
-开发时请先阅读 `AGENTS.md`、`AI_PROJECT_GUIDE.md` 和 `docs/MAINTENANCE_GUIDE.md`。
+开发时请先阅读 [源码布局说明](docs/REPOSITORY_LAYOUT.md)、`docs/development/AGENTS.md`、`docs/development/AI_PROJECT_GUIDE.md` 和 `docs/MAINTENANCE_GUIDE.md`。
 
 ## 项目结构
 
 ```text
-agy-hub/
-├─ main.js                         Electron 生命周期与主进程编排
-├─ preload.js                      安全 IPC 桥
-├─ renderer.js                     前端全局入口
-├─ index.html                      主界面
-├─ gatewayController.js            反代页面控制器
-├─ codexGateway.js                 本地 8046 统一网关
-├─ codexModels.js                  Codex 模型目录与别名
-├─ antigravityModelCatalog.js      Antigravity 动态模型目录
-├─ anthropicGateway.js             Anthropic Messages 协议转换
-├─ accountIpc.js                   本地账号与额度 IPC
-├─ tokenUsage.js                   Token 统计
-├─ marketplaceController.js        MCP / Skill 市场
-├─ patch-workbench/                Antigravity 补丁构建与兼容验证
-├─ assets/                         图标、主题、截图和发布用补丁资源
-│  └─ screenshots/                 社区界面预览截图
-├─ docs/                           架构、维护与兼容文档
-├─ tests/
-│  └─ unit/                       单元测试、协议与回归测试（65 个文件）
-└─ scripts/
-   └─ smoke/                      Electron 页面、UI 和注入冒烟验证脚本
+Antigravity-Chinese/
+├─ app/                           AGY Hub 桌面端完整工程
+│  ├─ package.json                启动、测试与构建配置
+│  ├─ main.js / preload.js        Electron 入口与 IPC 桥
+│  ├─ index.html / renderer.js    主界面与页面入口
+│  ├─ assets/                     图标、主题和已验证的汉化补丁
+│  ├─ build/                      Windows 安装器与构建钩子
+│  ├─ patch-workbench/            汉化构建与兼容适配
+│  ├─ scripts/                    开发与冒烟验证脚本
+│  └─ tests/                      单元、协议与回归测试
+├─ community-backend/             社区后端独立工程
+├─ docs/                          使用、架构、维护与版本说明
+├─ .github/                       持续集成
+├─ LICENSE
+└─ README.md
 ```
 
 ### 源码目录整理说明
 
-测试源码统一放在 `tests/unit/`，Electron 冒烟测试放在 `scripts/smoke/`，社区预览图片放在 `assets/screenshots/`，避免占据 GitHub 仓库首页。Electron 主进程、渲染进程和网关模块保留原有路径，确保 **1.3.8 运行与安装包资源布局不受影响**。目录整理不会改变现有 Release 安装包。
+桌面端工程集中在 `app/`，其内部相对路径保持一致。旧 `src/` 中的重复副本已由当前工程统一替代。以后同步源码时应更新 `app/`，避免再次把运行文件平铺到仓库根目录。
 
 ## 开发与验证
 
-安装依赖：
+从仓库根目录进入桌面端工程后安装依赖；后续命令均在 `app/` 执行：
 
 ```powershell
-npm install
+cd app
+npm ci
 ```
 
 本地启动：
