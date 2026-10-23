@@ -8,4 +8,5 @@ module.exports = async context => {
   const generated = path.join(root, 'build', 'generated');
   fs.mkdirSync(generated, { recursive: true });
   fs.copyFileSync(path.join(root, 'accountQuota.js'), path.join(generated, 'accountQuota.js'));
+  fs.copyFileSync(path.join(root, 'antigravityQuotaBridge.js'), path.join(generated, 'antigravityQuotaBridge.js'));
 };

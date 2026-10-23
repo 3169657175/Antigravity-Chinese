@@ -5,7 +5,8 @@ export async function ensureManagement(db) {
 }
 export async function ensureContent(db) {
   await db.prepare('CREATE TABLE IF NOT EXISTS feedbacks (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, content TEXT NOT NULL, image_url TEXT, created_at INTEGER NOT NULL)').run();
-  await db.prepare('CREATE TABLE IF NOT EXISTS replies (id INTEGER PRIMARY KEY AUTOINCREMENT, feedback_id INTEGER NOT NULL, username TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS replies (id INTEGER PRIMARY KEY AUTOINCREMENT, feedback_id INTEGER NOT NULL, username TEXT NOT NULL, content TEXT NOT NULL, image_url TEXT, created_at INTEGER NOT NULL)').run();
+  try { await db.prepare('ALTER TABLE replies ADD COLUMN image_url TEXT').run(); } catch (_) {}
   await db.prepare('CREATE TABLE IF NOT EXISTS feedback_likes (username TEXT NOT NULL, feedback_id INTEGER NOT NULL, PRIMARY KEY (username, feedback_id))').run();
   await db.prepare('CREATE TABLE IF NOT EXISTS reply_likes (username TEXT NOT NULL, reply_id INTEGER NOT NULL, PRIMARY KEY (username, reply_id))').run();
 }

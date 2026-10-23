@@ -24,10 +24,12 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const { feedback_id, content } = await request.json();
+    const { feedback_id, content, image_url } = await request.json();
+    const cleanContent = typeof content === 'string' ? content.trim().slice(0, 500) : '';
+    const cleanImageUrl = typeof image_url === 'string' ? image_url.trim().slice(0, 2000) : '';
 
-    if (!feedback_id || !content || !content.trim()) {
-      return new Response(JSON.stringify({ error: "参数不全：回复内容及目标留言ID不能为空" }), {
+    if (!feedback_id || (!cleanContent && !cleanImageUrl)) {
+      return new Response(JSON.stringify({ error: "回复文字和图片至少需要填写一项" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
@@ -40,13 +42,15 @@ export async function onRequestPost(context) {
         feedback_id INTEGER NOT NULL,
         username TEXT NOT NULL,
         content TEXT NOT NULL,
+        image_url TEXT,
         created_at INTEGER NOT NULL
       )
     `).run();
+    try { await db.prepare("ALTER TABLE replies ADD COLUMN image_url TEXT").run(); } catch (e) {}
 
     // 3. 将回复写入表，绑定 JWT 实名身份
-    await db.prepare("INSERT INTO replies (feedback_id, username, content, created_at) VALUES (?, ?, ?, ?)")
-      .bind(feedback_id, user.username, content.trim().slice(0, 500), Date.now())
+    await db.prepare("INSERT INTO replies (feedback_id, username, content, image_url, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(feedback_id, user.username, cleanContent, cleanImageUrl, Date.now())
       .run();
 
     return new Response(JSON.stringify({ success: true }), {

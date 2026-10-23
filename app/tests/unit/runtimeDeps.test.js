@@ -64,16 +64,16 @@ test('NSIS updater uses the dedicated graceful shutdown include', () => {
 
 test('renderer entry files required by BrowserWindow exist', () => {
   for (const file of [
-    'preload.js', 'index.html', 'renderer.js', 'patchController.js', 'style.css', 'safeDom.js', 'communityController.js', 'navigationController.js',
+    'preload.js', 'index.html', 'renderer.js', 'patchController.js', 'style.css', 'safeDom.js', 'communityController.js', 'communityMedia.js', 'navigationController.js',
     'gatewayController.js', 'appShellController.js', 'localAccountsController.js',
     'themeController.js', 'tokenMonitorController.js', 'marketplaceController.js', 'operationFeedback.js',
     'marketplace/marketplacePresenter.js', 'marketplace/marketplaceLayout.js',
-    'styles/base.css', 'styles/gateway.css', 'styles/theme-modes.css', 'styles/claude-access.css'
+    'styles/base.css', 'styles/gateway.css', 'styles/theme-modes.css', 'styles/claude-access.css', 'styles/community.css'
   ]) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', '..', file)), `Missing renderer runtime file: ${file}`);
   }
   const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
-  for (const dependency of ['safeDom.js', 'communityController.js', 'navigationController.js', 'marketplace/marketplacePresenter.js', 'marketplace/marketplaceLayout.js']) {
+  for (const dependency of ['safeDom.js', 'communityController.js', 'communityMedia.js', 'navigationController.js', 'marketplace/marketplacePresenter.js', 'marketplace/marketplaceLayout.js']) {
     assert.ok(html.includes(`src="${dependency}"`), `index.html must load ${dependency}`);
     assert.ok(html.indexOf(`src="${dependency}"`) < html.indexOf('src="renderer.js"'), `${dependency} must load before renderer.js`);
   }

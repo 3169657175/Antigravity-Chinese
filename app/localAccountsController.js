@@ -3,6 +3,48 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AgyLocalAccountsController = api;
 })(typeof window !== 'undefined' ? window : globalThis, function createLocalAccountsController() {
+const QUOTA_SECTIONS = Object.freeze([
+  { title: 'Claude / GPT', fields: [['claude5h', '5h 限制'], ['claudeWeekly', '每周上限']] },
+  { title: 'Gemini', fields: [['gemini5h', '5h 限制'], ['geminiWeekly', '每周上限']] }
+]);
+let localAccountsLoadGeneration = 0;
+
+function quotaFieldState(result, field) {
+  if (/^\d+%$/.test(String(result?.quota?.[field] || ''))) return 'available';
+  const missing = Array.isArray(result?.missingQuotaFields) ? result.missingQuotaFields : [];
+  const confirmed = Array.isArray(result?.confirmedMissingQuotaFields)
+    ? result.confirmedMissingQuotaFields
+    : missing.filter(name => !(result?.unconfirmedQuotaFields || []).includes(name));
+  return confirmed.includes(field) ? 'missing' : 'unconfirmed';
+}
+
+function quotaPercent(result, field) {
+  if (quotaFieldState(result, field) !== 'available') return null;
+  const value = Number.parseInt(result.quota[field], 10);
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
+}
+
+function calculateQuotaScore(weekly, shortWindow) {
+  if (weekly === null) return shortWindow;
+  if (shortWindow === null) return weekly;
+  const weeklyFraction = weekly / 100;
+  const alpha = 1 - Math.pow(weeklyFraction, 2);
+  return alpha * weekly + (1 - alpha) * shortWindow;
+}
+
+function quotaSectionsForResult(result) {
+  const sections = [...QUOTA_SECTIONS];
+  if (result?.capabilities?.argon && quotaFieldState(result, 'argonWeekly') === 'available') {
+    sections.push({ title: 'Gemini 4 Argon', fields: [['argonWeekly', '每周上限']] });
+  }
+  return sections.map(section => ({
+    title: section.title,
+    fields: section.fields
+      .map(([field, label]) => ({ field, label, state: quotaFieldState(result, field) }))
+      .filter(item => item.state !== 'missing')
+  })).filter(section => section.fields.length > 0);
+}
+
 function createLocalAccountBadge(text, type) {
   const badge = document.createElement('span');
   badge.className = `local-account-badge ${type}`;
@@ -10,7 +52,7 @@ function createLocalAccountBadge(text, type) {
   return badge;
 }
 
-function createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal) {
+function createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad = () => true) {
   const btnAddLocalAccount = document.getElementById('btn-add-local-account');
   const btnStartOauth = document.getElementById('btn-start-oauth');
   const oauthStatusMessage = document.getElementById('oauth-status-message');
@@ -126,12 +168,12 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
   // 添加配额显示区
   const quotaPanel = document.createElement('div');
   quotaPanel.className = 'local-account-quota';
-  
+
   if (account.storageState === 'missing') {
     quotaPanel.innerHTML = `<div class="quota-error">凭据不可用，请先在官方客户端登录该账号</div>`;
   } else {
     quotaPanel.innerHTML = `<div class="quota-spinner">正在查询实时额度...</div>`;
-    
+
     // 格式化重置倒计时
     function formatResetTime(isoStr) {
       if (!isoStr) return '';
@@ -155,49 +197,31 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
     const qPromise = (async () => {
       try {
         const res = await window.agyHubAPI.fetchAccountQuota(account.id);
+        if (!isCurrentLoad()) return { accountId: account.id, success: false, stale: true };
         if (res && res.success) {
           if (res.quotaSourceHost) {
-            logToTerminal(`[Quota] ${account.email} source: ${res.quotaSourceHost}`);
+            logToTerminal(`[Quota] ${account.email} source: ${res.quotaSourceHost}, ${res.quotaResponseTimeMs || 0}ms`);
           }
-          const c5hR = formatResetTime(res.quota.claude5hReset);
-          const cWkR = formatResetTime(res.quota.claudeWeeklyReset);
-          const g5hR = formatResetTime(res.quota.gemini5hReset);
-          const gWkR = formatResetTime(res.quota.geminiWeeklyReset);
+          const quotaColumns = quotaSectionsForResult(res).map(section => {
+            const items = section.fields.map(({ field, label, state }) => {
+              if (state === 'unconfirmed') {
+                return `<div class="quota-item pending"><div class="quota-label"><span>${label}</span><span class="quota-val">待确认</span></div></div>`;
+              }
+              const percent = quotaPercent(res, field);
+              const reset = formatResetTime(res.quota[`${field}Reset`]);
+              return `<div class="quota-item"><div class="quota-label"><span>${label} ${reset}</span><span class="quota-val">${percent}%</span></div><div class="quota-bar"><div class="quota-fill" style="width: ${percent}%"></div></div></div>`;
+            }).filter(Boolean).join('');
+            return items ? `<div class="quota-col"><div class="quota-platform">${section.title}</div>${items}</div>` : '';
+          }).filter(Boolean);
+          quotaPanel.innerHTML = `<div class="quota-grid${quotaColumns.length === 1 ? ' single' : ''}">${quotaColumns.join('')}</div>`;
 
-          quotaPanel.innerHTML = `
-            <div class="quota-grid">
-              <div class="quota-col">
-                <div class="quota-platform">Claude / GPT</div>
-                <div class="quota-item">
-                  <div class="quota-label"><span>5h 限制 ${c5hR}</span> <span class="quota-val">${res.quota.claude5h}</span></div>
-                  <div class="quota-bar"><div class="quota-fill" style="width: ${res.quota.claude5h}"></div></div>
-                </div>
-                <div class="quota-item">
-                  <div class="quota-label"><span>每周上限 ${cWkR}</span> <span class="quota-val">${res.quota.claudeWeekly}</span></div>
-                  <div class="quota-bar"><div class="quota-fill" style="width: ${res.quota.claudeWeekly}"></div></div>
-                </div>
-              </div>
-              <div class="quota-col">
-                <div class="quota-platform">Gemini</div>
-                <div class="quota-item">
-                  <div class="quota-label"><span>5h 限制 ${g5hR}</span> <span class="quota-val">${res.quota.gemini5h}</span></div>
-                  <div class="quota-bar"><div class="quota-fill" style="width: ${res.quota.gemini5h}"></div></div>
-                </div>
-                <div class="quota-item">
-                  <div class="quota-label"><span>每周上限 ${gWkR}</span> <span class="quota-val">${res.quota.geminiWeekly}</span></div>
-                  <div class="quota-bar"><div class="quota-fill" style="width: ${res.quota.geminiWeekly}"></div></div>
-                </div>
-              </div>
-            </div>
-          `;
-          
           if (res.quotaDetails && Object.keys(res.quotaDetails).length > 0) {
             logToTerminal(`[Quota] 账号 ${account.email} 详细配额明细 (Project: ${res.projectId || '未知'}): ${JSON.stringify(res.quotaDetails)}`);
           }
           if (res.quotaDataDebug && Object.keys(res.quotaDataDebug).length > 0) {
             logToTerminal(`[Quota] 账号 ${account.email} 响应体最外层全局非 models 属性: ${JSON.stringify(res.quotaDataDebug)}`);
           }
-          
+
           // 渲染完成后稍微延迟给进度条上色及填充，以展示顺滑过渡动画
           setTimeout(() => {
             quotaPanel.querySelectorAll('.quota-fill').forEach(fill => {
@@ -211,10 +235,12 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
           return {
             accountId: account.id,
             success: true,
-            gemini5h: parseInt(res.quota.gemini5h) || 0,
-            geminiWeekly: parseInt(res.quota.geminiWeekly) || 0,
-            claude5h: parseInt(res.quota.claude5h) || 0,
-            claudeWeekly: parseInt(res.quota.claudeWeekly) || 0
+            gemini5h: quotaPercent(res, 'gemini5h'),
+            geminiWeekly: quotaPercent(res, 'geminiWeekly'),
+            claude5h: quotaPercent(res, 'claude5h'),
+            claudeWeekly: quotaPercent(res, 'claudeWeekly'),
+            argonWeekly: quotaPercent(res, 'argonWeekly'),
+            capabilities: res.capabilities || {}
           };
         } else {
           if (accountUi.renderQuotaFailure) {
@@ -240,6 +266,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
           logToTerminal(`[Quota] ${account.email || account.id}: ${res?.code || 'ACCOUNT_UNKNOWN_ERROR'} ${res?.message || ''}`, 'error');
         }
       } catch (err) {
+        if (!isCurrentLoad()) return { accountId: account.id, success: false, stale: true };
         if (accountUi.renderQuotaFailure) {
           accountUi.renderQuotaFailure({
             container: quotaPanel,
@@ -262,12 +289,12 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
       }
       return { accountId: account.id, success: false };
     })();
-    
+
     if (activeQuotaPromises) {
       activeQuotaPromises.push(qPromise);
     }
   }
-  
+
   row.appendChild(quotaPanel);
   return row;
 }
@@ -278,6 +305,8 @@ async function loadLocalAccounts(options = {}) {
   const localAccountCount = document.getElementById('local-account-count');
   const localAccountCurrent = document.getElementById('local-account-current');
   if (!localAccountsList || !localAccountCount || !localAccountCurrent) return;
+  const generation = ++localAccountsLoadGeneration;
+  const isCurrentLoad = () => generation === localAccountsLoadGeneration;
 
   localAccountsList.replaceChildren();
   const loading = document.createElement('div');
@@ -295,6 +324,7 @@ async function loadLocalAccounts(options = {}) {
     if (!result || !result.success) {
       throw new Error(result?.error || '本地账号读取失败');
     }
+    if (!isCurrentLoad()) return;
 
     const accounts = Array.isArray(result.accounts) ? result.accounts : [];
     localAccountCount.textContent = String(accounts.length);
@@ -311,38 +341,30 @@ async function loadLocalAccounts(options = {}) {
       localAccountsList.appendChild(empty);
     } else {
       accounts.forEach((account, index) => {
-        localAccountsList.appendChild(createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal));
+        localAccountsList.appendChild(createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad));
       });
 
       // 异步执行智能算分与账号推荐标记
       if (activeQuotaPromises.length > 0) {
-        (async () => {
-          const quotaResults = await Promise.all(activeQuotaPromises);
-          const validResults = quotaResults.filter(r => r.success);
-          if (validResults.length === 0) return;
-
-          // 核心算法函数：S = a * W + (1 - a) * H, 其中 a = 1 - (W/100)^2
-          const calculateScore = (w, h) => {
-            const wFraction = w / 100;
-            const alpha = 1 - Math.pow(wFraction, 2);
-            return alpha * w + (1 - alpha) * h;
-          };
-
+        const quotaResults = await Promise.all(activeQuotaPromises);
+        if (!isCurrentLoad()) return;
+        const validResults = quotaResults.filter(r => r.success);
+        if (validResults.length > 0) {
           let bestGeminiId = null;
           let bestGeminiScore = -1;
           let bestClaudeId = null;
           let bestClaudeScore = -1;
 
           for (const res of validResults) {
-            const gScore = calculateScore(res.geminiWeekly, res.gemini5h);
-            const cScore = calculateScore(res.claudeWeekly, res.claude5h);
+            const gScore = calculateQuotaScore(res.geminiWeekly, res.gemini5h);
+            const cScore = calculateQuotaScore(res.claudeWeekly, res.claude5h);
 
-            // 只有剩余额度大于 0% 的情况下参与算分推荐
-            if (gScore > bestGeminiScore && res.geminiWeekly > 0) {
+            // 周额度缺失时使用已确认的 5h 额度，避免整个平台失去推荐能力。
+            if (gScore !== null && gScore > bestGeminiScore && gScore > 0) {
               bestGeminiScore = gScore;
               bestGeminiId = res.accountId;
             }
-            if (cScore > bestClaudeScore && res.claudeWeekly > 0) {
+            if (cScore !== null && cScore > bestClaudeScore && cScore > 0) {
               bestClaudeScore = cScore;
               bestClaudeId = res.accountId;
             }
@@ -368,12 +390,13 @@ async function loadLocalAccounts(options = {}) {
               }
             }
           }
-        })();
+        }
       }
     }
 
     logToTerminal(`[Accounts] 已读取 ${accounts.length} 个本地账号。`, 'success');
   } catch (error) {
+    if (!isCurrentLoad()) return;
     localAccountCount.textContent = '0';
     localAccountCurrent.textContent = '读取失败';
     localAccountsList.replaceChildren();
@@ -383,11 +406,11 @@ async function loadLocalAccounts(options = {}) {
     localAccountsList.appendChild(failed);
     logToTerminal(`[Accounts] ${error.message}`, 'error');
   } finally {
-    if (btnRefreshLocalAccounts) btnRefreshLocalAccounts.disabled = false;
+    if (isCurrentLoad() && btnRefreshLocalAccounts) btnRefreshLocalAccounts.disabled = false;
   }
 }
 
 // 输出日志到终端
 
-  return { loadLocalAccounts };
+  return { loadLocalAccounts, quotaFieldState, quotaPercent, calculateQuotaScore, quotaSectionsForResult };
 });

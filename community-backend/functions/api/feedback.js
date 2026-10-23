@@ -47,9 +47,11 @@ export async function onRequestGet(context) {
         feedback_id INTEGER NOT NULL,
         username TEXT NOT NULL,
         content TEXT NOT NULL,
+        image_url TEXT,
         created_at INTEGER NOT NULL
       )
     `).run();
+    try { await db.prepare("ALTER TABLE replies ADD COLUMN image_url TEXT").run(); } catch (e) {}
 
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS feedback_likes (
@@ -72,11 +74,11 @@ export async function onRequestGet(context) {
     const ordering = sort === 'popular' ? 'likes_count DESC, f.created_at DESC, f.id DESC' : 'f.created_at DESC, f.id DESC';
     const unanswered = sort === 'unanswered' ? 'WHERE NOT EXISTS (SELECT 1 FROM replies r WHERE r.feedback_id = f.id)' : '';
     const { results: feedbacks } = await db.prepare(`
-      SELECT 
-        f.id, 
-        f.username, 
-        f.content, 
-        f.image_url, 
+      SELECT
+        f.id,
+        f.username,
+        f.content,
+        f.image_url,
         f.created_at,
         (SELECT role FROM users WHERE username = f.username) AS role,
         (SELECT COUNT(*) FROM feedback_likes WHERE feedback_id = f.id) as likes_count,
@@ -96,15 +98,16 @@ export async function onRequestGet(context) {
     // 3. 联合检索二级回复：支持回复点赞与高赞置顶排序 (点赞降序，时间升序)
     const feedbackIds = feedbacks.map(f => f.id).join(',');
     const { results: allReplies } = await db.prepare(`
-      SELECT 
-        r.id, 
-        r.feedback_id, 
-        r.username, 
-        r.content, 
+      SELECT
+        r.id,
+        r.feedback_id,
+        r.username,
+        r.content,
+        r.image_url,
         r.created_at,
         (SELECT COUNT(*) FROM reply_likes WHERE reply_id = r.id) as likes_count,
         (SELECT COUNT(*) FROM reply_likes WHERE reply_id = r.id AND username = ?) as has_liked
-      FROM replies r 
+      FROM replies r
       WHERE r.feedback_id IN (${feedbackIds})
       ORDER BY likes_count DESC, r.created_at ASC
     `).bind(currentUsername).all();

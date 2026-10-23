@@ -13,7 +13,7 @@ export async function onRequestGet({ request, env }) {
       if (!user) return json({ error: '用户不存在' }, 404);
       const { results: feedbacks } = await db.prepare('SELECT id, content, image_url, created_at FROM feedbacks WHERE username = ? ORDER BY created_at DESC, id DESC').bind(username).all();
       if (url.searchParams.get('detail') !== 'true') return json(feedbacks || []);
-      const { results: replies } = await db.prepare('SELECT id, feedback_id, content, created_at FROM replies WHERE username = ? ORDER BY created_at DESC, id DESC').bind(username).all();
+      const { results: replies } = await db.prepare('SELECT id, feedback_id, content, image_url, created_at FROM replies WHERE username = ? ORDER BY created_at DESC, id DESC').bind(username).all();
       const { results: events } = await db.prepare('SELECT actor, action, created_at FROM admin_audit WHERE target = ? ORDER BY id DESC LIMIT 20').bind(username).all();
       return json({ user, feedbacks: feedbacks || [], replies: replies || [], events: events || [], capabilities: ['status', 'role', 'note', 'clear-content', 'delete'] });
     }

@@ -1,10 +1,10 @@
 {
-  "verifiedAt": "2026-10-20T13:21:27.342Z",
+  "verifiedAt": "2026-10-23T10:27:41.172Z",
   "ok": true,
-  "archivePath": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "archiveSize": 5396567,
-  "archiveSha256": "11fbf033c21521ba28476fe76ae4d7e0ec5e503b8962b3a9b98e72e0af35fb2c",
-  "packageVersion": "2.24.0",
+  "archivePath": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\.codex-stage\\release-worktree-1.4.1\\app\\assets\\app.asar",
+  "archiveSize": 5309745,
+  "archiveSha256": "68719401baca9e64abba9a2480b8f6e841c65215e2a5c041e4859041346e8b9e",
+  "packageVersion": "2.26.0",
   "formatVersion": 2,
   "unpackedMode": "preserve-official",
   "requiredFiles": [
@@ -16,7 +16,8 @@
     "dist/utils.js",
     "dist/ipcHandlers.js",
     "dist/accountVault.js",
-    "dist/accountQuota.js"
+    "dist/accountQuota.js",
+    "dist/antigravityQuotaBridge.js"
   ],
   "checkedSyntax": [
     "dist/languageServer.js",
@@ -26,7 +27,8 @@
     "dist/utils.js",
     "dist/ipcHandlers.js",
     "dist/accountVault.js",
-    "dist/accountQuota.js"
+    "dist/accountQuota.js",
+    "dist/antigravityQuotaBridge.js"
   ],
   "checkedTrayModuleExports": [
     "createTray",

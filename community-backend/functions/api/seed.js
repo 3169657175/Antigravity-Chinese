@@ -22,6 +22,7 @@ export async function onRequest(context) {
         feedback_id INTEGER NOT NULL,
         username TEXT NOT NULL,
         content TEXT NOT NULL,
+        image_url TEXT,
         created_at INTEGER NOT NULL
       )
     `).run();
@@ -71,10 +72,10 @@ export async function onRequest(context) {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "5 张说明书真实截图已成功写入官方 D1 数据库 feedbacks 表！" 
-      }), 
+      JSON.stringify({
+        success: true,
+        message: "5 张说明书真实截图已成功写入官方 D1 数据库 feedbacks 表！"
+      }),
       {
         headers: { "Content-Type": "application/json; charset=utf-8" }
       }

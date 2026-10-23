@@ -3,7 +3,7 @@ const { contextBridge } = require('electron');
 const ok = async () => ({ success: true });
 let updaterCallback = null;
 let claudeDesktopConnected = false;
-const partialQuota = process.argv.includes('--smoke-partial-quota');
+const partialQuota = typeof process !== 'undefined' && process.argv.includes('--smoke-partial-quota');
 const currentModels = ['agy-auto', 'gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low', 'claude-opus-4-6-thinking', 'claude-sonnet-4-6', 'gpt-oss-120b-medium'];
 const mockSkills = Array.from({ length: 60 }, (_, index) => ({
   id: `responsive-skill-${String(index + 1).padStart(2, '0')}`,
@@ -41,7 +41,18 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   getAsarVersions: async () => ({ success: true, originalVersion: '2.3.1', patchVersion: '2.3.1' }),
   getNetworkConfig: async () => ({}), checkProxyPort: async () => true,
   listLocalAccounts: async () => ({ success: true, currentAccountId: 'demo', accounts: [{ id: 'demo', email: 'demo@example.com', name: 'Demo', current: true, storageState: 'encrypted' }] }),
-  fetchAccountQuota: async () => ({ success: true, quota: { gemini5h: '71%', geminiWeekly: partialQuota ? '--' : '89%', claude5h: '100%', claudeWeekly: '77%', gemini5hReset: new Date(Date.now() + 3600000).toISOString(), geminiWeeklyReset: new Date(Date.now() + 86400000).toISOString(), claude5hReset: new Date(Date.now() + 7200000).toISOString(), claudeWeeklyReset: new Date(Date.now() + 172800000).toISOString() } }),
+  fetchAccountQuota: async () => {
+    if (partialQuota) await new Promise(resolve => setTimeout(resolve, 150));
+    return {
+      success: true,
+      quota: { gemini5h: '71%', geminiWeekly: partialQuota ? '--' : '89%', claude5h: '100%', claudeWeekly: '77%', argonWeekly: '63%', gemini5hReset: new Date(Date.now() + 3600000).toISOString(), geminiWeeklyReset: new Date(Date.now() + 86400000).toISOString(), claude5hReset: new Date(Date.now() + 7200000).toISOString(), claudeWeeklyReset: new Date(Date.now() + 172800000).toISOString(), argonWeeklyReset: new Date(Date.now() + 172800000).toISOString() },
+      capabilities: { argon: true },
+      missingQuotaFields: partialQuota ? ['geminiWeekly'] : [],
+      confirmedMissingQuotaFields: partialQuota ? ['geminiWeekly'] : [],
+      unconfirmedQuotaFields: [],
+      quotaResponseTimeMs: 150
+    };
+  },
   getTokenStats: async () => ({ logs: mockUsageLogs, totalTokens: 6476004, promptTokens: 6447411, completionTokens: 28593, cachedTokens: 4588497, cachePromptTokens: 6447411, cacheDataAvailable: true }),
   getTokenMonitorStatus: async () => ({ ready: true, routed: true, localMonitor: { ready: true, watchedFiles: 12 } }),
   getCodexGatewayStatus: async () => ({ running: true, host: '127.0.0.1', port: 8046, apiKey: 'sk-demo', accountId: 'demo', model: 'agy-auto', autoResolvedModel: 'claude-sonnet-4-6', baseUrl: 'http://127.0.0.1:8046/v1', models: currentModels }),
@@ -55,7 +66,7 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   installCommunitySkill: ok, uninstallSkill: ok, writeSkill: ok,
   readMcpConfig: async () => ({ success: true, servers: {} }), writeMcpConfig: ok, validateMcpServer: ok,
   getAuthSession: async () => ({ success: false }), authLogin: ok, authRegister: ok, authLogout: ok,
-  uploadImage: ok, fetchFeedbacks: async () => ({ success: true, data: [] }), submitFeedback: ok, deleteFeedback: ok,
+  uploadImage: ok, uploadImageData: ok, fetchFeedbacks: async () => ({ success: true, data: [] }), submitFeedback: ok, deleteFeedback: ok,
   communityRequest: async () => ({ success: true, ok: true, status: 200, data: [] }),
   openExternalUrl: ok, switchLocalAccount: ok, addLocalAccount: ok, openOfficialClient: ok,
   exportLocalAccount: ok, importLocalAccountFile: ok,

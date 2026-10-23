@@ -23,7 +23,7 @@ test('feedback detail actions remain compatible with the strict CSP', () => {
   const renderer = fs.readFileSync('renderer.js', 'utf8');
   assert.match(html, /script-src 'self'/);
   assert.doesNotMatch(renderer, /onclick="(?:submitModalReplyDesktop|deleteReplyDesktop|focusCommentInputDesktop|toggleLikeReplyDesktop|toggleLikePostDesktop)/);
-  for (const action of ['submit-reply', 'delete-reply', 'focus-reply', 'like-reply', 'like-post']) {
+  for (const action of ['submit-reply', 'attach-reply-image', 'remove-reply-image', 'delete-reply', 'focus-reply', 'like-reply', 'like-post']) {
     assert.match(renderer, new RegExp(`data-feedback-detail-action=["']${action}["']`));
   }
   assert.match(renderer, /modalBody\.onclick = async/);

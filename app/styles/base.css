@@ -6,26 +6,26 @@
   /* 基础网格与排版比例 */
   --font-display: "Segoe UI Variable Display", "Microsoft YaHei UI", "Inter", system-ui, sans-serif;
   --font-body: "Segoe UI Variable Text", "Microsoft YaHei UI", "Inter", system-ui, sans-serif;
-  
+
   /* 精确冷灰单色系 */
   --bg-base: #17191d;
   --bg-card: #21252b;
   --bg-input: #1b1f24;
   --border-subtle: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.18);
-  
+
   /* 强调指示色 */
   --accent-cyan: #8dbbd1;
   --accent-cyan-dim: rgba(141, 187, 209, 0.14);
   --accent-pink: #d78f98;
   --accent-green: #7fb69e;
   --accent-green-glow: 0 0 0 rgba(127, 182, 158, 0);
-  
+
   /* 文字秩序系统 */
   --text-main: #eef1f2;
   --text-dim: #aeb7c1;
   --text-muted: #707a85;
-  
+
   /* 缓动与动画 */
   --transition-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1018,6 +1018,10 @@ body {
   gap: 24px;
 }
 
+.quota-grid.single {
+  grid-template-columns: 1fr;
+}
+
 .quota-col {
   display: flex;
   flex-direction: column;
@@ -1049,6 +1053,11 @@ body {
 .quota-val {
   font-family: var(--font-display);
   font-weight: 600;
+}
+
+.quota-item.pending .quota-val {
+  color: #f5c97a;
+  font-size: 9px;
 }
 
 .quota-bar {

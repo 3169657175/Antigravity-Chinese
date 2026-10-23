@@ -215,8 +215,87 @@ function buildPreload(official, legacy) {
   payload = addDeveloperModeGate(payload);
   payload = enhanceThemeSemanticCoverage(payload);
   payload = buildLocalizationOverlay(payload);
+  payload = enhanceArgonQuotaWidget(payload);
   const anchor = "electron_1.contextBridge.exposeInMainWorld('ide', ideAPI);";
   const output = insertAfter(official, anchor, payload, 'preload extension point');
+  return output;
+}
+
+function enhanceArgonQuotaWidget(source) {
+  let output = String(source || '');
+  const modelReturn = '              return m[1];';
+  requireSingleAnchor(output, modelReturn, 'quota widget current model label');
+  output = output.replace(modelReturn, '              return text;');
+
+  const values = "      const c5h = localStorage.getItem('quota_claude_5h') || '--';";
+  requireSingleAnchor(output, values, 'quota widget cached values');
+  output = output.replace(values, `${values}\n      const argonWeekly = localStorage.getItem('quota_argon_weekly') || '--';`);
+
+  const modelFlags = "      const isGemini = currentModel.includes('gemini');";
+  requireSingleAnchor(output, modelFlags, 'quota widget model flags');
+  output = output.replace(modelFlags, `${modelFlags}\n      const isArgon = isGemini && currentModel.includes('argon');`);
+
+  const geminiBlock = `      if (isGemini) {
+        if (titleEl.textContent !== 'gemini') {
+          titleEl.textContent = 'gemini';
+          titleEl.style.color = '#3b82f6';
+        }
+        if (weeklyEl.textContent !== gWeekly) weeklyEl.textContent = gWeekly;
+        if (hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
+      } else {`;
+  requireSingleAnchor(output, geminiBlock, 'quota widget Gemini render');
+  output = output.replace(geminiBlock, `      if (isGemini) {
+        const titleText = isArgon ? 'Gemini 4 Argon' : 'gemini';
+        if (titleEl.textContent !== titleText) {
+          titleEl.textContent = titleText;
+          titleEl.style.color = isArgon ? '#8b5cf6' : '#3b82f6';
+        }
+        const weeklyValue = isArgon ? argonWeekly : gWeekly;
+        if (weeklyEl.textContent !== weeklyValue) weeklyEl.textContent = weeklyValue;
+        const hourlyRow = root.querySelector('.hourly-row');
+        if (hourlyRow) hourlyRow.style.display = isArgon ? 'none' : 'flex';
+        if (!isArgon && hourlyEl.textContent !== g5h) hourlyEl.textContent = g5h;
+      } else {
+        const hourlyRow = root.querySelector('.hourly-row');
+        if (hourlyRow) hourlyRow.style.display = 'flex';`);
+
+  const accountLoaded = "            window.antigravityCurrentAccount = res.currentAccountId || '';";
+  requireSingleAnchor(output, accountLoaded, 'quota widget account load');
+  output = output.replace(accountLoaded, `${accountLoaded}
+            if (window.antigravityCurrentAccount) {
+              electron_1.ipcRenderer.invoke('fetch-account-quota', window.antigravityCurrentAccount).then(qRes => {
+                if (!qRes || !qRes.success || !qRes.quota) return;
+                for (const [field, storageKey] of [['geminiWeekly','quota_gemini_weekly'],['gemini5h','quota_gemini_5h'],['claudeWeekly','quota_claude_weekly'],['claude5h','quota_claude_5h'],['argonWeekly','quota_argon_weekly']]) {
+                  if (/^\\d+%$/.test(String(qRes.quota[field] || ''))) localStorage.setItem(storageKey, qRes.quota[field]);
+                }
+                injectQuotaWidget();
+              }).catch(() => {});
+            }`);
+
+  const cardQuotaEnd = `              <div class="quota-item">
+                <div class="quota-label"><span>Gemini 5H 额度</span><span class="val-g-5h">${'${thisG5h}'}</span></div>
+                <div class="progress-bar"><div class="progress-fill gemini fill-g-5h" style="width: ${"${thisG5h !== '--' ? thisG5h : '0%'}"}; background-color: ${'${getQuotaColor(thisG5h)}'}"></div></div>
+              </div>`;
+  requireSingleAnchor(output, cardQuotaEnd, 'account card Gemini 5H quota');
+  output = output.replace(cardQuotaEnd, `${cardQuotaEnd}
+              <div class="quota-item argon-quota-item" style="display:none; grid-column:1 / -1;">
+                <div class="quota-label"><span>Gemini 4 Argon 每周额度</span><span class="val-argon-weekly">--</span></div>
+                <div class="progress-bar"><div class="progress-fill gemini fill-argon-weekly" style="width:0%"></div></div>
+              </div>`);
+
+  const storeQuota = "                  localStorage.setItem('quota_' + acc.id + '_claude_5h', qRes.quota.claude5h);";
+  requireSingleAnchor(output, storeQuota, 'account card quota persistence');
+  output = output.replace(storeQuota, `${storeQuota}
+                  if (qRes.capabilities && qRes.capabilities.argon && /^\\d+%$/.test(String(qRes.quota.argonWeekly || ''))) {
+                    const argonItem = card.querySelector('.argon-quota-item');
+                    const argonValue = card.querySelector('.val-argon-weekly');
+                    const argonFill = card.querySelector('.fill-argon-weekly');
+                    if (argonItem) argonItem.style.display = '';
+                    if (argonValue) argonValue.textContent = qRes.quota.argonWeekly;
+                    if (argonFill) { argonFill.style.width = qRes.quota.argonWeekly; argonFill.style.backgroundColor = getQuotaColor(qRes.quota.argonWeekly); }
+                    localStorage.setItem('quota_' + acc.id + '_argon_weekly', qRes.quota.argonWeekly);
+                    if (isCurrent) localStorage.setItem('quota_argon_weekly', qRes.quota.argonWeekly);
+                  }`);
   return output;
 }
 
@@ -353,9 +432,14 @@ function buildIpcHandlers(official, legacy) {
   output = `${output.slice(0, outputFinalBrace)}\n${suffix}\n${output.slice(outputFinalBrace)}`;
   output = hardenAccountSwitch(output);
   output = replaceBetween(output, '            // B. 获取配额数据', '        } catch (err) {\n            return { success: false, error: err.message };\n        }\n    });\n\n    // 注入：export-local-account', [
+    '            const registryPath = path.join(accountRoot, "accounts.json");',
+    '            const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, "utf8")) : {};',
+    '            const liveQuota = await require("./antigravityQuotaBridge").fetchLiveQuotaSummary({ timeoutMs: 1600 }).catch(() => null);',
     '            return await require("./accountQuota").fetchAccountQuota({',
     '                fetch: net.fetch.bind(net), accessToken,',
-    '                projectId: tokenObj.project_id || detail.project_id',
+    '                projectId: tokenObj.project_id || detail.project_id,',
+    '                clientVersion: liveQuota?.appVersion,',
+    '                supplementalQuotaSummary: String(registry.current_account_id || "") === String(accountId) ? liveQuota?.summary : null',
     '            });'
   ].join('\n'), 'shared per-account quota query');
   return output;
@@ -499,6 +583,10 @@ function buildCompatibleTree(options) {
   syntaxCheck('dist/accountQuota.js', quotaSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuota.js'), quotaSource, 'utf8');
   report.files.push({ file: 'dist/accountQuota.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaSource) });
+  const quotaBridgeSource = readPatchWorkbenchResource('antigravityQuotaBridge.js');
+  syntaxCheck('dist/antigravityQuotaBridge.js', quotaBridgeSource);
+  fs.writeFileSync(path.join(officialDir, 'dist', 'antigravityQuotaBridge.js'), quotaBridgeSource, 'utf8');
+  report.files.push({ file: 'dist/antigravityQuotaBridge.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaBridgeSource) });
   return report;
 }
 

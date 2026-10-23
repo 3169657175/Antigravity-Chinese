@@ -63,7 +63,8 @@ async function main() {
       'dist/utils.js',
       'dist/ipcHandlers.js',
       'dist/accountVault.js',
-      'dist/accountQuota.js'
+      'dist/accountQuota.js',
+      'dist/antigravityQuotaBridge.js'
     ];
   const manifest = {
       formatVersion: 2,

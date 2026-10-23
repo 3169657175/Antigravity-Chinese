@@ -41,7 +41,7 @@ try {
   if (manifest.unpackedMode !== 'preserve-official') throw new Error(`Unexpected unpacked mode: ${manifest.unpackedMode}`);
   if (manifest.patchSha256 !== sha256(archivePath)) throw new Error('Patch manifest SHA-256 does not match assets/app.asar');
 
-  const requiredFiles = [...new Set([...(manifest.requiredCapabilities || []), 'dist/accountVault.js', 'dist/accountQuota.js'])];
+  const requiredFiles = [...new Set([...(manifest.requiredCapabilities || []), 'dist/accountVault.js', 'dist/accountQuota.js', 'dist/antigravityQuotaBridge.js'])];
   const entries = new Set(asar.listPackage(archivePath).map(entry => String(entry).replace(/^[/\\]+/, '').replace(/\\/g, '/')));
   const missingFiles = requiredFiles.filter(relativePath => !entries.has(relativePath));
   if (missingFiles.length) throw new Error(`Patch archive is missing required capabilities: ${missingFiles.join(', ')}`);
@@ -54,7 +54,8 @@ try {
     'dist/utils.js',
     'dist/ipcHandlers.js',
     'dist/accountVault.js',
-    'dist/accountQuota.js'
+    'dist/accountQuota.js',
+    'dist/antigravityQuotaBridge.js'
   ].filter(relativePath => entries.has(relativePath));
   for (const relativePath of syntaxFiles) {
     new vm.Script(asar.extractFile(archivePath, relativePath).toString('utf8'), { filename: relativePath });
@@ -99,6 +100,11 @@ try {
   const quota = asar.extractFile(archivePath, 'dist/accountQuota.js').toString('utf8');
   requireText(quota, "'loadCodeAssist'", 'dist/accountQuota.js');
   requireText(quota, "'retrieveUserQuotaSummary'", 'dist/accountQuota.js');
+  requireText(quota, "'gemini-argon-wtu-weekly'", 'dist/accountQuota.js');
+  const quotaBridge = asar.extractFile(archivePath, 'dist/antigravityQuotaBridge.js').toString('utf8');
+  requireText(quotaBridge, 'RetrieveUserQuotaSummary', 'dist/antigravityQuotaBridge.js');
+  requireText(ipc, 'supplementalQuotaSummary', 'dist/ipcHandlers.js');
+  requireText(preload, 'Gemini 4 Argon', 'dist/preload.js');
   rejectText(ipc, 'if (gemini5hVal === null) gemini5hVal = 100;', 'dist/ipcHandlers.js');
   rejectText(preload, 'antigravity-version-widget', 'dist/preload.js');
   rejectText(preload, "ipcRenderer.invoke('patch:check-update'", 'dist/preload.js');

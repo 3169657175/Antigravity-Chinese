@@ -3,10 +3,14 @@ const QUOTA_HOSTS = ['daily-cloudcode-pa.googleapis.com', 'cloudcode-pa.googleap
 const BUCKET_FIELDS = Object.freeze({
   'gemini-5h': 'gemini5h',
   'gemini-weekly': 'geminiWeekly',
+  'gemini-argon-wtu-weekly': 'argonWeekly',
   '3p-5h': 'claude5h',
   '3p-weekly': 'claudeWeekly'
 });
-const FIELDS = Object.values(BUCKET_FIELDS);
+const FIELDS = Object.freeze(['gemini5h', 'geminiWeekly', 'claude5h', 'claudeWeekly']);
+const OPTIONAL_FIELDS = Object.freeze(['argonWeekly']);
+const SHORT_WINDOW_FIELDS = Object.freeze(['gemini5h', 'claude5h']);
+const WEEKLY_FIELDS = Object.freeze(['geminiWeekly', 'claudeWeekly']);
 
 function fractionPercent(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -15,7 +19,8 @@ function fractionPercent(value) {
 
 function parseQuotaSummary(payload) {
   const quota = {};
-  for (const group of payload?.groups || []) {
+  const summary = payload?.response || payload;
+  for (const group of summary?.groups || []) {
     for (const bucket of group?.buckets || []) {
       const field = BUCKET_FIELDS[bucket.bucketId];
       const percent = fractionPercent(bucket.remainingFraction);
@@ -43,8 +48,10 @@ function parseModelQuota(payload) {
   return quota;
 }
 
-async function fetchAccountQuota({ fetch, accessToken, projectId }) {
-  const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'User-Agent': 'Antigravity-Quota-Watcher' };
+async function fetchAccountQuota({ fetch, accessToken, projectId, clientVersion, supplementalQuotaSummary }) {
+  const normalizedVersion = /^\d+\.\d+\.\d+/.test(String(clientVersion || '')) ? String(clientVersion).match(/^\d+\.\d+\.\d+/)[0] : '2.26.0';
+  const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'User-Agent': `antigravity/${normalizedVersion}` };
+  const startedAt = Date.now();
   let lastError = 'No quota endpoint responded successfully';
   async function request(host, endpoint, body) {
     const response = await fetch(`https://${host}/v1internal:${endpoint}`, {
@@ -54,52 +61,124 @@ async function fetchAccountQuota({ fetch, accessToken, projectId }) {
     return response.json();
   }
 
-  const projects = [];
-  for (const host of QUOTA_HOSTS) {
-    try {
-      const data = await request(host, 'loadCodeAssist', { metadata: { ideType: 'ANTIGRAVITY' } });
-      const project = data.cloudaicompanionProject;
-      const id = typeof project === 'string' ? project : project?.id;
-      if (id) { projects.push(id); break; }
-    } catch (error) { lastError = error.message; }
+  function mergeQuota(target, incoming, allowedFields = FIELDS) {
+    for (const field of allowedFields) {
+      if (target[field] !== undefined || incoming[field] === undefined) continue;
+      target[field] = incoming[field];
+      target[`${field}Reset`] = incoming[`${field}Reset`] || null;
+    }
   }
-  if (typeof projectId === 'string' && projectId) projects.push(projectId);
-  // A virtual project is a last resort; HTTP 200 alone does not mean quota is complete.
-  projects.push('gemini_virtual_primary');
-  let best = { quota: {}, projectId: '', quotaSourceHost: '' };
+
   const count = quota => FIELDS.filter(field => quota[field] !== undefined).length;
-  for (const project of new Set(projects)) {
-    for (const host of QUOTA_HOSTS) {
-      try {
-        const quota = parseQuotaSummary(await request(host, 'retrieveUserQuotaSummary', { project }));
-        if (count(quota) > count(best.quota)) best = { quota, projectId: project, quotaSourceHost: host };
-        if (count(quota) === FIELDS.length) return { success: true, ...best, partial: false, missingQuotaFields: [] };
-      } catch (error) { lastError = error.message; }
+
+  async function queryProjects(projects) {
+    const states = new Map(projects.map(project => [project, {
+      quota: {}, projectId: project, quotaSourceHost: '', sourceScore: 0, summaryHosts: new Set(), modelHosts: new Set()
+    }]));
+    const jobs = [];
+    for (const project of projects) {
+      for (const host of QUOTA_HOSTS) {
+        jobs.push({
+          project, host, type: 'summary',
+          promise: request(host, 'retrieveUserQuotaSummary', { project })
+        });
+        // Model quota is requested alongside the summary. Newer upstream versions can
+        // omit Gemini summary buckets, so waiting for a serial fallback doubles latency.
+        jobs.push({
+          project, host, type: 'models',
+          promise: request(host, 'fetchAvailableModels', { project })
+        });
+      }
     }
-  }
-  // Preserve real summary buckets. Fall back to current model ids only for absent short windows.
-  for (const project of new Set(projects)) {
-    if (best.quota.gemini5h !== undefined && best.quota.claude5h !== undefined) break;
-    for (const host of QUOTA_HOSTS) {
-      try {
-        const quota = parseModelQuota(await request(host, 'fetchAvailableModels', { project }));
-        for (const field of ['gemini5h', 'claude5h']) {
-          if (best.quota[field] !== undefined || quota[field] === undefined) continue;
-          best.quota[field] = quota[field];
-          best.quota[`${field}Reset`] = quota[`${field}Reset`];
-          if (!best.quotaSourceHost) Object.assign(best, { projectId: project, quotaSourceHost: host });
+    const settled = await Promise.allSettled(jobs.map(job => job.promise));
+    settled.forEach((result, index) => {
+      const job = jobs[index];
+      const state = states.get(job.project);
+      if (result.status === 'rejected') {
+        lastError = result.reason?.message || String(result.reason);
+        return;
+      }
+      if (job.type === 'summary') {
+        state.summaryHosts.add(job.host);
+        const quota = parseQuotaSummary(result.value);
+        if (count(quota) > state.sourceScore) {
+          state.quotaSourceHost = job.host;
+          state.sourceScore = count(quota);
         }
-        if (best.quota.gemini5h !== undefined && best.quota.claude5h !== undefined) break;
-      } catch (error) { lastError = error.message; }
+        mergeQuota(state.quota, quota);
+        return;
+      }
+      state.modelHosts.add(job.host);
+      const quota = parseModelQuota(result.value);
+      if (count(quota) > state.sourceScore) {
+        state.quotaSourceHost = job.host;
+        state.sourceScore = count(quota);
+      }
+      mergeQuota(state.quota, quota, SHORT_WINDOW_FIELDS);
+    });
+    return [...states.values()];
+  }
+
+  // Resolve both hosts concurrently. A discovered project is authoritative; a saved
+  // project is used only when discovery fails, and the virtual project is the last resort.
+  const assistJobs = QUOTA_HOSTS.map(host => ({
+    host,
+    promise: request(host, 'loadCodeAssist', { metadata: { ideType: 'ANTIGRAVITY' } })
+  }));
+  const assistSettled = await Promise.allSettled(assistJobs.map(job => job.promise));
+  const discoveredProjects = [];
+  assistSettled.forEach(result => {
+    if (result.status === 'rejected') {
+      lastError = result.reason?.message || String(result.reason);
+      return;
     }
+    const project = result.value?.cloudaicompanionProject;
+    const id = typeof project === 'string' ? project : project?.id;
+    if (id) discoveredProjects.push(id);
+  });
+  const savedProject = typeof projectId === 'string' && projectId ? projectId : '';
+  const projects = [...new Set(discoveredProjects.length ? discoveredProjects : [savedProject || 'gemini_virtual_primary'])];
+  let candidates = await queryProjects(projects);
+  let best = candidates.reduce((selected, candidate) => count(candidate.quota) > count(selected.quota) ? candidate : selected,
+    { quota: {}, projectId: '', quotaSourceHost: '', sourceScore: 0, summaryHosts: new Set(), modelHosts: new Set() });
+
+  // A virtual project is queried only when authoritative candidates yielded nothing.
+  if (!count(best.quota) && !projects.includes('gemini_virtual_primary')) {
+    candidates = await queryProjects(['gemini_virtual_primary']);
+    best = candidates[0];
   }
   if (!count(best.quota)) throw new Error(`Quota unavailable: ${lastError}`);
+
+  // The public Cloud Code endpoint currently omits capability-specific quota groups
+  // such as Argon. The running Antigravity language service is authoritative for the
+  // active account, so merge only explicitly returned optional buckets.
+  mergeQuota(best.quota, parseQuotaSummary(supplementalQuotaSummary), OPTIONAL_FIELDS);
+
   const missingQuotaFields = FIELDS.filter(field => best.quota[field] === undefined);
+  const allHostsResponded = hosts => hosts.size === QUOTA_HOSTS.length;
+  const candidateEvidence = candidates.length ? candidates : [best];
+  const confirmedMissingQuotaFields = missingQuotaFields.filter(field => candidateEvidence.every(candidate => {
+    if (WEEKLY_FIELDS.includes(field)) return allHostsResponded(candidate.summaryHosts);
+    return allHostsResponded(candidate.summaryHosts) && allHostsResponded(candidate.modelHosts);
+  }));
+  const unconfirmedQuotaFields = missingQuotaFields.filter(field => !confirmedMissingQuotaFields.includes(field));
   for (const field of missingQuotaFields) {
     best.quota[field] = '--';
     best.quota[`${field}Reset`] = null;
   }
-  return { success: true, ...best, partial: missingQuotaFields.length > 0, missingQuotaFields };
+  return {
+    success: true,
+    quota: best.quota,
+    projectId: best.projectId,
+    quotaSourceHost: best.quotaSourceHost,
+    partial: missingQuotaFields.length > 0,
+    missingQuotaFields,
+    confirmedMissingQuotaFields,
+    unconfirmedQuotaFields,
+    capabilities: { argon: best.quota.argonWeekly !== undefined },
+    optionalQuotaFields: best.quota.argonWeekly !== undefined ? ['argonWeekly'] : [],
+    quotaResponseTimeMs: Date.now() - startedAt
+  };
 }
 
 module.exports = { fetchAccountQuota, parseQuotaSummary, parseModelQuota };

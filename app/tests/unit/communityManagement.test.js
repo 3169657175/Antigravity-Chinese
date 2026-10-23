@@ -71,7 +71,7 @@ test('self-management and admin deletion are rejected and content cleanup is com
   for (const action of ['disable', 'delete', 'role']) assert.equal((await f.users.onRequestPost({ request: f.request({ username: 'owner', action, role: 'user' }), env: f.env })).status, 409);
   f.sql.exec("INSERT INTO users VALUES ('admin2','hash','admin',3)");
   assert.equal((await f.users.onRequestPost({ request: f.request({ username: 'admin2', action: 'delete' }), env: f.env })).status, 409);
-  f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','owned',NULL,1),(2,'owner','keep',NULL,2); INSERT INTO replies VALUES (1,1,'owner','thread',1),(2,2,'member','own reply',2),(3,2,'owner','keep reply',3); INSERT INTO feedback_likes VALUES ('owner',1),('member',2); INSERT INTO reply_likes VALUES ('owner',1),('member',3),('owner',2)");
+  f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','owned',NULL,1),(2,'owner','keep',NULL,2); INSERT INTO replies VALUES (1,1,'owner','thread',NULL,1),(2,2,'member','own reply',NULL,2),(3,2,'owner','keep reply',NULL,3); INSERT INTO feedback_likes VALUES ('owner',1),('member',2); INSERT INTO reply_likes VALUES ('owner',1),('member',3),('owner',2)");
   assert.equal((await f.users.onRequestPost({ request: f.request({ username: 'member', action: 'delete' }), env: f.env })).status, 200);
   assert.deepEqual(f.sql.prepare('SELECT id FROM feedbacks').all().map(r => r.id), [2]);
   assert.deepEqual(f.sql.prepare('SELECT id FROM replies').all().map(r => r.id), [3]);
@@ -82,8 +82,29 @@ test('self-management and admin deletion are rejected and content cleanup is com
 
 test('feedback server selects newest, popular and unanswered before applying the row limit', async () => {
   const f = await fixture();
-  f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','old',NULL,1),(2,'member','new',NULL,2); INSERT INTO replies VALUES (1,1,'owner','answered',1); INSERT INTO feedback_likes VALUES ('owner',1)");
+  f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','old',NULL,1),(2,'member','new',NULL,2); INSERT INTO replies VALUES (1,1,'owner','answered',NULL,1); INSERT INTO feedback_likes VALUES ('owner',1)");
   const handler = await importBackend('feedback.js');
   for (const [sort, ids] of [['newest', [2,1]], ['popular', [1,2]], ['unanswered', [2]]]) { const res = await handler.onRequestGet({ request: new Request('https://example.test/api/feedback?sort=' + sort), env: f.env }); assert.equal(res.status, 200); assert.deepEqual((await res.json()).map(r => r.id), ids); }
+  f.sql.close();
+});
+
+test('reply API accepts image-only comments and feedback reads the image URL', async () => {
+  const f = await fixture();
+  f.sql.exec("INSERT INTO feedbacks VALUES (1,'member','screenshot issue',NULL,1)");
+  const handler = await importBackend('reply.js');
+  const token = await f.auth.generateJWT({ username: 'owner', role: 'admin' }, f.env.JWT_SECRET);
+  const posted = await handler.onRequestPost({
+    request: new Request('https://example.test/api/reply', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedback_id: 1, content: '', image_url: 'https://cdn.example.test/reply.png' })
+    }),
+    env: f.env
+  });
+  assert.equal(posted.status, 200);
+  const feedback = await importBackend('feedback.js');
+  const response = await feedback.onRequestGet({ request: new Request('https://example.test/api/feedback'), env: f.env });
+  const rows = await response.json();
+  assert.equal(rows[0].replies[0].image_url, 'https://cdn.example.test/reply.png');
   f.sql.close();
 });

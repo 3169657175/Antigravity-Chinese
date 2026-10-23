@@ -36,7 +36,7 @@ function inspectPatchArchive(archivePath, requiredFiles = []) {
   ));
   const packageJson = JSON.parse(asar.extractFile(archivePath, 'package.json').toString('utf8').replace(/^\uFEFF/, ''));
   const syntaxErrors = [];
-  for (const entry of ['dist/main.js', 'dist/preload.js', 'dist/ipcHandlers.js', 'dist/languageServer.js', 'dist/tray.js', 'dist/utils.js', 'dist/accountVault.js', 'dist/accountQuota.js']) {
+  for (const entry of ['dist/main.js', 'dist/preload.js', 'dist/ipcHandlers.js', 'dist/languageServer.js', 'dist/tray.js', 'dist/utils.js', 'dist/accountVault.js', 'dist/accountQuota.js', 'dist/antigravityQuotaBridge.js']) {
     if (!entries.has(entry)) continue;
     try {
       new vm.Script(asar.extractFile(archivePath, entry).toString('utf8'), { filename: entry });
@@ -59,7 +59,7 @@ function inspectPatchArchive(archivePath, requiredFiles = []) {
     ? asar.extractFile(archivePath, 'dist/preload.js').toString('utf8')
     : '';
   const dependencies = entries.has('dist/ipcHandlers.js')
-    ? [...asar.extractFile(archivePath, 'dist/ipcHandlers.js').toString('utf8').matchAll(/require\(['"]\.\/(accountQuota|accountVault)(?:\.js)?['"]\)/g)].map(match => `dist/${match[1]}.js`)
+    ? [...asar.extractFile(archivePath, 'dist/ipcHandlers.js').toString('utf8').matchAll(/require\(['"]\.\/(accountQuota|accountVault|antigravityQuotaBridge)(?:\.js)?['"]\)/g)].map(match => `dist/${match[1]}.js`)
     : [];
   return {
     version: normalizeClientVersion(packageJson.version),

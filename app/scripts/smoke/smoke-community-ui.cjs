@@ -25,7 +25,17 @@ const { chromium } = require('C:/Users/niu/.cache/codex-runtimes/codex-primary-r
     `);
     await page.goto('file://' + path.resolve('index.html').replace(/\\/g, '/'));
     await page.addStyleTag({ content: '*,*::before,*::after { animation:none!important; transition:none!important; }' });
-    await page.locator('[data-target="tab-admin-users"]').waitFor({state:'visible'});
+    try {
+      await page.locator('[data-target="tab-admin-users"]').waitFor({state:'visible',timeout:8000});
+    } catch (error) {
+      const diagnostics = await page.evaluate(async () => ({
+        currentUser: typeof currentUser === 'undefined' ? null : currentUser,
+        session: await window.agyHubAPI.getAuthSession(),
+        display: document.querySelector('[data-target="tab-admin-users"]')?.style.display,
+        lifecycleReady: Boolean(window.AgyPageLifecycle)
+      }));
+      throw new Error(`Admin navigation did not restore the saved session: ${JSON.stringify({ diagnostics, errors })}`, { cause: error });
+    }
     await page.keyboard.press('Escape');
     await page.locator('[data-target="tab-admin-users"]').click();
     await page.locator('.community-table tbody tr').first().waitFor();

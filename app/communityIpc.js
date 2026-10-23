@@ -8,6 +8,27 @@ const GENERIC_PATH_ALLOWLIST = [
   /^\/api\/feedback\/like(?:\?.*)?$/,
   /^\/api\/reply(?:\/like)?(?:\?.*)?$/
 ];
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function normalizeImageBytes(value) {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  return Buffer.alloc(0);
+}
+
+function detectImageMime(value) {
+  const bytes = normalizeImageBytes(value);
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(bytes.subarray(0, 6).toString('ascii'))) return 'image/gif';
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function extensionForMime(mime) {
+  return mime === 'image/png' ? '.png' : mime === 'image/gif' ? '.gif' : mime === 'image/webp' ? '.webp' : '.jpg';
+}
 
 function allowedCommunityPath(value) {
   const url = new URL(String(value || ''), COMMUNITY_ORIGIN);
@@ -16,6 +37,20 @@ function allowedCommunityPath(value) {
 
 function registerCommunityIpc(options) {
   const { ipcMain, client, shell } = options;
+  async function uploadBytes(value, filename, context) {
+    const session = client.readSession();
+    if (!session?.token) return { success: false, code: 'AUTH_REQUIRED', error: '请先登录后再上传图片' };
+    const bytes = normalizeImageBytes(value);
+    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return { success: false, code: bytes.length ? 'IMAGE_TOO_LARGE' : 'INVALID_IMAGE', error: bytes.length ? '图片不能超过 8MB' : '图片内容为空' };
+    const mime = detectImageMime(bytes);
+    if (!mime) return { success: false, code: 'INVALID_IMAGE', error: '只支持 PNG、JPG、GIF 或 WebP 图片' };
+    const base = path.basename(String(filename || 'clipboard-image'), path.extname(String(filename || ''))).replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image';
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: mime }), `${base}${extensionForMime(mime)}`);
+    form.append('context', String(context || 'feedback').slice(0, 40));
+    const result = await client.request('/api/upload', { method: 'POST', body: form, timeoutMs: 15000 });
+    return result.success && result.data?.url ? { success: true, url: result.data.url } : { success: false, code: result.code, error: result.message || result.data?.error || '上传失败' };
+  }
   if (options.registerLegacy !== false) {
   ipcMain.handle('get-auth-session', async () => {
     const data = client.readSession();
@@ -29,21 +64,18 @@ function registerCommunityIpc(options) {
   ipcMain.handle('auth-logout', async () => { client.clearSession(); return { success: true }; });
 
   ipcMain.handle('upload-image', async (_event, filePath, context = 'feedback') => {
-    const session = client.readSession();
-    if (!session?.token) return { success: false, code: 'AUTH_REQUIRED', error: '请先登录后再上传图片' };
     const resolved = path.resolve(String(filePath || ''));
     if (!fs.existsSync(resolved) || !/\.(?:png|jpe?g|gif|webp)$/i.test(resolved)) return { success: false, code: 'INVALID_IMAGE', error: '请选择 PNG、JPG、GIF 或 WebP 图片' };
-    if (fs.statSync(resolved).size > 8 * 1024 * 1024) return { success: false, code: 'IMAGE_TOO_LARGE', error: '图片不能超过 8MB' };
-    const mime = /\.png$/i.test(resolved) ? 'image/png' : /\.gif$/i.test(resolved) ? 'image/gif' : /\.webp$/i.test(resolved) ? 'image/webp' : 'image/jpeg';
-    const form = new FormData();
-    form.append('file', new Blob([fs.readFileSync(resolved)], { type: mime }), path.basename(resolved));
-    form.append('context', String(context || 'feedback').slice(0, 40));
-    const result = await client.request('/api/upload', { method: 'POST', body: form });
-    return result.success && result.data?.url ? { success: true, url: result.data.url } : { success: false, code: result.code, error: result.message || result.data?.error || '上传失败' };
+    return uploadBytes(fs.readFileSync(resolved), path.basename(resolved), context);
   });
+  ipcMain.handle('upload-image-data', (_event, bytes, filename, context = 'feedback') => uploadBytes(bytes, filename, context));
 
   ipcMain.handle('fetch-feedbacks', async (_event, options = {}) => {
     const sort = ['popular', 'unanswered'].includes(options?.sort) ? options.sort : 'newest';
+    if (options?.preferCache) {
+      const cached = client.readCache(`feedback:${sort}`);
+      if (cached) return { success: true, data: cached.data, stale: true, fromCache: true, savedAt: cached.savedAt, warning: '正在后台同步最新讨论' };
+    }
     const result = await client.request(`/api/feedback?sort=${sort}`, { headers: { 'Cache-Control': 'no-cache' }, cacheKey: `feedback:${sort}` });
     return result.success ? { success: true, data: result.data, stale: Boolean(result.stale), warning: result.warning || '' } : { success: false, code: result.code, error: result.message };
   });
@@ -76,4 +108,4 @@ function registerCommunityIpc(options) {
   });
 }
 
-module.exports = { registerCommunityIpc, allowedCommunityPath };
+module.exports = { registerCommunityIpc, allowedCommunityPath, detectImageMime, normalizeImageBytes, MAX_IMAGE_BYTES };

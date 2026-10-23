@@ -1,6 +1,6 @@
 {
   "name": "agy-hub",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "AGY Hub 桌面管家：管理 Antigravity 汉化注入、账号额度、Codex / 自定义 Provider 接入、本地反向代理、社区与自动更新。",
   "author": "niu1029",
   "homepage": "https://github.com/3169657175/Antigravity-Chinese",
@@ -47,6 +47,7 @@
       "accountErrorClassifier.js",
       "accountIpc.js",
       "accountQuota.js",
+      "antigravityQuotaBridge.js",
       "accountUi.js",
       "anthropicGateway.js",
       "appShutdown.js",
@@ -63,6 +64,7 @@
       "communityClient.js",
       "communityController.js",
       "communityIpc.js",
+      "communityMedia.js",
       "configSnapshotStore.js",
       "customContextBudget.js",
       "fsUtils.js",
@@ -127,6 +129,7 @@
       "uiFeedback.js",
       "featureFlags.js",
       "communityState.js",
+      "styles/community.css",
       "releaseConfig.js",
       "pageLifecycle.js",
       "errorDiagnostics.js",
@@ -140,6 +143,10 @@
       {
         "from": "build/generated/accountQuota.js",
         "to": "patch/accountQuota.js"
+      },
+      {
+        "from": "build/generated/antigravityQuotaBridge.js",
+        "to": "patch/antigravityQuotaBridge.js"
       },
       {
         "from": "patch-workbench/injections/native-localization.js",

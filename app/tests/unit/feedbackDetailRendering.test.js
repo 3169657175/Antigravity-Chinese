@@ -13,6 +13,9 @@ function renderWithReplies(replies) {
     document: { getElementById: id => id === 'detail-modal-body' ? modalBody : null },
     currentUser: { username: 'owner', role: 'user' },
     escapeHTML: input => String(input ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
+    safeDom: { imageUrl: value => String(value || '') },
+    replyImageDrafts: new Map(),
+    window: { AgyCommunityMedia: { avatarInitial: value => String(value || '?')[0].toUpperCase() } },
     console
   };
   const fb = { id: 21, username: 'owner', content: 'Details can open', created_at: '2026-10-10T00:00:00Z', replies };
@@ -20,7 +23,7 @@ function renderWithReplies(replies) {
   return modalBody.innerHTML;
 }
 test('comment dialog renders a post without replies', () => {
-  assert.match(renderWithReplies([]), /暂无回复/);
+  assert.match(renderWithReplies([]), /还没有回复/);
 });
 test('comment dialog renders existing replies without ReferenceError', () => {
   const html = renderWithReplies([{ id: 77, username: 'commenter', content: 'existing reply visible', likes_count: 1, created_at: '2026-10-10T00:00:00Z' }]);

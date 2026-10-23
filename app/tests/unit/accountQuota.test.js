@@ -27,7 +27,7 @@ test('quota lookup resolves each account project before accepting HTTP 200 from 
     assert.equal(result.partial, false);
     for (const field of fields) assert.equal(result.quota[field], account === 'first' ? '73%' : '0%');
   }
-  assert.equal(requests.length, 4);
+  assert.equal(requests.length, 12);
   assert.ok(requests.every(request => request.body.project !== 'gemini_virtual_primary'));
 });
 
@@ -43,7 +43,7 @@ test('incomplete HTTP 200 summary retries the other host with the discovered pro
   } });
   assert.equal(result.partial, false);
   assert.equal(result.quotaSourceHost, 'cloudcode-pa.googleapis.com');
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 6);
 });
 
 test('model fallback supports 3.8 tiered quota and leaves missing weekly values unknown', async () => {
@@ -61,6 +61,46 @@ test('model fallback supports 3.8 tiered quota and leaves missing weekly values 
   assert.equal(result.quota.geminiWeekly, '--');
   assert.equal(result.quota.claudeWeekly, '--');
   assert.deepEqual(result.missingQuotaFields, ['geminiWeekly', 'claudeWeekly']);
+  assert.deepEqual(result.confirmedMissingQuotaFields, ['geminiWeekly', 'claudeWeekly']);
+  assert.deepEqual(result.unconfirmedQuotaFields, []);
+});
+
+test('missing quota stays unconfirmed when a required host has not answered', async () => {
+  const result = await fetchAccountQuota({ accessToken: 'test', projectId: 'saved-project', fetch: async url => {
+    if (url.endsWith(':loadCodeAssist')) return response({ cloudaicompanionProject: 'real-project' });
+    if (url.includes('cloudcode-pa.googleapis.com') && !url.includes('daily-cloudcode')) throw new Error('secondary unavailable');
+    if (url.endsWith(':retrieveUserQuotaSummary')) return response({ groups: [{ buckets: [{
+      bucketId: '3p-weekly', remainingFraction: 0.8
+    }] }] });
+    return response({ models: {
+      'gemini-3.8-flash-tiered': { quotaInfo: { remainingFraction: 0.6 } }
+    } });
+  } });
+  assert.equal(result.quota.gemini5h, '60%');
+  assert.equal(result.quota.geminiWeekly, '--');
+  assert.ok(result.unconfirmedQuotaFields.includes('geminiWeekly'));
+  assert.ok(!result.confirmedMissingQuotaFields.includes('geminiWeekly'));
+});
+
+test('quota discovery runs independent host and endpoint requests concurrently', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const result = await fetchAccountQuota({ accessToken: 'test', fetch: async url => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise(resolve => setTimeout(resolve, 15));
+    active -= 1;
+    if (url.endsWith(':loadCodeAssist')) return response({ cloudaicompanionProject: 'real-project' });
+    if (url.endsWith(':retrieveUserQuotaSummary')) return response({ groups: [{ buckets: [
+      { bucketId: '3p-5h', remainingFraction: 1 },
+      { bucketId: '3p-weekly', remainingFraction: 1 }
+    ] }] });
+    return response({ models: {
+      'gemini-3.8-flash-tiered': { quotaInfo: { remainingFraction: 0.9 } }
+    } });
+  } });
+  assert.equal(result.quota.gemini5h, '90%');
+  assert.ok(maximumActive >= 4, `expected at least four concurrent requests, got ${maximumActive}`);
 });
 
 test('absent or invalid remainingFraction is never fabricated as 100 percent', () => {
@@ -68,6 +108,24 @@ test('absent or invalid remainingFraction is never fabricated as 100 percent', (
     { bucketId: 'gemini-5h' }, { bucketId: 'gemini-weekly', remainingFraction: null },
     { bucketId: '3p-5h', remainingFraction: '1' }, { bucketId: '3p-weekly', remainingFraction: NaN }
   ] }] }), {});
+});
+
+test('official Antigravity user agent preserves Gemini weekly quota and Argon remains optional', async () => {
+  const seenAgents = [];
+  const result = await fetchAccountQuota({
+    accessToken: 'test',
+    clientVersion: '2.26.0',
+    supplementalQuotaSummary: { groups: [{ buckets: [{ bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.42 }] }] },
+    fetch: async (url, options) => {
+      seenAgents.push(options.headers['User-Agent']);
+      if (url.endsWith(':loadCodeAssist')) return response({ cloudaicompanionProject: 'real-project' });
+      return response(summary());
+    }
+  });
+  assert.ok(seenAgents.every(value => value === 'antigravity/2.26.0'));
+  assert.equal(result.quota.argonWeekly, '42%');
+  assert.deepEqual(result.capabilities, { argon: true });
+  assert.equal(result.partial, false);
 });
 
 test('hub quota IPC queries non-current accounts without writing the registry or credentials', async t => {

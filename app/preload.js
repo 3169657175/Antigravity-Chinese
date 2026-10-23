@@ -38,13 +38,14 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   saveThemeDesign: (payload) => ipcRenderer.invoke('save-theme-design', payload),
   resetThemeImage: (themeId) => ipcRenderer.invoke('reset-theme-image', themeId),
   deleteCustomTheme: (themeId) => ipcRenderer.invoke('delete-custom-theme', themeId),
-  
+
   // 新增 Pages 云端结合 API
   getAuthSession: () => ipcRenderer.invoke('get-auth-session'),
   authLogin: (username, password) => ipcRenderer.invoke('auth-login', username, password),
   authRegister: (username, password) => ipcRenderer.invoke('auth-register', username, password),
   authLogout: () => ipcRenderer.invoke('auth-logout'),
   uploadImage: (filePath, context) => ipcRenderer.invoke('upload-image', filePath, context),
+  uploadImageData: (bytes, filename, context) => ipcRenderer.invoke('upload-image-data', bytes, filename, context),
   fetchFeedbacks: options => ipcRenderer.invoke('fetch-feedbacks', options),
   submitFeedback: (content, imageUrl) => ipcRenderer.invoke('submit-feedback', content, imageUrl),
   deleteFeedback: (id) => ipcRenderer.invoke('delete-feedback', id),
@@ -61,7 +62,7 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   startOauthLogin: () => ipcRenderer.invoke('oauth:start-login'),
   submitOauthCode: (code) => ipcRenderer.invoke('oauth:submit-code', code),
   onOauthCodeCaptured: (callback) => ipcRenderer.on('oauth:code-captured', (_event, data) => callback(data)),
-  
+
   onThemeChanged: (callback) => ipcRenderer.on('agy-theme-changed', (_event, activeConfig) => callback(activeConfig)),
 
   // 注入：Token Proxy
