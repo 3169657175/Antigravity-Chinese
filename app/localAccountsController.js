@@ -18,6 +18,23 @@ function argonLastSeenCopy(result) {
   return `上次确认：${result.argonLastKnown?.lastPercent || '额度未知'} · ${age}（非实时）`;
 }
 let localAccountsLoadGeneration = 0;
+const LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS = 9000;
+
+function withQuotaUiDeadline(promise, timeoutMs = LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS, timers = {}) {
+  const schedule = timers.setTimeout || setTimeout;
+  const cancel = timers.clearTimeout || clearTimeout;
+  let timer = null;
+  const timeout = new Promise(resolve => {
+    timer = schedule(() => resolve({
+      success: false,
+      code: 'QUOTA_REFRESH_TIMEOUT',
+      title: '实时刷新超时',
+      message: '云端本次没有在限定时间内完成，已保留上次额度，可稍后重试。',
+      retryable: true
+    }), Math.max(250, Number(timeoutMs) || LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS));
+  });
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => { if (timer !== null) cancel(timer); });
+}
 
 function quotaFieldState(result, field) {
   if (/^\d+%$/.test(String(result?.quota?.[field] || ''))) return 'available';
@@ -62,7 +79,7 @@ function createLocalAccountBadge(text, type) {
   return badge;
 }
 
-function createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad = () => true) {
+function createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad = () => true, quotaOptions = {}) {
   const btnAddLocalAccount = document.getElementById('btn-add-local-account');
   const btnStartOauth = document.getElementById('btn-start-oauth');
   const oauthStatusMessage = document.getElementById('oauth-status-message');
@@ -133,7 +150,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
                 : '，账号状态已更新';
           logToTerminal(`[Account] 已切换当前活动账户：${account.email}${lifecycleText}`, 'success');
           if (sRes.restartRequired && sRes.error) alert(sRes.error);
-          await loadLocalAccounts();
+          await loadLocalAccounts({ logToTerminal, forceQuotaRefresh: false });
         } else {
           alert('切换失败: ' + (sRes?.error || '未知错误'));
           btnSwitch.disabled = false;
@@ -240,7 +257,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
       const rawCache = typeof localStorage !== 'undefined' ? localStorage.getItem(swrCacheKey) : null;
       if (rawCache) {
         const parsed = JSON.parse(rawCache);
-        if (parsed && parsed.savedAt && (Date.now() - parsed.savedAt < 300000) && parsed.res?.success && parsed.res?.quota) {
+        if (parsed && parsed.savedAt && parsed.res?.success && parsed.res?.quota) {
           renderQuotaResultIntoPanel(parsed.res);
           swrRendered = true;
         }
@@ -254,7 +271,9 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
     // 异步拉取该账号的配额信息
     const qPromise = (async () => {
       try {
-        const res = await window.agyHubAPI.fetchAccountQuota(account.id);
+        const res = await withQuotaUiDeadline(
+          window.agyHubAPI.fetchAccountQuota(account.id, { force: quotaOptions.force === true })
+        );
         if (!isCurrentLoad()) return { accountId: account.id, success: false, stale: true };
         if (res && res.success) {
           if (res.quotaSourceHost) {
@@ -285,6 +304,10 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
             capabilities: res.capabilities || {}
           };
         } else {
+          if (swrRendered && res?.code === 'QUOTA_REFRESH_TIMEOUT') {
+            logToTerminal(`[Quota] ${account.email || account.id}: 实时刷新超时，保留上次额度`, 'error');
+            return { accountId: account.id, success: false, timedOut: true };
+          }
           if (accountUi.renderQuotaFailure) {
             accountUi.renderQuotaFailure({
               container: quotaPanel,
@@ -299,7 +322,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
                 // This is still user-initiated: only the recovery button reaches this path.
                 btnStartOauth?.click();
               },
-              onRetry: () => loadLocalAccounts()
+              onRetry: () => loadLocalAccounts({ logToTerminal, forceQuotaRefresh: true })
             });
           } else {
             quotaPanel.textContent = res?.message || res?.error || '实时额度暂未拉取成功';
@@ -321,7 +344,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
               action: 'retry',
               actionLabel: '重新查询'
             },
-            onRetry: () => loadLocalAccounts()
+            onRetry: () => loadLocalAccounts({ logToTerminal, forceQuotaRefresh: true })
           });
         } else {
           quotaPanel.textContent = '账号状态检查失败，请重新查询。';
@@ -342,7 +365,7 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
 }
 
 async function loadLocalAccounts(options = {}) {
-  const { logToTerminal = () => {} } = options;
+  const { logToTerminal = () => {}, forceQuotaRefresh = false } = options;
   const localAccountsList = document.getElementById('local-accounts-list');
   const localAccountCount = document.getElementById('local-account-count');
   const localAccountCurrent = document.getElementById('local-account-current');
@@ -383,7 +406,7 @@ async function loadLocalAccounts(options = {}) {
       localAccountsList.appendChild(empty);
     } else {
       accounts.forEach((account, index) => {
-        localAccountsList.appendChild(createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad));
+        localAccountsList.appendChild(createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad, { force: forceQuotaRefresh }));
       });
 
       // 异步执行智能算分与账号推荐标记
@@ -454,5 +477,5 @@ async function loadLocalAccounts(options = {}) {
 
 // 输出日志到终端
 
-  return { loadLocalAccounts, quotaFieldState, quotaPercent, calculateQuotaScore, quotaSectionsForResult };
+  return { loadLocalAccounts, quotaFieldState, quotaPercent, calculateQuotaScore, quotaSectionsForResult, withQuotaUiDeadline, LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS };
 });

@@ -231,8 +231,8 @@ function enhanceArgonQuotaWidget(source) {
       window.__agyQuotaAccountId = id;
       for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h', 'argon_weekly']) {
         const globalKey = 'quota_' + suffix;
-        const cacheAge = Date.now() - Number(localStorage.getItem('quota_' + id + '_checked_at') || 0);
-        const scopedValue = id && cacheAge >= 0 && cacheAge < 300000 ? localStorage.getItem('quota_' + id + '_' + suffix) : null;
+        const hasScopedCache = Number(localStorage.getItem('quota_' + id + '_checked_at') || 0) > 0;
+        const scopedValue = id && hasScopedCache ? localStorage.getItem('quota_' + id + '_' + suffix) : null;
         localStorage.removeItem(globalKey);
         if (/^\\d+%$/.test(String(scopedValue || ''))) localStorage.setItem(globalKey, scopedValue);
       }
@@ -244,7 +244,7 @@ function enhanceArgonQuotaWidget(source) {
     const id = window.antigravityCurrentAccount;
     if (!id || window.__agyQuotaRefreshingId === id) return;
     window.__agyQuotaRefreshingId = id;
-    electron_1.ipcRenderer.invoke('fetch-account-quota', id).then(qRes => {
+    electron_1.ipcRenderer.invoke('fetch-account-quota', { accountId: id, force: false }).then(qRes => {
       if (window.antigravityCurrentAccount !== id || !qRes || !qRes.success || !qRes.quota) return;
       for (const [field, suffix] of [['geminiWeekly','gemini_weekly'],['gemini5h','gemini_5h'],['claudeWeekly','claude_weekly'],['claude5h','claude_5h'],['argonWeekly','argon_weekly']]) {
         const globalKey = 'quota_' + suffix;
@@ -270,12 +270,12 @@ function enhanceArgonQuotaWidget(source) {
 
   const values = "      const c5h = localStorage.getItem('quota_claude_5h') || '--';";
   requireSingleAnchor(output, values, 'quota widget cached values');
-  output = output.replace(values, `${values}\n      const argonWeekly = window.antigravityCurrentAccount && Date.now() - Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) < 300000 ? (localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_argon_weekly') || '待确认') : '待查询';`);
+  output = output.replace(values, `${values}\n      const argonWeekly = window.antigravityCurrentAccount && Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) > 0 ? (localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_argon_weekly') || '待确认') : '待查询';`);
 
   for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h']) {
     const original = `localStorage.getItem('quota_${suffix}') || '--'`;
-    // The live sidebar is never allowed to display a value cached days ago.
-    const fresh = `window.antigravityCurrentAccount && Date.now() - Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) < 300000`;
+    // Keep the last confirmed value until an explicit refresh or credential change.
+    const fresh = `window.antigravityCurrentAccount && Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) > 0`;
     const line = `const ${suffix === 'gemini_weekly' ? 'gWeekly' : suffix === 'gemini_5h' ? 'g5h' : suffix === 'claude_weekly' ? 'cWeekly' : 'c5h'} = ${original};`;
     requireSingleAnchor(output, line, 'quota widget ' + suffix);
     output = output.replace(line, line.replace(original, `(${fresh} ? (${original}) : '待查询')`));
@@ -317,11 +317,10 @@ function enhanceArgonQuotaWidget(source) {
   output = output.replace(accountLoaded, `            setAgyCurrentQuotaAccount(res.currentAccountId || '');
             refreshAgyActiveQuota();`);
   output = output.replaceAll("window.antigravityCurrentAccount = newList.currentAccountId || '';", "setAgyCurrentQuotaAccount(newList.currentAccountId || '');");
-  // Both DOM-ready branches run a single periodic refresh. If the account
-  // changes, the response ID check in refreshAgyActiveQuota rejects stale data.
+  // Repaint the widget quickly without polling cloud quota in the background.
   const widgetTimer = 'setInterval(injectQuotaWidget, 2000);';
   if (countHits(output, widgetTimer) !== 2) throw new Error('Quota widget timers changed unexpectedly');
-  output = output.replaceAll(widgetTimer, `${widgetTimer}\n      setInterval(refreshAgyActiveQuota, 120000);\n      if (!window.__agyModelSwitchFastHook) { window.__agyModelSwitchFastHook = true; document.addEventListener('click', () => { setTimeout(injectQuotaWidget, 60); }, true); }`);
+  output = output.replaceAll(widgetTimer, `${widgetTimer}\n      if (!window.__agyModelSwitchFastHook) { window.__agyModelSwitchFastHook = true; document.addEventListener('click', () => { setTimeout(injectQuotaWidget, 60); }, true); }`);
 
   const modalStyleAnchor = '        .btn-switch-card { min-width: 66px; }';
   requireSingleAnchor(output, modalStyleAnchor, 'account modal style anchor');
@@ -343,7 +342,7 @@ function enhanceArgonQuotaWidget(source) {
       try {
         const res = await electron_1.ipcRenderer.invoke('accounts:list');`;
   requireSingleAnchor(output, loadAccountsStart, 'account modal loadAccounts start');
-  output = output.replace(loadAccountsStart, `    async function loadAccounts(forceIpc) {
+  output = output.replace(loadAccountsStart, `    async function loadAccounts(forceIpc, forceQuota) {
       const hasMemoryCache = !forceIpc && Array.isArray(window.antigravityAccounts) && window.antigravityAccounts.length > 0;
       if (!hasMemoryCache) accountListContainer.innerHTML = '<div class="empty-hint">正在载入中...</div>';
       try {
@@ -357,13 +356,13 @@ function enhanceArgonQuotaWidget(source) {
             const nextSig = (fresh.currentAccountId || '') + ':' + fresh.accounts.map(a => a.id + ':' + a.storageState).join(',');
             window.antigravityAccounts = fresh.accounts;
             setAgyCurrentQuotaAccount(fresh.currentAccountId || '');
-            if (prevSig !== nextSig) loadAccounts(true);
+            if (prevSig !== nextSig) loadAccounts(true, false);
           }).catch(() => {});
         }`);
 
   const cardAccountId = '          const accId = acc.id;';
   requireSingleAnchor(output, cardAccountId, 'account card cache id');
-  output = output.replace(cardAccountId, `${cardAccountId}\n          const cachedAge = Date.now() - Number(localStorage.getItem('quota_' + accId + '_checked_at') || 0);\n          const freshCache = cachedAge >= 0 && cachedAge < 300000;`);
+  output = output.replace(cardAccountId, `${cardAccountId}\n          const freshCache = Number(localStorage.getItem('quota_' + accId + '_checked_at') || 0) > 0;`);
   for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h']) {
     const value = `localStorage.getItem('quota_' + accId + '_${suffix}')`;
     requireSingleAnchor(output, value, 'account card cache ' + suffix);
@@ -417,6 +416,12 @@ function enhanceArgonQuotaWidget(source) {
                     localStorage.removeItem('quota_' + acc.id + '_argon_weekly');
                     if (isCurrent && window.antigravityCurrentAccount === acc.id) localStorage.removeItem('quota_argon_weekly');
                   }`);
+  const modalQuotaInvoke = "electron_1.ipcRenderer.invoke('fetch-account-quota', acc.id)";
+  requireSingleAnchor(output, modalQuotaInvoke, 'account modal quota lookup');
+  output = output.replace(modalQuotaInvoke, "electron_1.ipcRenderer.invoke('fetch-account-quota', { accountId: acc.id, force: Boolean(forceQuota) })");
+  const modalRefresh = "root.querySelector('.btn-refresh').onclick = loadAccounts;";
+  requireSingleAnchor(output, modalRefresh, 'account modal refresh button');
+  output = output.replace(modalRefresh, "root.querySelector('.btn-refresh').onclick = () => loadAccounts(true, true);");
   return output;
 }
 
@@ -552,10 +557,23 @@ function buildIpcHandlers(official, legacy) {
   if (outputFinalBrace < 0) throw new Error('Official ipcHandlers final brace is missing');
   output = `${output.slice(0, outputFinalBrace)}\n${suffix}\n${output.slice(outputFinalBrace)}`;
   output = hardenAccountSwitch(output);
+  const quotaHandlerStart = "    electron_1.ipcMain.handle('fetch-account-quota', async (event, accountId) => {\n        try {";
+  requireSingleAnchor(output, quotaHandlerStart, 'quota IPC request normalization');
+  output = output.replace(quotaHandlerStart, `    electron_1.ipcMain.handle('fetch-account-quota', async (event, request) => {
+        try {
+            const quotaRequest = request && typeof request === 'object' ? request : { accountId: request };
+            const accountId = String(quotaRequest.accountId || '');
+            const forceQuotaRefresh = quotaRequest.force === true;
+            if (!/^[A-Za-z0-9_-]{1,128}$/.test(accountId)) throw new Error('无效账号 ID');`);
   output = replaceBetween(output, '            // A. 静默换取 access_token', '        } catch (err) {\n            return { success: false, error: err.message };\n        }\n    });\n\n    // 注入：export-local-account', [
     '            const registryPath = path.join(accountRoot, "accounts.json");',
     '            const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, "utf8")) : {};',
     '            const isCurrentAccount = String(registry.current_account_id || "") === String(accountId);',
+    '            const quotaCacheMod = require("./accountQuotaCache");',
+    '            if (!forceQuotaRefresh) {',
+    '                const cachedQuota = quotaCacheMod.readCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token });',
+    '                if (cachedQuota) return cachedQuota;',
+    '            }',
     '            const accountQuotaMod = require("./accountQuota");',
     '            const liveQuota = isCurrentAccount ? await require("./antigravityQuotaBridge").fetchLiveQuotaSummary({ cacheKey: String(accountId), timeoutMs: 2200, maxAttempts: 2 }).catch(() => null) : null;',
     '            const localSummary = isCurrentAccount && liveQuota?.summary ? accountQuotaMod.parseQuotaSummary(liveQuota.summary) : {};',
@@ -577,7 +595,8 @@ function buildIpcHandlers(official, legacy) {
     '                    const tokenRes = await net.fetch(tokenUrl, {',
     '                        method: "POST",',
     '                        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-    '                        body: params.toString()',
+    '                        body: params.toString(),',
+    '                        signal: AbortSignal.timeout(4500)',
     '                    });',
     '                    if (!tokenRes.ok) {',
     '                        const errTxt = await tokenRes.text();',
@@ -592,7 +611,8 @@ function buildIpcHandlers(official, legacy) {
     '                fetch: net.fetch.bind(net), accessToken,',
     '                projectId: tokenObj.project_id || detail.project_id,',
     '                clientVersion: liveQuota?.appVersion,',
-    '                supplementalQuotaSummary: isCurrentAccount ? liveQuota?.summary : null',
+    '                supplementalQuotaSummary: isCurrentAccount ? liveQuota?.summary : null,',
+    '                timeoutMs: 6500, requestTimeoutMs: 3000',
     '            });',
     '            if (isCurrentAccount) {',
     '                const latest = JSON.parse(fs.readFileSync(registryPath, "utf8"));',
@@ -608,9 +628,14 @@ function buildIpcHandlers(official, legacy) {
     '                    scopedResult = evidence.decorateQuotaWithEvidence(result, evidence.readEvidence(home, accountId, tokenObj.refresh_token));',
     '                }',
     '            } catch (_) { /* optional local positive evidence cache */ }',
+    '            if (scopedResult.success) {',
+    '                const cachedAt = Date.now();',
+    '                quotaCacheMod.writeCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token, result: scopedResult, now: cachedAt });',
+    '                scopedResult = { ...scopedResult, fromCache: false, cachedAt, quotaCacheVersion: 1 };',
+    '            }',
     '            return scopedResult;'
   ].join('\n'), 'shared per-account quota query');
-  return output;
+  return addNativeSwitchRequestBridge(output);
 }
 
 function hardenAccountSwitch(source) {
@@ -638,6 +663,79 @@ function hardenAccountSwitch(source) {
   hardened = hardened.replace(/\s*try \{\s*execSync\('taskkill \/F \/IM language_server\.exe'\);\s*\} catch \(e\) \{\}/g, '');
   hardened = hardened.replace(/win\.reload\(\);/g, "global.isQuitting = true;\n                    electron_1.app.relaunch();\n                    electron_1.app.exit(0);");
   return hardened;
+}
+
+function addNativeSwitchRequestBridge(source) {
+  const output = String(source || '');
+  const startMarker = "    electron_1.ipcMain.handle('accounts:switch', async (_event, accountId) => {";
+  const endMarker = '    // Debug logging helper';
+  requireSingleAnchor(output, startMarker, 'native account switch handler');
+  requireSingleAnchor(output, endMarker, 'native account switch bridge insertion');
+  const start = output.indexOf(startMarker);
+  const end = output.indexOf(endMarker, start);
+  const handlerBlock = output.slice(start, end);
+  const closeMarker = '\n    });';
+  const close = handlerBlock.lastIndexOf(closeMarker);
+  if (close < 0 || handlerBlock.slice(close + closeMarker.length).trim()) {
+    throw new Error('Native account switch handler end changed unexpectedly');
+  }
+  const handlerBody = handlerBlock.slice(startMarker.length, close);
+  const replacement = `    const agyPerformNativeAccountSwitch = async (accountId) => {${handlerBody}
+    };
+    electron_1.ipcMain.handle('accounts:switch', async (_event, accountId) => agyPerformNativeAccountSwitch(accountId));
+
+    // AGY Hub asks the running Antigravity main process to execute the same
+    // account switch as the injected dialog. Only account ids and a one-time
+    // nonce cross this user-local bridge; OAuth tokens never do.
+    (function installAgyNativeSwitchRequestBridge() {
+        const fsSync = require('fs');
+        const bridgePath = require('path');
+        const bridgeOs = require('os');
+        const bridgeRoot = bridgePath.join(bridgeOs.homedir(), '.gemini', 'antigravity', 'tools');
+        const requestPath = bridgePath.join(bridgeRoot, '.agy-native-switch-request.json');
+        const responsePath = bridgePath.join(bridgeRoot, '.agy-native-switch-response.json');
+        let busy = false;
+        const removeQuietly = filePath => { try { fsSync.rmSync(filePath, { force: true }); } catch (_) {} };
+        const writeResponse = value => {
+            const tempPath = responsePath + '.' + process.pid + '.' + Date.now() + '.tmp';
+            try {
+                fsSync.writeFileSync(tempPath, JSON.stringify(value) + '\\n', { encoding: 'utf8', mode: 0o600 });
+                fsSync.renameSync(tempPath, responsePath);
+            } catch (error) {
+                removeQuietly(tempPath);
+                console.warn('[AGY Account Bridge] response write failed:', error && error.message ? error.message : error);
+            }
+        };
+        const poll = async () => {
+            if (busy || !fsSync.existsSync(requestPath)) return;
+            let request;
+            try { request = JSON.parse(fsSync.readFileSync(requestPath, 'utf8').replace(/^\\uFEFF/, '')); }
+            catch (_) { removeQuietly(requestPath); return; }
+            const valid = request
+                && request.protocol === 1
+                && /^[a-f0-9]{24,64}$/i.test(String(request.nonce || ''))
+                && /^[A-Za-z0-9_-]{1,128}$/.test(String(request.accountId || ''))
+                && Number.isFinite(Number(request.createdAt))
+                && Math.abs(Date.now() - Number(request.createdAt)) <= 30000;
+            removeQuietly(requestPath);
+            if (!valid) return;
+            busy = true;
+            try {
+                const result = await agyPerformNativeAccountSwitch(String(request.accountId));
+                writeResponse({ protocol: 1, nonce: String(request.nonce), success: Boolean(result && result.success), error: result && result.error ? String(result.error) : '', restartScheduled: Boolean(result && result.success), completedAt: Date.now() });
+            } catch (error) {
+                writeResponse({ protocol: 1, nonce: String(request.nonce), success: false, error: String(error && error.message ? error.message : error), restartScheduled: false, completedAt: Date.now() });
+            } finally {
+                busy = false;
+            }
+        };
+        const timer = setInterval(poll, 200);
+        if (timer && typeof timer.unref === 'function') timer.unref();
+        poll();
+    })();
+
+`;
+  return `${output.slice(0, start)}${replacement}${output.slice(end)}`;
 }
 
 function buildLanguageServerStartOverlay(officialStart) {
@@ -751,6 +849,10 @@ function buildCompatibleTree(options) {
   syntaxCheck('dist/accountQuota.js', quotaSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuota.js'), quotaSource, 'utf8');
   report.files.push({ file: 'dist/accountQuota.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaSource) });
+  const quotaCacheSource = readPatchWorkbenchResource('accountQuotaCache.js');
+  syntaxCheck('dist/accountQuotaCache.js', quotaCacheSource);
+  fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuotaCache.js'), quotaCacheSource, 'utf8');
+  report.files.push({ file: 'dist/accountQuotaCache.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaCacheSource) });
   const evidenceSource = readPatchWorkbenchResource('argonEvidence.js');
   syntaxCheck('dist/argonEvidence.js', evidenceSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'argonEvidence.js'), evidenceSource, 'utf8');
@@ -778,6 +880,7 @@ module.exports = {
   buildUtils,
   buildIpcHandlers,
   hardenAccountSwitch,
+  addNativeSwitchRequestBridge,
   buildLanguageServer,
   buildLanguageServerStartOverlay,
   assertUniqueIpcHandlers

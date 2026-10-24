@@ -65,7 +65,7 @@ test('Claude Code 接入页与 Codex 共享账号、额度和服务控制结构'
   assert.match(markup, /id="btn-claude-gateway-start"/);
   assert.match(markup, /id="btn-claude-gateway-stop"/);
   assert.match(renderer, /function claudeSettings\(\)[\s\S]*?accountId: claudeDesktopAccount\?\.value/);
-  assert.match(renderer, /fetchAccountQuota\(selectedId\)/);
+  assert.match(renderer, /fetchAccountQuota\(selectedId, \{ force: options\.force === true \}\)/);
   assert.match(renderer, /testClaudeDesktopGateway\(claudeSettings\(\)\)/);
   assert.match(renderer, /connectClaudeDesktop\(claudeSettings\(\)\)/);
 });

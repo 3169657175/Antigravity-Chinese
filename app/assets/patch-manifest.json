@@ -16,11 +16,12 @@
     "dist/ipcHandlers.js",
     "dist/accountVault.js",
     "dist/accountQuota.js",
+    "dist/accountQuotaCache.js",
     "dist/argonEvidence.js",
     "dist/antigravityQuotaBridge.js"
   ],
   "optionalCapabilities": [],
   "officialSha256": "8ce27ff7c2defa10ed1ed2817288a61c546690f4cae1b1a8c91d4e69e0851e4d",
-  "patchSha256": "ec9c39a27b4c029dd826d3fdaa681c2e084ffcf98ef7709e47d925c0cd65a062",
-  "builtAt": "2026-10-24T11:10:03.200Z"
+  "patchSha256": "3f0defdc4da30a3584b8eb8288c630c4b221704cfb1ee05abe4a83d65a0333b4",
+  "builtAt": "2026-10-24T13:19:56.857Z"
 }

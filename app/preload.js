@@ -51,7 +51,10 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   deleteFeedback: (id) => ipcRenderer.invoke('delete-feedback', id),
   communityRequest: (resource, options) => ipcRenderer.invoke('community-request', resource, options),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
-  fetchAccountQuota: (id) => ipcRenderer.invoke('fetch-account-quota', id),
+  fetchAccountQuota: (id, options = {}) => ipcRenderer.invoke('fetch-account-quota', {
+    accountId: id,
+    force: options.force === true
+  }),
   switchLocalAccount: (id) => ipcRenderer.invoke('switch-local-account', id),
   addLocalAccount: (email, name, refreshToken) => ipcRenderer.invoke('add-local-account', { email, name, refreshToken }),
   openOfficialClient: () => ipcRenderer.invoke('open-official-client'),

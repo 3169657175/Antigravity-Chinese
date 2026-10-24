@@ -15,6 +15,22 @@ function summary(fraction = 0.73) {
 }
 const response = (data, status = 200) => ({ ok: status === 200, status, json: async () => data });
 
+test('quota lookup obeys one overall deadline instead of stacking endpoint timeouts', async () => {
+  const startedAt = Date.now();
+  const abortingFetch = (_url, options = {}) => new Promise((resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(options.signal.reason || new Error('timeout')), { once: true });
+  });
+  const result = await fetchAccountQuota({
+    fetch: abortingFetch,
+    accessToken: 'mock',
+    timeoutMs: 90,
+    requestTimeoutMs: 35,
+    supplementalQuotaSummary: summary(1)
+  });
+  assert.equal(result.success, true);
+  assert.ok(Date.now() - startedAt < 350, 'overall deadline should not stack 15-second endpoint waits');
+});
+
 test('cloud CLI quota lookup uses empty bodies and retrieves account-scoped model metadata', async () => {
   const requests = [];
   for (const account of ['first', 'second']) {
@@ -227,12 +243,44 @@ test('hub quota IPC queries non-current accounts without writing the registry or
   assert.deepEqual(files.map(file => fs.readFileSync(file, 'utf8')), before);
 });
 
-test('shipped Antigravity preload isolates quota cache and refreshes it periodically', () => {
+test('shipped Antigravity preload isolates quota cache without periodic cloud polling', () => {
   const preload = asar.extractFile(path.join(__dirname, '../../assets/app.asar'), 'dist/preload.js').toString('utf8');
   assert.match(preload, /function setAgyCurrentQuotaAccount\(accountId\)/);
   assert.match(preload, /function refreshAgyActiveQuota\(\)/);
   assert.match(preload, /window\.antigravityCurrentAccount !== id/);
   assert.match(preload, /_checked_at/);
-  assert.match(preload, /setInterval\(refreshAgyActiveQuota, 120000\)/);
+  assert.doesNotMatch(preload, /setInterval\(refreshAgyActiveQuota/);
+  assert.match(preload, /fetch-account-quota', \{ accountId: acc\.id, force: Boolean\(forceQuota\) \}/);
   assert.match(preload, /Gemini 4 Argon 每周额度/);
+});
+
+test('hub quota IPC reuses shared account cache unless refresh is explicitly forced', async t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-quota-cache-ipc-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const root = path.join(home, '.gemini/antigravity/tools');
+  fs.mkdirSync(path.join(root, 'accounts'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'accounts.json'), JSON.stringify({ current_account_id: 'other', accounts: [{ id: 'cached' }] }));
+  fs.writeFileSync(path.join(root, 'accounts', 'cached.json'), JSON.stringify({ token: { refresh_token: 'refresh-cached' } }));
+  const handlers = new Map();
+  let networkCalls = 0;
+  registerAccountIpc({
+    app: { getPath: () => home }, safeStorage: {}, getMainWindow: () => null,
+    ipcMain: { handle: (name, fn) => handlers.set(name, fn) },
+    net: { fetch: async (url, options) => {
+      networkCalls += 1;
+      if (url.includes('oauth2.googleapis.com')) return response({ access_token: 'cached-access' });
+      if (url.endsWith(':loadCodeAssist')) return response({ cloudaicompanionProject: 'cached-project' });
+      return response(summary(0.64));
+    } }
+  });
+  const handler = handlers.get('fetch-account-quota');
+  const first = await handler(null, 'cached');
+  const callsAfterFirst = networkCalls;
+  const second = await handler(null, { accountId: 'cached' });
+  assert.equal(second.fromCache, true);
+  assert.equal(second.quota.geminiWeekly, first.quota.geminiWeekly);
+  assert.equal(networkCalls, callsAfterFirst);
+  const forced = await handler(null, { accountId: 'cached', force: true });
+  assert.equal(forced.fromCache, false);
+  assert.ok(networkCalls > callsAfterFirst);
 });

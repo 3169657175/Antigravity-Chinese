@@ -66,16 +66,20 @@ function modelEntries(payload) {
   return Object.entries(source);
 }
 
-async function fetchAccountQuota({ fetch, accessToken, projectId, clientVersion, supplementalQuotaSummary }) {
+async function fetchAccountQuota({ fetch, accessToken, projectId, clientVersion, supplementalQuotaSummary, timeoutMs = 6500, requestTimeoutMs = 3000 }) {
   const normalizedVersion = /^\d+\.\d+\.\d+/.test(String(clientVersion || '')) ? String(clientVersion).match(/^\d+\.\d+\.\d+/)[0] : '2.26.0';
   const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'User-Agent': `antigravity/${normalizedVersion}` };
   const startedAt = Date.now();
+  const deadlineAt = startedAt + Math.max(50, Number(timeoutMs) || 6500);
   let lastError = 'No quota endpoint responded successfully';
   async function request(host, endpoint, body, cli = false) {
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) throw new Error('Quota request timed out');
     const response = await fetch(`https://${host}/v1internal:${endpoint}`, {
       method: 'POST',
       headers: cli ? { ...headers, 'User-Agent': CLI_QUOTA_USER_AGENT } : headers,
-      body: JSON.stringify(body), signal: AbortSignal.timeout(15000)
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.max(1, Math.min(Math.max(25, Number(requestTimeoutMs) || 3000), remainingMs)))
     });
     if (!response.ok) throw new Error(`${host}/${endpoint} returned HTTP ${response.status}`);
     return response.json();

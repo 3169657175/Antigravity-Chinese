@@ -41,7 +41,7 @@ try {
   if (manifest.unpackedMode !== 'preserve-official') throw new Error(`Unexpected unpacked mode: ${manifest.unpackedMode}`);
   if (manifest.patchSha256 !== sha256(archivePath)) throw new Error('Patch manifest SHA-256 does not match assets/app.asar');
 
-  const requiredFiles = [...new Set([...(manifest.requiredCapabilities || []), 'dist/accountVault.js', 'dist/accountQuota.js', 'dist/antigravityQuotaBridge.js'])];
+  const requiredFiles = [...new Set([...(manifest.requiredCapabilities || []), 'dist/accountVault.js', 'dist/accountQuota.js', 'dist/accountQuotaCache.js', 'dist/antigravityQuotaBridge.js'])];
   const entries = new Set(asar.listPackage(archivePath).map(entry => String(entry).replace(/^[/\\]+/, '').replace(/\\/g, '/')));
   const missingFiles = requiredFiles.filter(relativePath => !entries.has(relativePath));
   if (missingFiles.length) throw new Error(`Patch archive is missing required capabilities: ${missingFiles.join(', ')}`);
@@ -55,6 +55,7 @@ try {
     'dist/ipcHandlers.js',
     'dist/accountVault.js',
     'dist/accountQuota.js',
+    'dist/accountQuotaCache.js',
     'dist/antigravityQuotaBridge.js'
   ].filter(relativePath => entries.has(relativePath));
   for (const relativePath of syntaxFiles) {
@@ -101,10 +102,18 @@ try {
   requireText(quota, "'loadCodeAssist'", 'dist/accountQuota.js');
   requireText(quota, "'retrieveUserQuotaSummary'", 'dist/accountQuota.js');
   requireText(quota, "'gemini-argon-wtu-weekly'", 'dist/accountQuota.js');
+  const quotaCache = asar.extractFile(archivePath, 'dist/accountQuotaCache.js').toString('utf8');
+  requireText(quotaCache, 'tokenFingerprint', 'dist/accountQuotaCache.js');
+  requireText(quotaCache, 'readCachedQuota', 'dist/accountQuotaCache.js');
+  requireText(ipc, 'require("./accountQuotaCache")', 'dist/ipcHandlers.js');
+  requireText(ipc, 'forceQuotaRefresh', 'dist/ipcHandlers.js');
   const quotaBridge = asar.extractFile(archivePath, 'dist/antigravityQuotaBridge.js').toString('utf8');
   requireText(quotaBridge, 'RetrieveUserQuotaSummary', 'dist/antigravityQuotaBridge.js');
   requireText(ipc, 'supplementalQuotaSummary', 'dist/ipcHandlers.js');
   requireText(preload, 'Gemini 4 Argon', 'dist/preload.js');
+  requireText(ipc, '.agy-native-switch-request.json', 'dist/ipcHandlers.js');
+  requireText(ipc, 'agyPerformNativeAccountSwitch(String(request.accountId))', 'dist/ipcHandlers.js');
+  rejectText(preload, 'setInterval(refreshAgyActiveQuota', 'dist/preload.js');
   rejectText(ipc, 'if (gemini5hVal === null) gemini5hVal = 100;', 'dist/ipcHandlers.js');
   rejectText(preload, 'antigravity-version-widget', 'dist/preload.js');
   rejectText(preload, "ipcRenderer.invoke('patch:check-update'", 'dist/preload.js');

@@ -15,13 +15,14 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 
 ## 1.4.3 重点更新
 
-- 账号额度改为当前账号本地语言服务优先，云端接口补充；云端额度缺失不能覆盖已确认的本地数据。
-- Gemini 4 Argon 权限按账号独立识别：只有存在本地额度桶或该账号云端可见模型证据时展示，不支持的账号不显示，无法判断时不伪称不支持。
-- 增加语言服务启动短暂失败的重试、按账号隔离的短缓存、切换失效及异步结果防串号。
-- 注入包同步升级多账号窗口和侧栏数据刷新；Argon 有权限但尚无数值时显示“待确认”，不再继承前一个账号的额度。
-- 补充云端失败本地回退、非当前账号模型证据、缓存切换和缺失额度判定的自动化测试。
-- 修复反代接入页“配置快照 / 请求时间线 / 一键诊断”按钮纵向错位，宽屏保持同一行，窄屏自动换行。
-- 反馈页不再弹出无必要的“离线只读”提示；回复成功后立即结束“发送中”状态并同步刷新详情，避免服务器已经接收但界面仍停留在处理中。
+- **纯云端 Gemini 4 Argon 额度**：使用每个已保存账号的 OAuth 授权直接查询 Cloud Code，Antigravity 关闭、账号未切换时也可刷新；显示真实剩余百分比与重置时间。无授权账号仍需先登录。
+- **双通道额度兼容**：只读额度/模型接口采用新 CLI User-Agent 与 `{}` 请求体；保留原桌面端请求回退。本地 Language Server 仅作辅助，缓存与未知状态不会冒充实时额度。
+- **本地账号管理**：优化账号切换和登录态保护、按账号独立模型目录及额度缓存，防止 A 账号模型或额度混进 B 账号。
+- **Codex / API 接入**：按当前账号的实际能力展示 Gemini 4 Argon、Claude 5.5，其他账号继续使用 Gemini 3.8 Flash / Claude 4.6 等可用模型；更新 Codex 私有别名映射。
+- **界面与社区**：优化反代页三个诊断按钮布局、反馈回复与弹窗、浅色主题及管理页面。
+- **汉化补丁**：保持 Antigravity 2.26.0 已验证适配、按版本校验构建、注入窗口额度显示与安全回退能力。
+
+> 说明：每个账号能否使用 Gemini 4 / Claude 5.5 取决于 Google 返回的实际权限与模型目录；普通额度与独立 Argon 额度不会强行合并。详细内容请看 [v1.4.3 更新日志](docs/RELEASE_NOTES_1.4.3.md)。
 
 ## 1.4.1 重点更新
 
@@ -84,7 +85,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 | Anthropic Messages | `http://127.0.0.1:8046` | `/v1/messages` | Messages、SSE、tool_use、`count_tokens` |
 | Gemini Native | `http://127.0.0.1:8046/v1beta` | `models/{model}:generateContent` | generate/stream、functionCall / functionResponse |
 
-公共模型发现：`GET /v1/models`；Gemini 模型发现：`GET /v1beta/models`。当前 live catalog 包含 Gemini 3.8 Flash High / Medium / Low、Claude Opus 4.6 Thinking、Claude Sonnet 4.6 与 GPT-OSS 120B Medium；已停用的旧 Gemini 版本不会继续出现在默认目录中。
+公共模型发现：`GET /v1/models`；Gemini 模型发现：`GET /v1beta/models`。实时模型目录按账号查询与筛选：获得权限的账号可见 Gemini 4 Argon、Claude 5.5，其他账号保留其实际可用的 Gemini 3.8 Flash、Claude 4.6 和 GPT-OSS；不会将 A 账号的模型权限直接应用到 B 账号。
 
 > Codex 为了适配自身模型白名单仍使用 `gpt-*` 兼容槽位，但这些别名只写入 Codex 私有模型目录；普通 API 客户端始终看到并使用真实 Gemini / Claude 模型 ID。
 
@@ -94,7 +95,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 - **本地账号与额度**：读取 Antigravity 本地账号，展示额度、状态与重置时间，并提供账号切换和异常分类。
 - **统一 API 反代**：本地 `127.0.0.1:8046` 同时提供 OpenAI Responses、OpenAI Chat Completions、Anthropic Messages 与 Gemini Native，支持流式输出、工具调用、图片、长上下文与模型映射。
 - **Claude Code 底层兼容（暂时隐藏入口）**：相关实现仍保留在源码中，当前版本默认通过 Feature Flag 关闭 UI，待链路完善后可直接重新开放。
-- **当前模型目录**：支持 Gemini 3.8 Flash High / Medium / Low、Claude Opus 4.6 Thinking、Claude Sonnet 4.6 与 GPT-OSS 120B Medium；Gemini 4 Argon 由当前账号的本机语言服务按能力单独探测。
+- **当前模型目录**：按保存账号的云端模型目录动态识别 Gemini 4 Argon、Claude 5.5、Gemini 3.8 Flash、Claude 4.6 与 GPT-OSS；Argon 独立额度可在不启动 Antigravity 时实时查询。
 - **自定义 Provider**：支持 OpenAI Responses 兼容服务，测试不会改变当前已连接线路。
 - **Token 与缓存监控**：区分本地 Antigravity、Codex 和 Claude Code 调用，统计输入、输出、缓存与命中率。
 - **主题皮肤**：内置主题并支持本地自定义壁纸。

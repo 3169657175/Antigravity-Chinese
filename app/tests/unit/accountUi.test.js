@@ -5,8 +5,23 @@ const {
   quotaFieldState,
   quotaPercent,
   calculateQuotaScore,
-  quotaSectionsForResult
+  quotaSectionsForResult,
+  withQuotaUiDeadline
 } = require('../../localAccountsController');
+
+test('quota UI deadline always releases a refresh that never settles', async () => {
+  let fireTimeout = null;
+  let cleared = false;
+  const resultPromise = withQuotaUiDeadline(new Promise(() => {}), 9000, {
+    setTimeout: callback => { fireTimeout = callback; return 7; },
+    clearTimeout: id => { if (id === 7) cleared = true; }
+  });
+  fireTimeout();
+  const result = await resultPromise;
+  assert.equal(result.code, 'QUOTA_REFRESH_TIMEOUT');
+  assert.equal(result.retryable, true);
+  assert.equal(cleared, true);
+});
 
 test('account failure copy exposes a clear reauthorization action', () => {
   const copy = failureCopy({

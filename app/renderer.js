@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   if (btnRefreshLocalAccounts) {
-    btnRefreshLocalAccounts.addEventListener('click', loadLocalAccounts);
+    btnRefreshLocalAccounts.addEventListener('click', () => loadLocalAccounts({ forceQuotaRefresh: true }));
   }
 
   // 【性能优化】：将原本阻塞首屏渲染的串行磁盘/IO检测重构为并发异步非阻塞加载，首屏秒开！
@@ -221,12 +221,12 @@ async function initThemeManager() {
   return controller.init({ scheduleAfterPaint, logToTerminal });
 }
 
-async function loadLocalAccounts() {
+async function loadLocalAccounts(options = {}) {
   const controller = window.AgyLocalAccountsController;
   if (!controller || typeof controller.loadLocalAccounts !== 'function') {
     throw new Error('本地账号控制器未加载');
   }
-  return controller.loadLocalAccounts({ logToTerminal });
+  return controller.loadLocalAccounts({ logToTerminal, forceQuotaRefresh: options.forceQuotaRefresh === true });
 }
 
 function logToTerminal(msg, type = 'info') {

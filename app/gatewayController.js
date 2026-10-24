@@ -459,7 +459,7 @@
         refreshQuotaButton.disabled = true;
         if (options.showResult) showResult('正在查询所选账号实时额度...');
         try {
-          const response = await window.agyHubAPI.fetchAccountQuota(selectedId);
+          const response = await window.agyHubAPI.fetchAccountQuota(selectedId, { force: options.force === true });
           if (requestId !== quotaRequestId) return null;
           if (!response || response.success === false) throw new Error(response?.error || '额度查询失败');
           const entries = response.availableModelEntries;
@@ -543,7 +543,7 @@
         if (claudeGatewayRefreshQuotaButton) claudeGatewayRefreshQuotaButton.disabled = true;
         if (options.showResult) showClaudeDesktopResult('正在查询所选账号实时额度...');
         try {
-          const response = await window.agyHubAPI.fetchAccountQuota(selectedId);
+          const response = await window.agyHubAPI.fetchAccountQuota(selectedId, { force: options.force === true });
           if (requestId !== claudeQuotaRequestId) return null;
           if (!response || response.success === false) throw new Error(response?.error || '额度查询失败');
           const quota = response.quota || {};
@@ -1223,7 +1223,7 @@
         }
       });
     
-      refreshQuotaButton.addEventListener('click', () => refreshSelectedQuota({ showResult: true }));
+      refreshQuotaButton.addEventListener('click', () => refreshSelectedQuota({ force: true, showResult: true }));
     
       model.addEventListener('change', async () => {
         if (modelControl) modelControl.value = 'gateway';
@@ -1280,7 +1280,7 @@
           claudeGatewayAccountName.textContent = `${claudeDesktopAccount.options[claudeDesktopAccount.selectedIndex]?.textContent || selectedId}，已选择（未改变当前路由）`;
         }
         try {
-          await refreshClaudeSelectedQuota({ force: true });
+          await refreshClaudeSelectedQuota();
           showClaudeDesktopResult(`已选择 Claude Code 测试/接入账号\n${claudeDesktopAccount.options[claudeDesktopAccount.selectedIndex]?.textContent || selectedId}\n只有点击“连接到 Claude Code”才会改变当前网关账号。`, 'success');
         } finally {
           claudeDesktopAccount.disabled = false;
@@ -1419,7 +1419,7 @@
       setInterval(() => {
         const gatewayPane = document.getElementById('tab-codex-gateway');
         if (gatewayPane?.classList.contains('active') && activeCodexPage === 'overview') {
-          scheduleAfterPaint(() => refresh({ force: true, includeQuota: true }));
+          scheduleAfterPaint(() => refresh({ force: true }));
         }
       }, 60 * 1000);
   }

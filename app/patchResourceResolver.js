@@ -3,6 +3,7 @@ const path = require('path');
 
 const PACKAGED_NAMES = Object.freeze({
   'accountQuota.js': 'accountQuota.js',
+  'accountQuotaCache.js': 'accountQuotaCache.js',
   'argonEvidence.js': 'argonEvidence.js',
   'antigravityQuotaBridge.js': 'antigravityQuotaBridge.js',
   'locales/zh-CN.json': 'zh-CN.json',
@@ -19,7 +20,7 @@ function resolvePatchWorkbenchResource(relativePath, options = {}) {
   const fsModule = options.fsModule || fs;
   const candidates = [
     ...(resourcesPath ? [path.join(resourcesPath, 'patch', packagedName)] : []),
-    path.join(workbenchDir, ...(['accountQuota.js', 'argonEvidence.js', 'antigravityQuotaBridge.js'].includes(key) ? ['..', key] : key.split('/')))
+    path.join(workbenchDir, ...(['accountQuota.js', 'accountQuotaCache.js', 'argonEvidence.js', 'antigravityQuotaBridge.js'].includes(key) ? ['..', key] : key.split('/')))
   ];
   for (const filePath of candidates) {
     if (fsModule.existsSync(filePath)) return filePath;

@@ -48,7 +48,9 @@
       "accountIpc.js",
       "accountModelAvailability.js",
       "accountQuota.js",
+      "accountQuotaCache.js",
       "argonEvidence.js",
+      "antigravitySwitchBridge.js",
       "windowsAccountCredential.js",
       "antigravityQuotaBridge.js",
       "accountUi.js",
@@ -146,6 +148,10 @@
       {
         "from": "build/generated/accountQuota.js",
         "to": "patch/accountQuota.js"
+      },
+      {
+        "from": "build/generated/accountQuotaCache.js",
+        "to": "patch/accountQuotaCache.js"
       },
       {
         "from": "build/generated/argonEvidence.js",

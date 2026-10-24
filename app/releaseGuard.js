@@ -23,7 +23,7 @@ function verify(options = {}) {
   const publish = Array.isArray(pkg.build?.publish) ? pkg.build.publish[0] : null;
   if (!publish || publish.provider !== 'github') fail('build.publish must use GitHub');
   if (publish.owner !== RELEASE_REPOSITORY.owner || publish.repo !== RELEASE_REPOSITORY.repo) fail('package publish repository differs from releaseConfig');
-  const requiredFiles = ['releaseConfig.js','featureFlags.js','communityState.js','communityMedia.js','pageLifecycle.js','uiFeedback.js','errorDiagnostics.js','antigravityQuotaBridge.js','styles/community.css'];
+  const requiredFiles = ['releaseConfig.js','featureFlags.js','communityState.js','communityMedia.js','pageLifecycle.js','uiFeedback.js','errorDiagnostics.js','accountQuotaCache.js','antigravityQuotaBridge.js','styles/community.css'];
   for (const file of requiredFiles) if (!pkg.build.files.includes(file)) fail(`missing packaged module: ${file}`);
   const patchManifestPath = path.join(__dirname, 'assets', 'patch-manifest.json');
   const patchArchivePath = path.join(__dirname, 'assets', 'app.asar');
@@ -46,6 +46,7 @@ function verify(options = {}) {
     const resources = path.join(__dirname, 'dist', 'win-unpacked', 'resources');
     const asar = require('@electron/asar');
     if (!asar.extractFile(path.join(resources, 'app.asar'), 'accountQuota.js').equals(fs.readFileSync(path.join(__dirname, 'accountQuota.js')))) fail('Hub quota module missing or differs from source');
+    if (!asar.extractFile(path.join(resources, 'app.asar'), 'accountQuotaCache.js').equals(fs.readFileSync(path.join(__dirname, 'accountQuotaCache.js')))) fail('Hub quota cache module missing or differs from source');
     if (!asar.extractFile(path.join(resources, 'app.asar'), 'antigravityQuotaBridge.js').equals(fs.readFileSync(path.join(__dirname, 'antigravityQuotaBridge.js')))) fail('Hub local quota bridge missing or differs from source');
     for (const [name, file] of Object.entries(PACKAGED_NAMES)) {
       const source = resolvePatchWorkbenchResource(name, { resourcesPath: '' });

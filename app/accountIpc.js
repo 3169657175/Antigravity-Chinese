@@ -9,6 +9,8 @@ const { setModelsForAccount } = require('./accountModelAvailability.js');
 const { captureAntigravityModelCatalog, describeAntigravityModels } = require('./antigravityModelCatalog.js');
 const { writeWindowsAntigravityCredential } = require('./windowsAccountCredential.js');
 const { readEvidence, rememberEvidence, decorateQuotaWithEvidence } = require('./argonEvidence.js');
+const { readCachedQuota, writeCachedQuota } = require('./accountQuotaCache.js');
+const { requestNativeAccountSwitch } = require('./antigravitySwitchBridge.js');
 
 function normalizeAccountEmail(value) {
   return String(value || '')
@@ -28,10 +30,116 @@ function getGoogleClientSecret() {
   return Buffer.from(s1 + s2, 'base64').toString('utf8');
 }
 
+async function restartAntigravityClient(options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform !== 'win32') return { restarted: false, restartRequired: true };
+  const { execFile, spawn } = require('child_process');
+  const fsModule = options.fsModule || fs;
+  const sleep = options.sleep || (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)));
+  const run = options.run || ((file, args, timeout = 10000) => new Promise(resolve => {
+    (options.execFile || execFile)(file, args, { windowsHide: true, timeout, maxBuffer: 1024 * 1024 }, (error, stdout = '') => {
+      resolve({ error, stdout: String(stdout) });
+    });
+  }));
+  const launchDetached = options.launchDetached || ((executable, args) => new Promise((resolve, reject) => {
+    const child = (options.spawn || spawn)(executable, args, { detached: true, stdio: 'ignore', windowsHide: false });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(); });
+  }));
+
+  // Preserve the exact main-process argv. Starting Antigravity.exe with an
+  // empty argument list can select another profile and show the login page.
+  const queryScript = String.raw`
+$ErrorActionPreference = 'Stop'
+$p = Get-CimInstance Win32_Process -Filter "Name='Antigravity.exe'" |
+  Where-Object { $_.CommandLine -and $_.CommandLine -notmatch '--type=' } |
+  Select-Object -First 1
+if (-not $p) { Write-Output '{"running":false}'; exit 0 }
+$definition = @'
+using System;
+using System.Runtime.InteropServices;
+public static class AgyCommandLineParser {
+  [DllImport("shell32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+  public static extern IntPtr CommandLineToArgvW(string commandLine, out int argc);
+  [DllImport("kernel32.dll", SetLastError=true)]
+  public static extern IntPtr LocalFree(IntPtr memory);
+}
+'@
+Add-Type -TypeDefinition $definition
+$argc = 0
+$ptr = [AgyCommandLineParser]::CommandLineToArgvW([string]$p.CommandLine, [ref]$argc)
+try {
+  $argv = @()
+  for ($i = 0; $i -lt $argc; $i++) {
+    $argv += [Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::ReadIntPtr($ptr, $i * [IntPtr]::Size))
+  }
+  [pscustomobject]@{ running=$true; pid=[int]$p.ProcessId; executable=[string]$p.ExecutablePath; argv=$argv } | ConvertTo-Json -Compress -Depth 4
+} finally {
+  if ($ptr -ne [IntPtr]::Zero) { [void][AgyCommandLineParser]::LocalFree($ptr) }
+}`;
+  const query = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(queryScript, 'utf16le').toString('base64')]);
+  if (query.error) throw new Error('无法读取 Antigravity 原启动参数，已取消切换以保护登录状态');
+  let launchInfo;
+  try { launchInfo = JSON.parse(query.stdout.trim()); }
+  catch (_) { throw new Error('无法解析 Antigravity 启动参数，已取消切换以保护登录状态'); }
+  if (!launchInfo.running) return { restarted: false, restartRequired: false, willApplyOnNextLaunch: true };
+
+  const pid = Number(launchInfo.pid);
+  const executable = launchInfo.executable || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'Antigravity', 'Antigravity.exe');
+  const args = Array.isArray(launchInfo.argv) ? launchInfo.argv.slice(1) : [];
+  if (!Number.isInteger(pid) || pid <= 0 || path.basename(executable).toLowerCase() !== 'antigravity.exe' || !fsModule.existsSync(executable)) {
+    throw new Error('Antigravity 主进程信息不完整，已取消切换以保护登录状态');
+  }
+
+  const isRunning = async () => {
+    const check = await run('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], 3000);
+    return check.stdout.includes(`"${pid}"`);
+  };
+  const waitForExit = async (waitMs) => {
+    const attempts = Math.max(1, Math.ceil(waitMs / 250));
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (!(await isRunning())) return true;
+      await sleep(250);
+    }
+    return !(await isRunning());
+  };
+
+  // Account switching is an explicit restart operation. Antigravity's normal
+  // close is intercepted by its background/tray preference, so terminate only
+  // the verified main PID and its own child tree, then relaunch with the exact
+  // original argv. Never kill by image name.
+  const forcedTermination = true;
+  await run('taskkill.exe', ['/PID', String(pid), '/T', '/F'], 8000);
+  const exited = await waitForExit(Number(options.forceWaitMs) || 10000);
+  if (!exited) throw new Error('Antigravity 主进程未能退出，账号切换已回滚；请从 Antigravity 内置账号窗口重试');
+
+  try {
+    await launchDetached(executable, args);
+    return { restarted: true, restartRequired: false, preservedLaunchArguments: true, forcedTermination };
+  } catch (_) {
+    // The new account is already committed and the old process has exited.
+    return { restarted: false, restartRequired: true, preservedLaunchArguments: true, forcedTermination, error: '账号已切换，但自动启动失败；请手动打开 Antigravity' };
+  }
+}
+
+async function isAntigravityClientRunning(options = {}) {
+  if ((options.platform || process.platform) !== 'win32') return false;
+  const { execFile } = require('child_process');
+  const run = options.run || ((file, args) => new Promise(resolve => {
+    (options.execFile || execFile)(file, args, { windowsHide: true, timeout: 3000, maxBuffer: 256 * 1024 }, (error, stdout = '') => {
+      resolve({ error, stdout: String(stdout) });
+    });
+  }));
+  const result = await run('tasklist.exe', ['/FI', 'IMAGENAME eq Antigravity.exe', '/FO', 'CSV', '/NH']);
+  return !result.error && /Antigravity\.exe/i.test(result.stdout);
+}
+
 function registerAccountIpc(options) {
   const { ipcMain, app, net, safeStorage, getMainWindow } = options;
   const writeCredential = options.writeCredential || writeWindowsAntigravityCredential;
   const restartClient = options.restartClient || restartAntigravityClient;
+  const isClientRunning = options.isClientRunning || isAntigravityClientRunning;
+  const nativeSwitch = options.nativeSwitch || requestNativeAccountSwitch;
 
   function accountTokenFromDetail(detail) {
     if (!detail || typeof detail !== 'object') return null;
@@ -62,87 +170,6 @@ function registerAccountIpc(options) {
       if (token.access_token && token.refresh_token) return token;
     }
     return null;
-  }
-
-  async function restartAntigravityClient() {
-    if (process.platform !== 'win32') return { restarted: false, restartRequired: true };
-    const { execFile, spawn } = require('child_process');
-    const run = (file, args, timeout = 10000) => new Promise(resolve => {
-      execFile(file, args, { windowsHide: true, timeout, maxBuffer: 1024 * 1024 }, (error, stdout = '') => {
-        resolve({ error, stdout: String(stdout) });
-      });
-    });
-    // Antigravity's own accounts:switch handler relaunches Electron with the
-    // original argv. Launching Antigravity.exe with [] can silently create a
-    // different profile and show the Google login page. Capture the main
-    // process command line and preserve its original arguments.
-    const queryScript = String.raw`
-$ErrorActionPreference = 'Stop'
-$p = Get-CimInstance Win32_Process -Filter "Name='Antigravity.exe'" |
-  Where-Object { $_.CommandLine -and $_.CommandLine -notmatch '--type=' } |
-  Select-Object -First 1
-if (-not $p) { Write-Output '{"running":false}'; exit 0 }
-$definition = @'
-using System;
-using System.Runtime.InteropServices;
-public static class AgyCommandLineParser {
-  [DllImport("shell32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
-  public static extern IntPtr CommandLineToArgvW(string commandLine, out int argc);
-  [DllImport("kernel32.dll", SetLastError=true)]
-  public static extern IntPtr LocalFree(IntPtr memory);
-}
-'@
-Add-Type -TypeDefinition $definition
-$argc = 0
-$ptr = [AgyCommandLineParser]::CommandLineToArgvW([string]$p.CommandLine, [ref]$argc)
-try {
-  $argv = @()
-  for ($i = 0; $i -lt $argc; $i++) {
-    $argv += [Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::ReadIntPtr($ptr, $i * [IntPtr]::Size))
-  }
-  [pscustomobject]@{ running=$true; pid=[int]$p.ProcessId; executable=[string]$p.ExecutablePath; argv=$argv } | ConvertTo-Json -Compress -Depth 4
-} finally {
-  if ($ptr -ne [IntPtr]::Zero) { [void][AgyCommandLineParser]::LocalFree($ptr) }
-}`;
-    const query = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(queryScript, 'utf16le').toString('base64')]);
-    if (query.error) throw new Error('无法读取 Antigravity 原启动参数，已取消切换以保护登录状态');
-    let launchInfo;
-    try { launchInfo = JSON.parse(query.stdout.trim()); }
-    catch (_) { throw new Error('无法解析 Antigravity 启动参数，已取消切换以保护登录状态'); }
-    if (!launchInfo.running) return { restarted: false, restartRequired: false, willApplyOnNextLaunch: true };
-
-    const pid = Number(launchInfo.pid);
-    const executable = launchInfo.executable || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'Antigravity', 'Antigravity.exe');
-    const args = Array.isArray(launchInfo.argv) ? launchInfo.argv.slice(1) : [];
-    if (!Number.isInteger(pid) || pid <= 0 || !fs.existsSync(executable)) {
-      throw new Error('Antigravity 主进程信息不完整，已取消切换以保护登录状态');
-    }
-
-    // Request a graceful close (no /F and no /T). The injected in-client
-    // switch uses app.relaunch()/app.exit(); this mirrors that lifecycle rather
-    // than force-killing Electron and its Language Server child process.
-    await run('taskkill.exe', ['/PID', String(pid)], 8000);
-    const deadline = Date.now() + 15000;
-    let exited = false;
-    while (Date.now() < deadline) {
-      const check = await run('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], 3000);
-      if (!check.stdout.includes(`"${pid}"`)) { exited = true; break; }
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    if (!exited) throw new Error('Antigravity 未能正常关闭，账号切换已取消；请先手动关闭客户端后重试');
-
-    try {
-      await new Promise((resolve, reject) => {
-        const child = spawn(executable, args, { detached: true, stdio: 'ignore', windowsHide: false });
-        child.once('error', reject);
-        child.once('spawn', () => { child.unref(); resolve(); });
-      });
-      return { restarted: true, restartRequired: false, preservedLaunchArguments: true };
-    } catch (_) {
-      // The account and credential are already committed. Do not revert them
-      // after the old process has exited; let the user reopen the same app.
-      return { restarted: false, restartRequired: true, error: '账号已切换，但自动启动失败；请手动打开 Antigravity，原启动参数已保存在本次操作中' };
-    }
   }
 
 function getGoogleClientId() {
@@ -357,10 +384,15 @@ function getGoogleClientId() {
   // ==========================================
   let oauthServer = null;
   let currentOauthState = null;
+  const oauthTokenCache = new Map();
   
   // A. 注入 fetch-account-quota 用以向小助手卡片拉取配额
-  ipcMain.handle('fetch-account-quota', async (event, accountId) => {
+  ipcMain.handle('fetch-account-quota', async (event, request) => {
+    let fallbackCachedQuota = null;
     try {
+      const quotaRequest = request && typeof request === 'object' ? request : { accountId: request };
+      const accountId = String(quotaRequest.accountId || '');
+      const force = quotaRequest.force === true;
       if (typeof accountId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(accountId)) throw new Error('无效账号 ID');
       const userHome = app.getPath('home');
       const accountRoot = path.join(userHome, '.gemini/antigravity/tools');
@@ -372,11 +404,6 @@ function getGoogleClientId() {
       const envRoaming = process.env.APPDATA || '';
       const localAppData = envRoaming && path.resolve(envRoaming).toLowerCase().startsWith(path.resolve(userHome).toLowerCase() + path.sep)
         ? envRoaming : roaming;
-      // Only the currently active account may read the language-server quota.
-      // Inactive account requests are always scoped to their own OAuth token.
-      const liveQuotaPromise = isCurrentAccount
-        ? fetchLiveQuotaSummary({ appData: localAppData, cacheKey: accountId, timeoutMs: 2200, maxAttempts: 2 }).catch(() => null)
-        : Promise.resolve(null);
       const detailPath = path.join(accountRoot, 'accounts', `${accountId}.json`);
       if (!fs.existsSync(detailPath)) {
         throw new Error('凭证文件缺失');
@@ -398,6 +425,18 @@ function getGoogleClientId() {
       if (!tokenObj || !tokenObj.refresh_token) {
         throw new Error('无有效刷新令牌');
       }
+
+      fallbackCachedQuota = readCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token });
+      if (!force) {
+        if (fallbackCachedQuota) return fallbackCachedQuota;
+      }
+
+      // Only a cache miss or an explicit refresh performs live I/O. Inactive
+      // accounts remain scoped to their own OAuth token; the active account may
+      // also use its Language Server as a supplemental source.
+      const liveQuotaPromise = isCurrentAccount
+        ? fetchLiveQuotaSummary({ appData: localAppData, cacheKey: accountId, timeoutMs: 2200, maxAttempts: 2 }).catch(() => null)
+        : Promise.resolve(null);
   
       const liveQuota = await liveQuotaPromise;
       const localSummaryQuota = isCurrentAccount && liveQuota?.summary ? parseQuotaSummary(liveQuota.summary) : {};
@@ -416,20 +455,28 @@ function getGoogleClientId() {
         params.append('refresh_token', tokenObj.refresh_token);
         params.append('grant_type', 'refresh_token');
 
-        const tokenRes = await net.fetch(tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
-        });
-        if (!tokenRes.ok) {
-          const errTxt = await tokenRes.text();
-          throw new Error(`令牌获取失败: ${errTxt}`);
+        const tokenCacheKey = `${accountId}:${String(tokenObj.refresh_token).slice(-24)}`;
+        const cachedToken = oauthTokenCache.get(tokenCacheKey);
+        if (cachedToken && Date.now() < cachedToken.expiresAt) {
+          accessToken = cachedToken.accessToken;
+        } else {
+          const tokenRes = await net.fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+            signal: AbortSignal.timeout(4500)
+          });
+          if (!tokenRes.ok) {
+            const errTxt = await tokenRes.text();
+            throw new Error(`令牌获取失败: ${errTxt}`);
+          }
+          const tokenData = await tokenRes.json();
+          if (typeof tokenData.access_token !== 'string' || !tokenData.access_token) {
+            throw new Error('OAuth 未返回 access_token');
+          }
+          accessToken = tokenData.access_token;
+          oauthTokenCache.set(tokenCacheKey, { accessToken, expiresAt: Date.now() + 45 * 60 * 1000 });
         }
-        const tokenData = await tokenRes.json();
-        if (typeof tokenData.access_token !== 'string' || !tokenData.access_token) {
-          throw new Error('OAuth 未返回 access_token');
-        }
-        accessToken = tokenData.access_token;
       } catch (error) {
         if (!hasCompleteLocalQuota) throw error;
         // Keep ordinary local quota usable if OAuth is temporarily unavailable;
@@ -442,7 +489,9 @@ function getGoogleClientId() {
         fetch: net.fetch.bind(net), accessToken,
         projectId: tokenObj.project_id || detail.project_id,
         clientVersion: liveQuota?.appVersion,
-        supplementalQuotaSummary: isCurrentAccount ? liveQuota?.summary : null
+        supplementalQuotaSummary: isCurrentAccount ? liveQuota?.summary : null,
+        timeoutMs: 6500,
+        requestTimeoutMs: 3000
       });
       // A slow result from a previous active account must never be rendered
       // after the user switched to another account.
@@ -457,7 +506,7 @@ function getGoogleClientId() {
           const scoped = setModelsForAccount(accountId, quotaResult.availableModels, 'oauth-cloud');
           if (scoped?.modelIds?.length) quotaResult.availableModels = scoped.modelIds;
         }
-        if (isCurrentAccount) {
+        if (isCurrentAccount && !quotaResult.availableModels?.length) {
           try {
             const live = await fetchLiveAvailableModels({ appData: localAppData, timeoutMs: 2200 });
             if (Array.isArray(live.modelIds) && live.modelIds.length) {
@@ -490,11 +539,23 @@ function getGoogleClientId() {
           // Cache failure must never turn a valid live quota into an error.
           console.warn('[argon-evidence] Positive evidence cache unavailable');
         }
+        const cachedAt = Date.now();
+        writeCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token, result: quotaResult, now: cachedAt });
+        quotaResult = { ...quotaResult, fromCache: false, cachedAt, quotaCacheVersion: 1 };
       }
       return quotaResult;
     } catch (err) {
       const accountError = classifyAccountError(err);
       console.warn(`[fetch-quota] ${accountError.code}: ${accountError.diagnosticCode}`);
+      if (fallbackCachedQuota && accountError.retryable) {
+        return {
+          ...fallbackCachedQuota,
+          stale: true,
+          refreshFailed: true,
+          refreshError: accountError.message,
+          refreshErrorCode: accountError.code
+        };
+      }
       return { success: false, error: accountError.message, ...accountError };
     }
   });
@@ -825,17 +886,29 @@ function getGoogleClientId() {
         throw new Error('当前账号凭据不可读取，已取消切换以避免覆盖后无法恢复登录状态');
       }
 
+      // A running Antigravity must perform the switch inside its own Electron
+      // process. That is the same path used by the injected account dialog: it
+      // updates Credential Manager, commits the registry and calls app.relaunch.
+      // Externally killing the process after CredWrite can make the next boot
+      // discard the session and show the login page even when the credential is
+      // byte-for-byte correct.
+      if (await isClientRunning()) {
+        const lifecycle = await nativeSwitch({ accountRoot, accountId });
+        clearQuotaBridgeCache();
+        return { success: true, credentialUpdated: true, ...lifecycle };
+      }
+
       let credentialWritten = false;
       try {
-        // Keep the same credential document format as Antigravity's native
-        // accounts:switch handler, then atomically update the registry.
+        // When Antigravity is not running there is no in-process bridge to
+        // notify. It is safe to stage the native credential and registry for
+        // the next launch because no live keyring owner can overwrite them.
         await writeCredential(tokenObj);
         credentialWritten = true;
         registry.current_account_id = accountId;
         writeJsonAtomic(registryPath, registry);
         clearQuotaBridgeCache();
-        const lifecycle = await restartClient();
-        return { success: true, credentialUpdated: true, ...lifecycle };
+        return { success: true, credentialUpdated: true, restarted: false, restartRequired: false, willApplyOnNextLaunch: true };
       } catch (error) {
         // Before a successful relaunch, roll both sources back together. The
         // restart routine only throws if the original process is still alive
@@ -858,4 +931,4 @@ function getGoogleClientId() {
   
 }
 
-module.exports = { normalizeAccountEmail, getGoogleClientId, getGoogleClientSecret, registerAccountIpc };
+module.exports = { normalizeAccountEmail, getGoogleClientId, getGoogleClientSecret, restartAntigravityClient, isAntigravityClientRunning, registerAccountIpc };

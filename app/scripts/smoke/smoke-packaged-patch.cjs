@@ -87,6 +87,8 @@ async function makeClient(name, official, version, { crlf = false, changed = fal
 function assertInjected(target, expectedVersion, marker) {
   const quota = asar.extractFile(target, 'dist/accountQuota.js');
   assert.deepEqual(quota, fs.readFileSync(path.join(resources, 'patch/accountQuota.js')));
+  const quotaCache = asar.extractFile(target, 'dist/accountQuotaCache.js');
+  assert.deepEqual(quotaCache, fs.readFileSync(path.join(resources, 'patch/accountQuotaCache.js')));
   assert.ok(asar.extractFile(target, 'dist/ipcHandlers.js').toString().includes('require("./accountQuota").fetchAccountQuota'));
   assert.equal(fs.readFileSync(path.join(`${target}.unpacked`, 'keep-official-dependency.txt'), 'utf8'), marker);
   const version = getPatchVersionInfo(target, path.join(resources, 'patch/app.asar'));

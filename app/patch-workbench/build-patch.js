@@ -64,6 +64,7 @@ async function main() {
       'dist/ipcHandlers.js',
       'dist/accountVault.js',
       'dist/accountQuota.js',
+      'dist/accountQuotaCache.js',
       'dist/argonEvidence.js',
       'dist/antigravityQuotaBridge.js'
     ];
