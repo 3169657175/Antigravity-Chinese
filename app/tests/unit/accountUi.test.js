@@ -40,3 +40,12 @@ test('unconfirmed quotas remain visible and available short quota still drives r
   assert.deepEqual(quotaSectionsForResult(result).find(section => section.title === 'Gemini').fields.map(item => item.state), ['available', 'unconfirmed']);
   assert.equal(calculateQuotaScore(null, quotaPercent(result, 'gemini5h')), 71);
 });
+
+test('Argon appears as a distinct card only when this account has positive capability evidence', () => {
+  const base = { quota: { gemini5h: '100%', claudeWeekly: '90%' }, capabilities: { argon: false } };
+  assert.equal(quotaSectionsForResult(base).some(section => section.title === 'Gemini 4 Argon'), false);
+  const visible = quotaSectionsForResult({ ...base, capabilities: { argon: true } });
+  assert.equal(visible.find(section => section.title === 'Gemini 4 Argon').fields[0].state, 'unconfirmed');
+  const verified = quotaSectionsForResult({ ...base, capabilities: { argon: true }, quota: { ...base.quota, argonWeekly: '37%' } });
+  assert.equal(verified.find(section => section.title === 'Gemini 4 Argon').fields[0].state, 'available');
+});

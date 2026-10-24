@@ -2,16 +2,26 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.4.1-0A7D5A.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.4.3-0A7D5A.svg)
 ![Antigravity](https://img.shields.io/badge/Antigravity-2.26.0-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
-当前发布版本为 **AGY Hub 1.4.1**；汉化补丁基于 **Antigravity 2.26.0** 构建与验证。客户端更新后按版本、官方文件哈希与结构自动构建并校验；如果官方移除必要能力，会在写入前停止，不能保证未知结构的任意未来版本均兼容。
+当前发布版本为 **AGY Hub 1.4.3**；汉化补丁基于 **Antigravity 2.26.0** 构建与验证。客户端更新后按版本、官方文件哈希与结构自动构建并校验；如果官方移除必要能力，会在写入前停止，不能保证未知结构的任意未来版本均兼容。
 
-[下载 1.4.1 安装包](https://github.com/3169657175/Antigravity-Chinese/releases/download/v1.4.1/agy-hub-setup-1.4.1.exe) · [最新版 Release](https://github.com/3169657175/Antigravity-Chinese/releases/latest) · [完整更新说明](docs/RELEASE_NOTES_1.4.1.md)
+[下载 1.4.3 安装包](https://github.com/3169657175/Antigravity-Chinese/releases/download/v1.4.3/agy-hub-setup-1.4.3.exe) · [最新版 Release](https://github.com/3169657175/Antigravity-Chinese/releases/latest) · [完整更新说明](docs/RELEASE_NOTES_1.4.3.md)
 
 安装后打开 AGY Hub，点击“注入中文汉化补丁”应用新版汉化。覆盖安装会按安装目录识别并关闭正在运行的管家。
+
+## 1.4.3 重点更新
+
+- 账号额度改为当前账号本地语言服务优先，云端接口补充；云端额度缺失不能覆盖已确认的本地数据。
+- Gemini 4 Argon 权限按账号独立识别：只有存在本地额度桶或该账号云端可见模型证据时展示，不支持的账号不显示，无法判断时不伪称不支持。
+- 增加语言服务启动短暂失败的重试、按账号隔离的短缓存、切换失效及异步结果防串号。
+- 注入包同步升级多账号窗口和侧栏数据刷新；Argon 有权限但尚无数值时显示“待确认”，不再继承前一个账号的额度。
+- 补充云端失败本地回退、非当前账号模型证据、缓存切换和缺失额度判定的自动化测试。
+- 修复反代接入页“配置快照 / 请求时间线 / 一键诊断”按钮纵向错位，宽屏保持同一行，窄屏自动换行。
+- 反馈页不再弹出无必要的“离线只读”提示；回复成功后立即结束“发送中”状态并同步刷新详情，避免服务器已经接收但界面仍停留在处理中。
 
 ## 1.4.1 重点更新
 
@@ -175,8 +185,8 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.4.1.exe
-agy-hub-setup-1.4.1.exe.blockmap
+agy-hub-setup-1.4.3.exe
+agy-hub-setup-1.4.3.exe.blockmap
 latest.yml
 ```
 

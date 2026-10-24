@@ -126,7 +126,7 @@ ipcMain.handle('codex-gateway-status', async () => requireCodexGateway().status(
         stateDir: app.getPath('userData'),
         baseUrl: status.baseUrl,
         apiKey: status.apiKey,
-        model: codexAliasForModel(status.model),
+        model: codexAliasForModel(status.model, status.models),
         models: status.models,
         antigravity: true,
         catalogKey: 'antigravity-local-gateway',

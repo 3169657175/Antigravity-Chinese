@@ -32,6 +32,7 @@ const {
 const { RequestBodyError, jsonError, decodeRequestBody, readJson, codexRequestMetadata } = require('./gatewayHttp.js');
 const { canRetryGeneration, retryDiagnostic } = require('./retryPolicy.js');
 const { readJsonSafe } = require('./fsUtils.js');
+const { gatewayModelsForAccount } = require('./accountModelAvailability.js');
 const { GatewayConfigStore } = require('./gatewayConfigStore.js');
 const { fetchResponsesCompatible } = require('./providerProtocol.js');
 const { optimizeCustomRequestBody, responsesRequestReadLimit } = require('./customContextBudget.js');
@@ -293,7 +294,10 @@ function normalizeResponsesToolHistory(body) {
 function selectRequestedModel(clientModel, config = {}, availableModels = MODELS) {
   const supportedModels = Array.isArray(availableModels) && availableModels.length ? availableModels : MODELS;
   const configuredModel = supportedModels.includes(config.model) ? config.model : DEFAULT_MODEL;
-  const requested = resolveCodexModelAlias(String(clientModel || '').trim());
+  // Resolve allowlisted Codex aliases against this profile's live account
+  // catalog, not the globally cached IDE catalog (which may belong to another
+  // account and omit newly published Claude 5.5 / Argon routes).
+  const requested = resolveCodexModelAlias(String(clientModel || '').trim(), supportedModels);
   if (config.modelControl === 'client' && supportedModels.includes(requested)) return requested;
   return configuredModel;
 }
@@ -879,8 +883,8 @@ class CodexGateway {
   }
 
   antigravityModels() {
-    const live = this.antigravityModelCatalog().models;
-    return live.length ? ['agy-auto', ...live.filter(model => model !== 'agy-auto')] : [...MODELS];
+    const selectedId = this.config ? profile(this.config, PROFILE_IDS.CODEX_ANTIGRAVITY)?.accountId : '';
+    return gatewayModelsForAccount(selectedId, this.antigravityModelCatalog().models, MODELS);
   }
 
   readConfig() {

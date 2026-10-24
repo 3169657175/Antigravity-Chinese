@@ -1,9 +1,9 @@
 {
-  "verifiedAt": "2026-10-23T10:27:41.172Z",
+  "verifiedAt": "2026-10-24T11:10:03.660Z",
   "ok": true,
-  "archivePath": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\.codex-stage\\release-worktree-1.4.1\\app\\assets\\app.asar",
-  "archiveSize": 5309745,
-  "archiveSha256": "68719401baca9e64abba9a2480b8f6e841c65215e2a5c041e4859041346e8b9e",
+  "archivePath": "D:\\AGY-Hub-Dev\\assets\\app.asar",
+  "archiveSize": 5330944,
+  "archiveSha256": "ec9c39a27b4c029dd826d3fdaa681c2e084ffcf98ef7709e47d925c0cd65a062",
   "packageVersion": "2.26.0",
   "formatVersion": 2,
   "unpackedMode": "preserve-official",
@@ -17,6 +17,7 @@
     "dist/ipcHandlers.js",
     "dist/accountVault.js",
     "dist/accountQuota.js",
+    "dist/argonEvidence.js",
     "dist/antigravityQuotaBridge.js"
   ],
   "checkedSyntax": [

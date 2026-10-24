@@ -46,7 +46,7 @@
           const version = await window.agyHubAPI.getAppVersion();
           currentAppVersion = String(version || '--').replace(/^v/i, '') || '--';
           const badge = document.getElementById('app-version-badge');
-          if (badge) badge.textContent = `${versionLabel(currentAppVersion)} Stable`;
+          if (badge) badge.textContent = versionLabel(currentAppVersion);
         } catch (_) {
           currentAppVersion = '--';
         }

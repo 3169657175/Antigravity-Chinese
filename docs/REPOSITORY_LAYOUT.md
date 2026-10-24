@@ -23,4 +23,4 @@ npm run patch:verify
 - 文档和版本说明放在根目录 `docs/`；独立后端工程保留在 `community-backend/`。
 - 已发布的版本标签记录当时的源码快照；目录整理通过新的主分支提交保存，历史标签不重写。
 
-本机维护目录 `C:\Users\niu\.gemini\antigravity\scratch\agy-hub` 仍是既有的平铺工程。同步到 GitHub 时应将该工程映射到仓库 `app/`；运行目录 `D:\ang\agy-hub` 不作为源码发布目录。
+本机维护目录 `D:\AGY-Hub-Dev` 仍是既有的平铺工程。同步到 GitHub 时应将该工程映射到仓库 `app/`；运行目录 `D:\ang\agy-hub` 不作为源码发布目录。

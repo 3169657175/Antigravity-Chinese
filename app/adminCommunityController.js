@@ -66,7 +66,17 @@
       state.feedbacks = legacy ? result : result.feedbacks || [];
       state.replies = legacy ? [] : result.replies || [];
       const u = state.selected;
-      el('admin-user-properties').innerHTML = `<dt>用户名</dt><dd>${text(u.username)}</dd><dt>角色</dt><dd>${u.role === 'admin' ? '管理员' : '普通用户'}</dd><dt>账号状态</dt><dd>${u.status === 'disabled' ? '已禁用' : '正常'}</dd><dt>注册时间</dt><dd>${text(data().date(u.created_at))}</dd><dt>最近登录</dt><dd>${text(data().date(u.last_login_at))}</dd><dt>管理备注</dt><dd>${text(u.admin_note || '无')}</dd>`;
+      const detailFields = [
+        ['用户名', `@${text(u.username)}`],
+        ['角色', u.role === 'admin' ? '管理员' : '普通用户'],
+        ['账号状态', u.status === 'disabled' ? '已禁用' : '正常'],
+        ['注册时间', text(data().date(u.created_at))],
+        ['最近登录', text(data().date(u.last_login_at))],
+        ['管理备注', text(u.admin_note || '无')]
+      ];
+      el('admin-user-properties').innerHTML = detailFields.map(([label, value]) =>
+        `<div class="community-property"><dt>${label}</dt><dd>${value}</dd></div>`
+      ).join('');
       el('admin-user-actions').hidden = legacy;
       el('admin-clear-content').hidden = legacy;
       el('admin-delete-user').hidden = legacy;

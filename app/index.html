@@ -35,7 +35,7 @@
         <button class="titlebar-login-btn" id="btn-titlebar-login">登录/注册</button>
         <div class="titlebar-user-dropdown" id="titlebar-user-dropdown" style="display: none;">
           <span class="titlebar-user-name" id="text-titlebar-username">@未知用户</span>
-          <button class="titlebar-logout-btn" id="btn-titlebar-logout" title="退出登录">🚪 退出</button>
+          <button class="titlebar-logout-btn" id="btn-titlebar-logout" title="退出登录">退出</button>
         </div>
       </div>
       <button class="control-btn minimize-btn" id="btn-minimize" title="最小化">
@@ -52,7 +52,7 @@
 
   <!-- 主布局 -->
   <div class="app-container">
-
+    
     <!-- 侧边导航栏 -->
     <aside class="sidebar">
       <nav class="nav-menu">
@@ -123,34 +123,30 @@
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.1 9a3 3 0 1 1 5.8 1c-.7 1.2-2.9 1.5-2.9 3"></path><path d="M12 17h.01"></path></svg>
           使用引导
         </button>
-        <button class="btn-visit-website" id="btn-visit-website" title="访问网站 myagy.me">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-          访问官方网站
-        </button>
-        <div class="version-badge" id="app-version-badge">v-- Stable</div>
+        <div class="version-badge" id="app-version-badge">v1.4.3</div>
       </div>
     </aside>
 
     <!-- 右侧功能主面板 -->
     <div class="main-wrapper">
       <main class="main-content">
-
+      
       <!-- Tab 1: 一键汉化补丁 -->
       <section class="tab-pane active" id="tab-patch">
         <div class="pane-header">
           <h2>汉化与版本管理</h2>
           <p class="subtitle">深度汉化 Antigravity 客户端，支持多版本安全备份与智能回滚还原。</p>
         </div>
-
+        
         <div class="pane-body">
           <div class="card">
             <h3>
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="title-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
               客户端检测
             </h3>
-
+            
             <div class="path-status" id="path-status-text">正在检索安装路径...</div>
-
+            
             <!-- 版本元数据展示行 -->
             <div class="version-row">
               <div class="version-item">
@@ -212,25 +208,26 @@
             <h2>Antigravity 本地账号 & Token 监控</h2>
             <p class="subtitle">管理当前 Windows 用户下保存的客户端账号，并独立监控 Token 消费与缓存命中。</p>
           </div>
-          <div class="local-accounts-tab-navigation" style="display: flex; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 6px; border: 1px solid var(--border-subtle);">
-            <button class="la-tab-btn active" id="btn-la-tab-accounts" style="padding: 6px 12px; border: none; background: var(--bg-card); color: var(--text-main); border-radius: 4px; font-size: 11px; cursor: pointer;">👤 本地账号管理</button>
-            <button class="la-tab-btn" id="btn-la-tab-token" style="padding: 6px 12px; border: none; background: transparent; color: var(--text-dim); border-radius: 4px; font-size: 11px; cursor: pointer;">📈 Token 使用统计</button>
+          <div class="local-accounts-tab-navigation">
+            <button class="la-tab-btn active" id="btn-la-tab-accounts">本地账号管理</button>
+            <button class="la-tab-btn" id="btn-la-tab-token">Token 使用统计</button>
           </div>
         </div>
 
         <div class="local-accounts-content-wrapper" style="position: relative; height: calc(100% - 70px);">
           <!-- 本地账号面板 -->
           <div class="la-panel" id="panel-la-accounts" style="height: 100%; display: flex; flex-direction: column;">
-            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-bottom: 12px;">
-              <button class="btn btn-add-local-account" id="btn-add-local-account" type="button" style="background-color: var(--accent-cyan-dim); border: 1px solid var(--accent-cyan); color: var(--accent-cyan);">
-                ➕ 添加新账号
+            <div class="la-toolbar-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-bottom: 12px;">
+              <button class="btn btn-primary btn-add-local-account" id="btn-add-local-account" type="button">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                添加新账号
               </button>
-              <button class="btn local-accounts-refresh" id="btn-refresh-local-accounts" type="button" title="刷新本地账号">
+              <button class="btn btn-secondary local-accounts-refresh" id="btn-refresh-local-accounts" type="button" title="刷新本地账号">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
                 刷新
               </button>
             </div>
-
+            
             <div class="local-account-summary" aria-live="polite">
               <div class="local-account-metric">
                 <span class="local-account-metric-value" id="local-account-count">-</span>
@@ -251,13 +248,13 @@
           <!-- Token 监控大屏面板 -->
           <div class="la-panel" id="panel-la-token" style="display: none; height: 100%; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-main);">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#8dbbd1" stroke-width="2" class="title-icon" style="margin: 0;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-main);">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--accent-cyan)" stroke-width="2" class="title-icon" style="margin: 0;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                 Token 使用统计
               </h3>
               <div style="font-size: 11px; display: flex; align-items: center; gap: 8px;">
                 <span style="color: var(--text-dim);">上游转发:</span>
-                <input type="text" id="input-proxy-upstream" value="https://generativelanguage.googleapis.com" style="width: 280px; text-align: left; padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
+                <input type="text" id="input-proxy-upstream" value="https://generativelanguage.googleapis.com" style="width: 280px; text-align: left; padding: 5px 10px; font-size: 12px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
                 <button class="btn btn-secondary" id="btn-proxy-apply" style="padding: 5px 10px; font-size: 11px; border-radius: 6px;">应用</button>
                 <button class="btn btn-secondary" id="btn-refresh-token-stats" type="button" title="手动刷新 Token 统计数据" style="padding: 5px 12px; font-size: 11px; display: flex; align-items: center; gap: 6px; border-radius: 6px;">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" id="icon-refresh-token-spin"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
@@ -265,19 +262,19 @@
                 </button>
               </div>
             </div>
-
+            
             <div class="cyber-dashboard-grid">
               <div class="cyber-stat-card cyber-card-cyan">
                 <div class="cyber-card-head">
                   <span class="cyber-card-title">观测 Token (输入+输出)</span>
-                  <span class="cyber-card-icon">⚡</span>
+                  <span class="cyber-card-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
                 </div>
                 <div class="cyber-card-value" id="stat-total-token">0</div>
               </div>
               <div class="cyber-stat-card cyber-card-amber">
                 <div class="cyber-card-head">
                   <span class="cyber-card-title">官方缓存命中率</span>
-                  <span class="cyber-card-icon">🎯</span>
+                  <span class="cyber-card-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg></span>
                 </div>
                 <div class="cyber-card-value" id="stat-cache-hit-rate">0.0%</div>
                 <div class="cyber-progress-track">
@@ -287,14 +284,14 @@
               <div class="cyber-stat-card cyber-card-emerald">
                 <div class="cyber-card-head">
                   <span class="cyber-card-title">官方缓存 Token 数</span>
-                  <span class="cyber-card-icon">💎</span>
+                  <span class="cyber-card-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></span>
                 </div>
                 <div class="cyber-card-value" id="stat-cached-token">0</div>
               </div>
               <div class="cyber-stat-card cyber-card-rose">
                 <div class="cyber-card-head">
                   <span class="cyber-card-title">观测输出 Token 数</span>
-                  <span class="cyber-card-icon">🚀</span>
+                  <span class="cyber-card-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></span>
                 </div>
                 <div class="cyber-card-value" id="stat-output-token">0</div>
               </div>
@@ -302,19 +299,19 @@
 
             <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
               <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span>🔴 实时记录日志 (本地监听端口: 31000)</span>
-                <div class="token-filter-tabs" id="token-filter-tabs" style="display: flex; gap: 4px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 4px;">
-                  <button class="filter-tab active" data-filter="all" style="background: var(--bg-card); color: var(--text-main); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">全部</button>
-                  <button class="filter-tab" data-filter="hour" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本时</button>
-                  <button class="filter-tab" data-filter="day" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本日</button>
-                  <button class="filter-tab" data-filter="week" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本周</button>
-                  <button class="filter-tab" data-filter="month" style="background: transparent; color: var(--text-dim); border: none; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">本月</button>
+                <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="live-indicator-dot"></span>实时记录日志 (本地监听端口: 31000)</span>
+                <div class="token-filter-tabs" id="token-filter-tabs">
+                  <button class="filter-tab active" data-filter="all">全部</button>
+                  <button class="filter-tab" data-filter="hour">本时</button>
+                  <button class="filter-tab" data-filter="day">本日</button>
+                  <button class="filter-tab" data-filter="week">本周</button>
+                  <button class="filter-tab" data-filter="month">本月</button>
                 </div>
               </div>
               <div class="token-log-list" id="token-log-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
                 <div style="font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 20px;">等待 Antigravity 模型调用...</div>
               </div>
-              <div id="token-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; color: var(--text-dim);">
+              <div id="token-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
                 <div id="token-page-info">共 0 条，第 1 页</div>
                 <div style="display: flex; gap: 8px;">
                   <button class="btn btn-secondary" id="btn-page-prev" style="padding: 2px 8px; font-size: 10px;" disabled>上一页</button>
@@ -822,7 +819,7 @@
 
         <div class="market-toolbar">
           <div class="search-box-wrapper">
-            <input type="text" id="input-search-skill" placeholder="🔍 输入关键字、领域或标识进行过滤筛选...">
+            <input type="text" id="input-search-skill" placeholder="输入关键字、领域或标识进行过滤筛选...">
           </div>
           <button class="btn-sync-github" id="btn-sync-github-skills">
             同步 GitHub 社区仓库
@@ -853,7 +850,7 @@
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" class="title-icon"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
               创建新技能
             </h3>
-
+            
             <div class="form-group">
               <label for="input-skill-name">技能唯一标识 (英文，如 code-reviewer)：</label>
               <input type="text" id="input-skill-name" placeholder="如 git-helper">
@@ -866,7 +863,7 @@
 
             <div class="form-group">
               <label for="input-skill-prompt">核心系统 Prompt 指令集：</label>
-              <textarea id="input-skill-prompt" rows="5" placeholder="你是一个资深重构专家。当收到用户的修改提示时，你需要..."></textarea>
+              <textarea id="input-skill-prompt" rows="4" placeholder="你是一个资深重构专家。当收到用户的修改提示时，你需要..."></textarea>
             </div>
 
             <button class="btn btn-primary" id="btn-generate-skill" style="width: 100%;">
@@ -884,60 +881,27 @@
             <h2>反馈与讨论</h2>
             <p class="subtitle">与官网 nhw1029.pages.dev 实时数据共享，同步呈现您的优化反馈。</p>
           </div>
-          <button class="btn-refresh-feedbacks" id="btn-refresh-feedbacks" title="刷新反馈流">🔄 刷新反馈流</button>
+          <button class="btn-refresh-feedbacks" id="btn-refresh-feedbacks" title="刷新反馈流">刷新反馈流</button>
         </div>
-
-        <div class="pane-body flex-column gap-20">
-
-          <!-- 上方：仿大厂高级发帖撰写框 (带登录状态锁) -->
-          <div class="feedback-write-box" id="feedback-write-container">
-            <!-- 锁定蒙层 (未登录时显示) -->
-            <div class="write-box-lock-overlay" id="write-lock-overlay">
-              <div class="lock-card">
-                <span class="lock-icon">🔒</span>
-                <span class="lock-text">极客专属权限：请先登录您的账号后再发表反馈</span>
-                <button class="btn btn-primary btn-trigger-login" id="btn-lock-trigger-login">立即登录账号</button>
-              </div>
-            </div>
-
-            <div class="write-box-header">
-              <span class="write-box-title">✍️ 撰写优化反馈</span>
-              <span class="char-counter" id="text-char-counter">0 / 500</span>
-            </div>
-
-            <div class="write-box-body">
-              <textarea id="input-feedback-content" rows="4" placeholder="写下您在使用汉化补丁或桌面管家时遇到的问题、反馈或您的宝贵建议... (最大500字)" maxlength="500"></textarea>
-            </div>
-
-            <!-- 上传图片预览条 (选择文件后在此渲染预览图) -->
-            <div class="upload-preview-area" id="upload-preview-wrapper" style="display: none;">
-              <div class="preview-thumbnail-box">
-                <img src="" id="img-upload-preview" alt="待上传图片预览">
-                <button class="btn-remove-uploaded" id="btn-remove-uploaded-img" title="移除图片">✕</button>
-              </div>
-              <span class="upload-status-text" id="text-upload-status">已就绪</span>
-            </div>
-
-            <div class="write-box-footer">
-              <div class="footer-actions-left">
-                <button class="btn-action-upload" id="btn-trigger-upload" title="上传本地截图">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                  添加图片或粘贴截图
-                </button>
-              </div>
-              <button class="btn btn-primary" id="btn-send-feedback">发送</button>
-            </div>
-          </div>
-
-          <!-- 下方：反馈列表 -->
-<div class="community-toolbar"><label class="community-search">搜索反馈<input type="search" id="feedback-search" placeholder="搜索作者或反馈内容"></label><label>显示顺序<select id="feedback-sort"><option value="newest">最新发布</option><option value="popular">最多点赞</option><option value="unanswered">待回复</option></select></label><span id="feedback-result-count" class="community-muted" aria-live="polite"></span></div><p class="community-muted community-hint">支持 Ctrl+V 粘贴截图。列表分批呈现，点击卡片进入完整讨论。</p>
+        
+        <div class="pane-body flex-column gap-14">
+          <!-- 反馈筛选与列表 -->
+          <div class="community-toolbar"><label class="community-search">搜索反馈<input type="search" id="feedback-search" placeholder="搜索作者或反馈内容"></label><label>显示顺序<select id="feedback-sort"><option value="newest">最新发布</option><option value="popular">最多点赞</option><option value="unanswered">待回复</option></select></label><span id="feedback-result-count" class="community-muted" aria-live="polite"></span></div>
           <div class="feedback-stream-card">
             <div class="feedback-flow-container" id="feedback-flow-list">
               <!-- 骨架屏 / 实时云数据 -->
             </div>
           </div>
-
+          <div class="community-row community-pagination" id="feedback-pagination" style="display: none;">
+            <span id="feedback-page-info">第 1 / 1 页 · 共 0 条反馈</span>
+            <div class="pagination-controls" id="feedback-page-controls">
+              <button class="btn btn-secondary" id="feedback-page-prev" type="button">上一页</button>
+              <div class="pagination-numbers" id="feedback-page-numbers"></div>
+              <button class="btn btn-secondary" id="feedback-page-next" type="button">下一页</button>
+            </div>
+          </div>
         </div>
+
       </section>
 
       <!-- Tab 7: 用户管理 (管理专享) -->
@@ -986,48 +950,34 @@
           <p class="subtitle">新公告按发布时间展示；编辑只更新内容，不改变发布时间和排列位置。</p>
         </div>
 
-        <div class="pane-body flex-column gap-20">
-          <div class="card admin-workbench-card">
-            <h3 id="text-ann-form-title">📢 发布系统新公告</h3>
-            <input type="hidden" id="input-announce-edit-id" value="">
-
-            <div class="form-group" style="margin-top: 12px;">
-              <label for="input-announce-content">公告内容：</label>
-              <textarea id="input-announce-content" rows="4" placeholder="写下系统重要通知、更新内容等..."></textarea>
-            </div>
-
-            <!-- 上传图片预览 -->
-            <div class="upload-preview-area" id="ann-upload-preview-wrapper" style="display: none; margin-bottom: 12px; margin-top: 12px;">
-              <div class="preview-thumbnail-box">
-                <img src="" id="img-ann-upload-preview" alt="公告配图预览">
-                <button class="btn-remove-uploaded" id="btn-remove-ann-uploaded-img" title="移除图片">✕</button>
-              </div>
-              <span class="upload-status-text" id="text-ann-upload-status">已就绪</span>
-            </div>
-
-            <div class="button-action-row-space" style="display:flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-              <button class="btn-action-upload" id="btn-trigger-ann-upload" style="padding: 6px 14px; font-size: 11px;">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                添加图片或粘贴截图
-              </button>
-              <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary" id="btn-cancel-ann-edit" style="display: none; padding: 6px 14px; font-size: 11px;">取消编辑</button>
-                <button class="btn btn-primary" id="btn-publish-announcement" style="padding: 6px 18px; font-size: 11px;">发布公告</button>
-              </div>
-            </div>
-          </div>
-
+        <div class="pane-body flex-column gap-14">
           <!-- 历史公告列表面板 -->
           <div class="card">
-            <h3>公告记录</h3><p class="community-muted">默认最新发布在前，同一时间按公告编号降序；编辑公告不改变顺序。</p><div class="community-toolbar"><label class="community-search">搜索公告<input type="search" id="admin-ann-search" placeholder="搜索公告内容"></label><label>排序<select id="admin-ann-sort"><option value="newest">最新发布</option><option value="oldest">最早发布</option></select></label></div>
-            <div class="announcement-history-flow" id="admin-ann-history-list" style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div class="community-toolbar"><label class="community-search">搜索公告<input type="search" id="admin-ann-search" placeholder="搜索公告内容"></label><label>排序<select id="admin-ann-sort"><option value="newest">最新发布</option><option value="oldest">最早发布</option></select></label><span id="admin-ann-result-count" class="community-muted" aria-live="polite"></span></div>
+            <div class="announcement-history-flow" id="admin-ann-history-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
               <!-- 动态载入历史公告 -->
+            </div>
+            <div class="community-row community-pagination" id="admin-ann-pagination" style="display: none; margin-top: 14px;">
+              <span id="admin-ann-page-info">第 1 / 1 页 · 共 0 条公告</span>
+              <div class="pagination-controls" id="admin-ann-page-controls">
+                <button class="btn btn-secondary" id="admin-ann-page-prev" type="button">上一页</button>
+                <div class="pagination-numbers" id="admin-ann-page-numbers"></div>
+                <button class="btn btn-secondary" id="admin-ann-page-next" type="button">下一页</button>
+              </div>
             </div>
           </div>
         </div>
+
       </section>
 
     </main>
+    <!-- 固定按钮必须独立于滚动层和带位移动画的 Tab -->
+    <button class="fab-add-btn" id="btn-open-feedback-modal" type="button" title="新增反馈" aria-label="新增反馈" aria-controls="feedback-compose-modal">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
+    <button class="fab-add-btn" id="btn-open-announcement-modal" type="button" title="发布公告" aria-label="发布公告" aria-controls="announcement-compose-modal">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
 
     <!-- 底部极窄缝隙状态日志栏 -->
     <footer class="terminal-bar" id="terminal-bar">
@@ -1065,10 +1015,10 @@
           <button class="auth-tab-btn active" id="btn-tab-login">快速登录</button>
           <button class="auth-tab-btn" id="btn-tab-register">账号注册</button>
         </div>
-
+        
         <!-- 内联交互提示 Banner (替代原生 alert 解决 Electron 失焦问题) -->
         <div id="auth-msg-banner" style="display: none; padding: 8px 12px; margin-bottom: 12px; border-radius: 6px; font-size: 12px; text-align: center; font-weight: 500; transition: all 0.2s ease;"></div>
-
+        
         <!-- 登录表单 -->
         <div id="form-login-box" class="auth-form-box active">
           <div class="form-group">
@@ -1130,16 +1080,110 @@
 
   <!-- 反馈详细内容与二级高赞回复模态弹窗 -->
   <div class="modal-overlay" id="feedback-detail-modal" style="display: none; z-index: 10008;">
-    <div class="modal-content feedback-detail-dialog">
+    <div class="modal-content feedback-detail-dialog" role="dialog" aria-modal="true" aria-label="反馈详情">
       <div class="modal-header">
         <div class="modal-logo">
           <span class="pulse-dot"></span>
-          <span class="logo-text">💬 极客反馈详情</span>
+          <span class="logo-text">反馈详情</span>
         </div>
         <button class="modal-close-btn" id="detail-modal-close-btn">✕</button>
       </div>
-      <div class="modal-body" id="detail-modal-body" style="overflow-y: auto; flex: 1; padding-right: 4px;">
+      <div class="modal-body" id="detail-modal-body" tabindex="0" aria-label="反馈与讨论记录">
         <!-- 详情动态内容 -->
+      </div>
+      <div id="detail-modal-composer" class="detail-modal-composer" aria-label="发送回复"></div>
+    </div>
+  </div>
+
+  <!-- 新增优化反馈模态弹窗 (点击右下角 + 唤醒) -->
+  <div class="modal-overlay" id="feedback-compose-modal" style="display: none; z-index: 10010;">
+    <div class="modal-content compose-modal-dialog">
+      <div class="modal-header">
+        <div class="modal-logo">
+          <span class="logo-text">撰写优化反馈</span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-feedback-compose" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="feedback-write-box" id="feedback-write-container">
+          <!-- 锁定蒙层 (未登录时显示) -->
+          <div class="write-box-lock-overlay" id="write-lock-overlay">
+            <div class="lock-card">
+              <span class="lock-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+              <span class="lock-text">请先登录您的账号后再发表反馈</span>
+              <button class="btn btn-primary btn-trigger-login" id="btn-lock-trigger-login" type="button">立即登录账号</button>
+            </div>
+          </div>
+
+          <div class="write-box-header">
+            <span class="write-box-title">反馈内容（支持 Ctrl+V 粘贴截图）</span>
+            <span class="char-counter" id="text-char-counter">0 / 500</span>
+          </div>
+
+          <div class="write-box-body">
+            <textarea id="input-feedback-content" rows="5" placeholder="写下您在使用汉化补丁或桌面管家时遇到的问题、反馈或您的宝贵建议... (最大500字)" maxlength="500"></textarea>
+          </div>
+
+          <!-- 上传图片预览条 -->
+          <div class="upload-preview-area" id="upload-preview-wrapper" style="display: none;">
+            <div class="preview-thumbnail-box">
+              <img src="" id="img-upload-preview" alt="待上传图片预览">
+              <button class="btn-remove-uploaded" id="btn-remove-uploaded-img" type="button" title="移除图片">✕</button>
+            </div>
+            <span class="upload-status-text" id="text-upload-status">已就绪</span>
+          </div>
+
+          <div class="write-box-footer">
+            <div class="footer-actions-left">
+              <button class="btn-action-upload" id="btn-trigger-upload" type="button" title="上传本地截图">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                添加图片或粘贴截图
+              </button>
+            </div>
+            <button class="btn btn-primary" id="btn-send-feedback" type="button">发送反馈</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发布/编辑系统公告模态弹窗 (点击右下角 + 或编辑按钮唤醒) -->
+  <div class="modal-overlay" id="announcement-compose-modal" style="display: none; z-index: 10010;">
+    <div class="modal-content compose-modal-dialog">
+      <div class="modal-header">
+        <div class="modal-logo">
+          <span class="logo-text" id="text-ann-form-title">发布系统新公告</span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-announcement-compose" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-workbench-card">
+          <input type="hidden" id="input-announce-edit-id" value="">
+          <div class="form-group">
+            <label for="input-announce-content">公告内容（支持 Ctrl+V 粘贴截图）：</label>
+            <textarea id="input-announce-content" rows="5" placeholder="写下系统重要通知、更新内容等..."></textarea>
+          </div>
+
+          <!-- 上传图片预览 -->
+          <div class="upload-preview-area" id="ann-upload-preview-wrapper" style="display: none; margin-bottom: 12px; margin-top: 12px;">
+            <div class="preview-thumbnail-box">
+              <img src="" id="img-ann-upload-preview" alt="公告配图预览">
+              <button class="btn-remove-uploaded" id="btn-remove-ann-uploaded-img" type="button" title="移除图片">✕</button>
+            </div>
+            <span class="upload-status-text" id="text-ann-upload-status">已就绪</span>
+          </div>
+
+          <div class="button-action-row-space" style="display:flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+            <button class="btn-action-upload" id="btn-trigger-ann-upload" type="button">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              添加图片或粘贴截图
+            </button>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" id="btn-cancel-ann-edit" type="button" style="display: none;">取消编辑</button>
+              <button class="btn btn-primary" id="btn-publish-announcement" type="button">发布公告</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1150,38 +1194,38 @@
       <div class="modal-header">
         <div class="modal-logo">
           <span class="pulse-dot"></span>
-          <span class="logo-text">👤 关联与导入新账号</span>
+          <span class="logo-text">关联与导入新账号</span>
         </div>
         <button class="modal-close-btn" id="btn-close-add-account-modal">✕</button>
       </div>
       <div class="modal-body" style="padding-top: 8px;">
-        <div class="add-account-tabs" style="display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
-          <button class="add-account-tab-btn active" id="btn-add-tab-official" style="flex: 1; padding: 8px 4px; background: transparent; border: none; color: var(--text-main); font-size: 11px; cursor: pointer; border-bottom: 2px solid var(--accent-cyan); font-weight: bold;">方式一：OAuth 授权登录</button>
-          <button class="add-account-tab-btn" id="btn-add-tab-json" style="flex: 1; padding: 8px 4px; background: transparent; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;">方式二: 配置文件导入</button>
+        <div class="add-account-tabs">
+          <button class="add-account-tab-btn active" id="btn-add-tab-official">方式一：OAuth 授权登录</button>
+          <button class="add-account-tab-btn" id="btn-add-tab-json">方式二：配置文件导入</button>
         </div>
 
         <!-- 方式一面板：OAuth 授权登录 -->
         <div class="add-account-panel-content" id="panel-add-official">
-          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; text-align: center;">
+          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.6;">
             推荐方式：将自动打开系统浏览器进行 Google 登录授权，安全获取并导入 Token。
           </p>
-          <button class="btn" id="btn-start-oauth" style="width: 100%; background: #3b82f6; color: #fff; font-weight: bold; padding: 10px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; margin-bottom: 14px;">
-            🌐 开始 OAuth 授权
+          <button class="btn btn-primary" id="btn-start-oauth" style="width: 100%; justify-content: center; margin-bottom: 14px;">
+            开始 OAuth 授权
           </button>
-
+          
           <div class="form-group" style="margin-bottom: 12px; display: none;" id="oauth-link-group">
-            <label style="display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">授权链接 (如果浏览器未自动打开，请手动复制访问)：</label>
-            <div style="display: flex; gap: 6px;">
-              <input type="text" id="input-oauth-url" readonly style="flex: 1; padding: 6px 8px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 4px; font-size: 10px;">
-              <button class="btn" id="btn-copy-oauth-url" style="background: var(--bg-card); color: var(--text-main); font-size: 10px; padding: 6px 10px; border: 1px solid var(--border-subtle); border-radius: 4px; cursor: pointer;">复制</button>
+            <label style="display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px;">授权链接 (如果浏览器未自动打开，请手动复制访问)：</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="input-oauth-url" readonly style="flex: 1;">
+              <button class="btn btn-secondary" id="btn-copy-oauth-url">复制</button>
             </div>
           </div>
-
+          
           <div class="form-group" style="margin-top: 16px;">
-            <label style="display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">如果浏览器没有自动跳转回小助手，请把认证成功后的链接 (或 Code) 粘贴在下方提交：</label>
-            <div style="display: flex; gap: 6px;">
-              <input type="text" id="input-oauth-code" placeholder="在此粘贴回调链接或 Authorization Code" style="flex: 1; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 4px; font-size: 11px;">
-              <button class="btn" id="btn-submit-oauth-code" style="background: var(--accent-cyan); color: #000; font-weight: bold; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">提交</button>
+            <label style="display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px;">如果浏览器没有自动跳转回小助手，请把认证成功后的链接 (或 Code) 粘贴在下方提交：</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="input-oauth-code" placeholder="在此粘贴回调链接或 Authorization Code" style="flex: 1;">
+              <button class="btn btn-primary" id="btn-submit-oauth-code">提交</button>
             </div>
           </div>
           <div id="oauth-status-message" style="margin-top: 10px; font-size: 11px; text-align: center; color: var(--accent-cyan); min-height: 16px;"></div>
@@ -1189,11 +1233,11 @@
 
         <!-- 方式二面板：配置文件导入 -->
         <div class="add-account-panel-content" id="panel-add-json" style="display: none;">
-          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 24px; line-height: 1.5;">
+          <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.6;">
             支持通过选择其他设备导出的 <code>.json</code> 账号凭证配置文件直接导入。一秒同步，零操作门槛。
           </p>
-          <button class="btn" id="btn-import-json-file" style="width: 100%; background: var(--accent-cyan); color: #000; font-weight: bold; padding: 12px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            📥 选择本地账号 JSON 配置文件
+          <button class="btn btn-primary" id="btn-import-json-file" style="width: 100%; justify-content: center;">
+            选择本地账号 JSON 配置文件
           </button>
         </div>
       </div>

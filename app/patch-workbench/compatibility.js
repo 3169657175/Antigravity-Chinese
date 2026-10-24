@@ -223,13 +223,63 @@ function buildPreload(official, legacy) {
 
 function enhanceArgonQuotaWidget(source) {
   let output = String(source || '');
+  // Legacy preload kept unscoped quota_* values across account switches. The
+  // sidebar must never show the previous account's Argon or Gemini allowance.
+  output = insertBefore(output, '  function injectQuotaWidget() {', `  function setAgyCurrentQuotaAccount(accountId) {
+    const id = String(accountId || '');
+    if (window.__agyQuotaAccountId !== id) {
+      window.__agyQuotaAccountId = id;
+      for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h', 'argon_weekly']) {
+        const globalKey = 'quota_' + suffix;
+        const cacheAge = Date.now() - Number(localStorage.getItem('quota_' + id + '_checked_at') || 0);
+        const scopedValue = id && cacheAge >= 0 && cacheAge < 300000 ? localStorage.getItem('quota_' + id + '_' + suffix) : null;
+        localStorage.removeItem(globalKey);
+        if (/^\\d+%$/.test(String(scopedValue || ''))) localStorage.setItem(globalKey, scopedValue);
+      }
+    }
+    window.antigravityCurrentAccount = id;
+  }
+`, 'account-scoped quota cache');
+  output = insertBefore(output, '  function injectQuotaWidget() {', `  function refreshAgyActiveQuota() {
+    const id = window.antigravityCurrentAccount;
+    if (!id || window.__agyQuotaRefreshingId === id) return;
+    window.__agyQuotaRefreshingId = id;
+    electron_1.ipcRenderer.invoke('fetch-account-quota', id).then(qRes => {
+      if (window.antigravityCurrentAccount !== id || !qRes || !qRes.success || !qRes.quota) return;
+      for (const [field, suffix] of [['geminiWeekly','gemini_weekly'],['gemini5h','gemini_5h'],['claudeWeekly','claude_weekly'],['claude5h','claude_5h'],['argonWeekly','argon_weekly']]) {
+        const globalKey = 'quota_' + suffix;
+        const accountKey = 'quota_' + id + '_' + suffix;
+        const value = String(qRes.quota[field] || '');
+        if (/^\\d+%$/.test(value)) {
+          localStorage.setItem(globalKey, value);
+          localStorage.setItem(accountKey, value);
+        } else {
+          localStorage.removeItem(globalKey);
+          localStorage.removeItem(accountKey);
+        }
+      }
+      localStorage.setItem('quota_' + id + '_checked_at', String(Date.now()));
+      localStorage.setItem('quota_' + id + '_argon_cap', (qRes.capabilities && qRes.capabilities.argon) ? '1' : '0');
+      injectQuotaWidget();
+    }).catch(() => {}).finally(() => { if (window.__agyQuotaRefreshingId === id) window.__agyQuotaRefreshingId = null; });
+  }
+`, 'current-account periodic quota refresh');
   const modelReturn = '              return m[1];';
   requireSingleAnchor(output, modelReturn, 'quota widget current model label');
   output = output.replace(modelReturn, '              return text;');
 
   const values = "      const c5h = localStorage.getItem('quota_claude_5h') || '--';";
   requireSingleAnchor(output, values, 'quota widget cached values');
-  output = output.replace(values, `${values}\n      const argonWeekly = localStorage.getItem('quota_argon_weekly') || '--';`);
+  output = output.replace(values, `${values}\n      const argonWeekly = window.antigravityCurrentAccount && Date.now() - Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) < 300000 ? (localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_argon_weekly') || '待确认') : '待查询';`);
+
+  for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h']) {
+    const original = `localStorage.getItem('quota_${suffix}') || '--'`;
+    // The live sidebar is never allowed to display a value cached days ago.
+    const fresh = `window.antigravityCurrentAccount && Date.now() - Number(localStorage.getItem('quota_' + window.antigravityCurrentAccount + '_checked_at') || 0) < 300000`;
+    const line = `const ${suffix === 'gemini_weekly' ? 'gWeekly' : suffix === 'gemini_5h' ? 'g5h' : suffix === 'claude_weekly' ? 'cWeekly' : 'c5h'} = ${original};`;
+    requireSingleAnchor(output, line, 'quota widget ' + suffix);
+    output = output.replace(line, line.replace(original, `(${fresh} ? (${original}) : '待查询')`));
+  }
 
   const modelFlags = "      const isGemini = currentModel.includes('gemini');";
   requireSingleAnchor(output, modelFlags, 'quota widget model flags');
@@ -250,6 +300,9 @@ function enhanceArgonQuotaWidget(source) {
           titleEl.textContent = titleText;
           titleEl.style.color = isArgon ? '#8b5cf6' : '#3b82f6';
         }
+        if (isArgon && argonWeekly === '待查询' && window.antigravityCurrentAccount) {
+          refreshAgyActiveQuota();
+        }
         const weeklyValue = isArgon ? argonWeekly : gWeekly;
         if (weeklyEl.textContent !== weeklyValue) weeklyEl.textContent = weeklyValue;
         const hourlyRow = root.querySelector('.hourly-row');
@@ -261,16 +314,68 @@ function enhanceArgonQuotaWidget(source) {
 
   const accountLoaded = "            window.antigravityCurrentAccount = res.currentAccountId || '';";
   requireSingleAnchor(output, accountLoaded, 'quota widget account load');
-  output = output.replace(accountLoaded, `${accountLoaded}
-            if (window.antigravityCurrentAccount) {
-              electron_1.ipcRenderer.invoke('fetch-account-quota', window.antigravityCurrentAccount).then(qRes => {
-                if (!qRes || !qRes.success || !qRes.quota) return;
-                for (const [field, storageKey] of [['geminiWeekly','quota_gemini_weekly'],['gemini5h','quota_gemini_5h'],['claudeWeekly','quota_claude_weekly'],['claude5h','quota_claude_5h'],['argonWeekly','quota_argon_weekly']]) {
-                  if (/^\\d+%$/.test(String(qRes.quota[field] || ''))) localStorage.setItem(storageKey, qRes.quota[field]);
-                }
-                injectQuotaWidget();
-              }).catch(() => {});
-            }`);
+  output = output.replace(accountLoaded, `            setAgyCurrentQuotaAccount(res.currentAccountId || '');
+            refreshAgyActiveQuota();`);
+  output = output.replaceAll("window.antigravityCurrentAccount = newList.currentAccountId || '';", "setAgyCurrentQuotaAccount(newList.currentAccountId || '');");
+  // Both DOM-ready branches run a single periodic refresh. If the account
+  // changes, the response ID check in refreshAgyActiveQuota rejects stale data.
+  const widgetTimer = 'setInterval(injectQuotaWidget, 2000);';
+  if (countHits(output, widgetTimer) !== 2) throw new Error('Quota widget timers changed unexpectedly');
+  output = output.replaceAll(widgetTimer, `${widgetTimer}\n      setInterval(refreshAgyActiveQuota, 120000);\n      if (!window.__agyModelSwitchFastHook) { window.__agyModelSwitchFastHook = true; document.addEventListener('click', () => { setTimeout(injectQuotaWidget, 60); }, true); }`);
+
+  const modalStyleAnchor = '        .btn-switch-card { min-width: 66px; }';
+  requireSingleAnchor(output, modalStyleAnchor, 'account modal style anchor');
+  output = output.replace(modalStyleAnchor, `${modalStyleAnchor}
+        .dialog { border-radius: 14px; box-shadow: 0 24px 64px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }
+        .header { padding: 16px 22px; background: color-mix(in srgb, var(--vscode-editor-background, Canvas) 92%, CanvasText 4%); }
+        .account-card { border-radius: 10px; padding: 14px 16px; background: color-mix(in srgb, var(--vscode-editor-background, Canvas) 78%, CanvasText 4%); border-color: color-mix(in srgb, CanvasText 12%, transparent); }
+        .account-card.current { border-left: 3px solid #3b82f6; background: color-mix(in srgb, #3b82f6 5%, var(--vscode-editor-background, Canvas)); }
+        .btn-action { font-weight: 600; border-radius: 6px; padding: 5px 12px; }
+        .btn-action.danger-text { color: #f87171 !important; border-color: rgba(239, 68, 68, 0.32) !important; background: rgba(239, 68, 68, 0.08) !important; }
+        .btn-action.danger-text:hover { color: #fecaca !important; background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.5) !important; }
+        .quota-label { font-size: 10px; font-weight: 500; }
+        .progress-bar { height: 6px; border-radius: 999px; }
+        .progress-fill { border-radius: 999px; }
+        .argon-quota-item .quota-label span:first-child { color: #a78bfa; font-weight: 600; }`);
+
+  const loadAccountsStart = `    async function loadAccounts() {
+      accountListContainer.innerHTML = '<div class="empty-hint">正在载入中...</div>';
+      try {
+        const res = await electron_1.ipcRenderer.invoke('accounts:list');`;
+  requireSingleAnchor(output, loadAccountsStart, 'account modal loadAccounts start');
+  output = output.replace(loadAccountsStart, `    async function loadAccounts(forceIpc) {
+      const hasMemoryCache = !forceIpc && Array.isArray(window.antigravityAccounts) && window.antigravityAccounts.length > 0;
+      if (!hasMemoryCache) accountListContainer.innerHTML = '<div class="empty-hint">正在载入中...</div>';
+      try {
+        const res = hasMemoryCache
+          ? { accounts: window.antigravityAccounts.slice(), currentAccountId: window.antigravityCurrentAccount || '' }
+          : await electron_1.ipcRenderer.invoke('accounts:list');
+        if (hasMemoryCache) {
+          electron_1.ipcRenderer.invoke('accounts:list').then(fresh => {
+            if (!fresh || !Array.isArray(fresh.accounts)) return;
+            const prevSig = (window.antigravityCurrentAccount || '') + ':' + (window.antigravityAccounts || []).map(a => a.id + ':' + a.storageState).join(',');
+            const nextSig = (fresh.currentAccountId || '') + ':' + fresh.accounts.map(a => a.id + ':' + a.storageState).join(',');
+            window.antigravityAccounts = fresh.accounts;
+            setAgyCurrentQuotaAccount(fresh.currentAccountId || '');
+            if (prevSig !== nextSig) loadAccounts(true);
+          }).catch(() => {});
+        }`);
+
+  const cardAccountId = '          const accId = acc.id;';
+  requireSingleAnchor(output, cardAccountId, 'account card cache id');
+  output = output.replace(cardAccountId, `${cardAccountId}\n          const cachedAge = Date.now() - Number(localStorage.getItem('quota_' + accId + '_checked_at') || 0);\n          const freshCache = cachedAge >= 0 && cachedAge < 300000;`);
+  for (const suffix of ['gemini_weekly', 'gemini_5h', 'claude_weekly', 'claude_5h']) {
+    const value = `localStorage.getItem('quota_' + accId + '_${suffix}')`;
+    requireSingleAnchor(output, value, 'account card cache ' + suffix);
+    output = output.replace(value, `(freshCache ? ${value} : null)`);
+  }
+
+  const c5hCacheLine = "          const thisC5h = (freshCache ? localStorage.getItem('quota_' + accId + '_claude_5h') : null) || (isCurrent ? (localStorage.getItem('quota_claude_5h') || '--') : '--');";
+  requireSingleAnchor(output, c5hCacheLine, 'account card c5h cache line');
+  output = output.replace(c5hCacheLine, `${c5hCacheLine}
+          const thisArgonWeekly = (freshCache ? localStorage.getItem('quota_' + accId + '_argon_weekly') : null) || (isCurrent && freshCache ? (localStorage.getItem('quota_argon_weekly') || '--') : '--');
+          const thisArgonVerified = /^\\d+%$/.test(String(thisArgonWeekly || ''));
+          const thisArgonCap = thisArgonVerified || (freshCache && localStorage.getItem('quota_' + accId + '_argon_cap') === '1') || (isCurrent && ((document.getElementById('antigravity-quota-widget')?.shadowRoot?.querySelector('.quota-title')?.textContent || '').toLowerCase().includes('argon')));`);
 
   const cardQuotaEnd = `              <div class="quota-item">
                 <div class="quota-label"><span>Gemini 5H 额度</span><span class="val-g-5h">${'${thisG5h}'}</span></div>
@@ -278,23 +383,39 @@ function enhanceArgonQuotaWidget(source) {
               </div>`;
   requireSingleAnchor(output, cardQuotaEnd, 'account card Gemini 5H quota');
   output = output.replace(cardQuotaEnd, `${cardQuotaEnd}
-              <div class="quota-item argon-quota-item" style="display:none; grid-column:1 / -1;">
-                <div class="quota-label"><span>Gemini 4 Argon 每周额度</span><span class="val-argon-weekly">--</span></div>
-                <div class="progress-bar"><div class="progress-fill gemini fill-argon-weekly" style="width:0%"></div></div>
+              <div class="quota-item argon-quota-item" style="display:${"${thisArgonCap ? '' : 'none'}"}; grid-column:1 / -1;">
+                <div class="quota-label"><span>Gemini 4 Argon 每周额度</span><span class="val-argon-weekly">${"${thisArgonVerified ? thisArgonWeekly : (thisArgonCap ? '待确认' : '--')}"}</span></div>
+                <div class="progress-bar"><div class="progress-fill gemini fill-argon-weekly" style="width:${"${thisArgonVerified ? thisArgonWeekly : '0%'}"}; background-color:${"${thisArgonVerified ? getQuotaColor(thisArgonWeekly) : 'transparent'}"}"></div></div>
               </div>`);
 
   const storeQuota = "                  localStorage.setItem('quota_' + acc.id + '_claude_5h', qRes.quota.claude5h);";
   requireSingleAnchor(output, storeQuota, 'account card quota persistence');
   output = output.replace(storeQuota, `${storeQuota}
-                  if (qRes.capabilities && qRes.capabilities.argon && /^\\d+%$/.test(String(qRes.quota.argonWeekly || ''))) {
+                  localStorage.setItem('quota_' + acc.id + '_checked_at', String(Date.now()));
+                  localStorage.setItem('quota_' + acc.id + '_argon_cap', (qRes.capabilities && qRes.capabilities.argon) ? '1' : '0');
+                  if (qRes.capabilities && qRes.capabilities.argon) {
                     const argonItem = card.querySelector('.argon-quota-item');
                     const argonValue = card.querySelector('.val-argon-weekly');
                     const argonFill = card.querySelector('.fill-argon-weekly');
                     if (argonItem) argonItem.style.display = '';
-                    if (argonValue) argonValue.textContent = qRes.quota.argonWeekly;
-                    if (argonFill) { argonFill.style.width = qRes.quota.argonWeekly; argonFill.style.backgroundColor = getQuotaColor(qRes.quota.argonWeekly); }
-                    localStorage.setItem('quota_' + acc.id + '_argon_weekly', qRes.quota.argonWeekly);
-                    if (isCurrent) localStorage.setItem('quota_argon_weekly', qRes.quota.argonWeekly);
+                    const verified = /^\\d+%$/.test(String(qRes.quota.argonWeekly || ''));
+                    const lastSeen = qRes.argonCapabilityStatus === 'previously-available' && /^\d+%$/.test(String(qRes.argonLastKnown?.lastPercent || ''))
+                      ? '上次 ' + qRes.argonLastKnown.lastPercent + '（非实时）' : '待确认';
+                    if (argonValue) argonValue.textContent = verified ? qRes.quota.argonWeekly : lastSeen;
+                    if (!verified) {
+                      localStorage.removeItem('quota_' + acc.id + '_argon_weekly');
+                      if (isCurrent && window.antigravityCurrentAccount === acc.id) localStorage.removeItem('quota_argon_weekly');
+                    }
+                    if (argonFill) { argonFill.style.width = verified ? qRes.quota.argonWeekly : '0%'; argonFill.style.backgroundColor = verified ? getQuotaColor(qRes.quota.argonWeekly) : 'transparent'; }
+                    if (verified) {
+                      localStorage.setItem('quota_' + acc.id + '_argon_weekly', qRes.quota.argonWeekly);
+                      if (isCurrent && window.antigravityCurrentAccount === acc.id) localStorage.setItem('quota_argon_weekly', qRes.quota.argonWeekly);
+                    }
+                  } else {
+                    const argonItem = card.querySelector('.argon-quota-item');
+                    if (argonItem) argonItem.style.display = 'none';
+                    localStorage.removeItem('quota_' + acc.id + '_argon_weekly');
+                    if (isCurrent && window.antigravityCurrentAccount === acc.id) localStorage.removeItem('quota_argon_weekly');
                   }`);
   return output;
 }
@@ -431,16 +552,63 @@ function buildIpcHandlers(official, legacy) {
   if (outputFinalBrace < 0) throw new Error('Official ipcHandlers final brace is missing');
   output = `${output.slice(0, outputFinalBrace)}\n${suffix}\n${output.slice(outputFinalBrace)}`;
   output = hardenAccountSwitch(output);
-  output = replaceBetween(output, '            // B. 获取配额数据', '        } catch (err) {\n            return { success: false, error: err.message };\n        }\n    });\n\n    // 注入：export-local-account', [
+  output = replaceBetween(output, '            // A. 静默换取 access_token', '        } catch (err) {\n            return { success: false, error: err.message };\n        }\n    });\n\n    // 注入：export-local-account', [
     '            const registryPath = path.join(accountRoot, "accounts.json");',
     '            const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, "utf8")) : {};',
-    '            const liveQuota = await require("./antigravityQuotaBridge").fetchLiveQuotaSummary({ timeoutMs: 1600 }).catch(() => null);',
-    '            return await require("./accountQuota").fetchAccountQuota({',
+    '            const isCurrentAccount = String(registry.current_account_id || "") === String(accountId);',
+    '            const accountQuotaMod = require("./accountQuota");',
+    '            const liveQuota = isCurrentAccount ? await require("./antigravityQuotaBridge").fetchLiveQuotaSummary({ cacheKey: String(accountId), timeoutMs: 2200, maxAttempts: 2 }).catch(() => null) : null;',
+    '            const localSummary = isCurrentAccount && liveQuota?.summary ? accountQuotaMod.parseQuotaSummary(liveQuota.summary) : {};',
+    '            const hasCompleteLocal = ["gemini5h", "geminiWeekly", "claude5h", "claudeWeekly"].every(f => localSummary[f] !== undefined);',
+    '            let accessToken = "local-language-service";',
+    '            if (!hasCompleteLocal) {',
+    '                const tokenCache = global.__agyOAuthTokenCache || (global.__agyOAuthTokenCache = new Map());',
+    '                const cacheKey = `${accountId}:${String(tokenObj.refresh_token).slice(-16)}`;',
+    '                const cachedToken = tokenCache.get(cacheKey);',
+    '                if (cachedToken && Date.now() < cachedToken.expiresAt) {',
+    '                    accessToken = cachedToken.accessToken;',
+    '                } else {',
+    '                    const tokenUrl = "https://oauth2.googleapis.com/token";',
+    '                    const params = new URLSearchParams();',
+    '                    params.append("client_id", "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com");',
+    '                    params.append("client_secret", "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");',
+    '                    params.append("refresh_token", tokenObj.refresh_token);',
+    '                    params.append("grant_type", "refresh_token");',
+    '                    const tokenRes = await net.fetch(tokenUrl, {',
+    '                        method: "POST",',
+    '                        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+    '                        body: params.toString()',
+    '                    });',
+    '                    if (!tokenRes.ok) {',
+    '                        const errTxt = await tokenRes.text();',
+    '                        throw new Error(`令牌获取失败: ${errTxt}`);',
+    '                    }',
+    '                    const tokenData = await tokenRes.json();',
+    '                    accessToken = tokenData.access_token;',
+    '                    tokenCache.set(cacheKey, { accessToken, expiresAt: Date.now() + 45 * 60 * 1000 });',
+    '                }',
+    '            }',
+    '            const result = await require("./accountQuota").fetchAccountQuota({',
     '                fetch: net.fetch.bind(net), accessToken,',
     '                projectId: tokenObj.project_id || detail.project_id,',
     '                clientVersion: liveQuota?.appVersion,',
-    '                supplementalQuotaSummary: String(registry.current_account_id || "") === String(accountId) ? liveQuota?.summary : null',
-    '            });'
+    '                supplementalQuotaSummary: isCurrentAccount ? liveQuota?.summary : null',
+    '            });',
+    '            if (isCurrentAccount) {',
+    '                const latest = JSON.parse(fs.readFileSync(registryPath, "utf8"));',
+    '                if (String(latest.current_account_id || "") !== String(accountId)) return { success: false, code: "ACCOUNT_CHANGED", error: "当前账号已改变，请刷新额度" };',
+    '            }',
+    '            let scopedResult = result;',
+    '            try {',
+    '                const evidence = require("./argonEvidence");',
+    '                const home = require("os").homedir();',
+    '                if (result.success && result.capabilities && result.capabilities.argon) {',
+    '                    evidence.rememberEvidence(home, accountId, tokenObj.refresh_token, result);',
+    '                } else if (result.success) {',
+    '                    scopedResult = evidence.decorateQuotaWithEvidence(result, evidence.readEvidence(home, accountId, tokenObj.refresh_token));',
+    '                }',
+    '            } catch (_) { /* optional local positive evidence cache */ }',
+    '            return scopedResult;'
   ].join('\n'), 'shared per-account quota query');
   return output;
 }
@@ -583,6 +751,10 @@ function buildCompatibleTree(options) {
   syntaxCheck('dist/accountQuota.js', quotaSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'accountQuota.js'), quotaSource, 'utf8');
   report.files.push({ file: 'dist/accountQuota.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(quotaSource) });
+  const evidenceSource = readPatchWorkbenchResource('argonEvidence.js');
+  syntaxCheck('dist/argonEvidence.js', evidenceSource);
+  fs.writeFileSync(path.join(officialDir, 'dist', 'argonEvidence.js'), evidenceSource, 'utf8');
+  report.files.push({ file: 'dist/argonEvidence.js', addedByPatch: true, rebuiltBytes: Buffer.byteLength(evidenceSource) });
   const quotaBridgeSource = readPatchWorkbenchResource('antigravityQuotaBridge.js');
   syntaxCheck('dist/antigravityQuotaBridge.js', quotaBridgeSource);
   fs.writeFileSync(path.join(officialDir, 'dist', 'antigravityQuotaBridge.js'), quotaBridgeSource, 'utf8');

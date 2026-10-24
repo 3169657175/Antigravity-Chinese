@@ -61,7 +61,20 @@ function applyFeedbackLikeVisual(id, liked, count) {
 
 function renderFeedbackDetailFromState(id) {
   const item = feedbackFromState(id);
-  if (item) renderDetailModalContentDesktop(item);
+  if (item) {
+    const scroller = document.getElementById('detail-modal-body');
+    const oldInput = document.getElementById(`modal-reply-text-${id}`);
+    const scrollTop = scroller?.scrollTop || 0;
+    const text = oldInput?.value || '';
+    const hadFocus = oldInput === document.activeElement;
+    renderDetailModalContentDesktop(item);
+    if (scroller) scroller.scrollTop = scrollTop;
+    const nextInput = document.getElementById(`modal-reply-text-${id}`);
+    if (nextInput) {
+      nextInput.value = text;
+      if (hadFocus) nextInput.focus({ preventScroll: true });
+    }
+  }
   const count = document.getElementById(`main-comment-count-${id}`);
   if (count && item) count.textContent = Array.isArray(item.replies) ? item.replies.length : 0;
 }
@@ -74,6 +87,10 @@ async function reconcileFeedbacksInBackground() {
     communityState?.setAll(res.data);
     syncCommunityStateToWindow();
     if (document.getElementById('tab-feedback')?.classList.contains('active')) await loadFeedbacks(true, { silent: true });
+    const detailModal = document.getElementById('feedback-detail-modal');
+    if (detailModal?.classList.contains('active') && detailModal.dataset.feedbackId) {
+      renderFeedbackDetailFromState(detailModal.dataset.feedbackId);
+    }
     return true;
   } catch (error) {
     console.warn('[Community] background reconcile failed:', error.message);
@@ -134,20 +151,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   logToTerminal('[Info] 正在初始化 AGY Hub 核心引擎...');
   window.AgyFeatureFlags?.apply?.();
   ensureAuthLoaded();
-
+  
   // 绑定窗口控制按钮
   btnMinimize.addEventListener('click', () => window.agyHubAPI.minimizeWindow());
   btnClose.addEventListener('click', () => window.agyHubAPI.closeWindow());
 
   // 绑定选项卡点击切换
   window.AgyNavigationController.bind({ navItems, tabPanes, onNavigate: (targetId, item) => {
-
+      
       // 切换导航项 Active
       // Active state is owned by navigationController.js.
 
       // 切换面板 Active
       const targetPane = document.getElementById(targetId);
-
+      
       logToTerminal(`[Navigate] 切换至选项卡: ${item.querySelector('.nav-text').textContent}`);
 
       // 动态载入联动
@@ -185,11 +202,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 【性能优化】：将原本阻塞首屏渲染的串行磁盘/IO检测重构为并发异步非阻塞加载，首屏秒开！
   initPatchPage().then(() => Promise.all([initNetworkStatus(), initPatchDeveloperMode()])).then(() => {
-    logToTerminal('[System] 核心管理组件并发初始化就绪，冷工业极简模式载入成功。');
+    logToTerminal('[System] 核心管理组件并发初始化就绪。');
   }).catch(err => {
     logToTerminal(`组件载入异常: ${err.message}`, 'error');
   });
-  initThemeManager();
+  scheduleAfterPaint(() => initThemeManager());
 });
 
 async function initMarketplace() {
@@ -213,13 +230,24 @@ async function loadLocalAccounts() {
 }
 
 function logToTerminal(msg, type = 'info') {
+  if (!logTerminal) return;
   const time = new Date().toLocaleTimeString();
-  let prefix = '[LOG]';
-  if (type === 'error') prefix = '❌ [ERROR]';
-  if (type === 'success') prefix = '✅ [SUCCESS]';
+  let prefix = '[INFO]';
+  if (type === 'error') prefix = '[ERROR]';
+  if (type === 'success') prefix = '[OK]';
 
-  logTerminal.innerHTML += `\n[${time}] ${prefix} ${msg}`;
-  logTerminal.scrollTop = logTerminal.scrollHeight; // 滚动到底部
+  logTerminal.appendChild(document.createTextNode(`\n[${time}] ${prefix} ${msg}`));
+  if (logTerminal.childNodes.length > 180) {
+    while (logTerminal.childNodes.length > 120) {
+      logTerminal.removeChild(logTerminal.firstChild);
+    }
+  }
+  const bar = document.getElementById('bottom-terminal-bar');
+  if (bar && !bar.classList.contains('collapsed')) {
+    requestAnimationFrame(() => {
+      logTerminal.scrollTop = logTerminal.scrollHeight;
+    });
+  }
 }
 
 // ==========================================
@@ -302,7 +330,7 @@ if (btnSaveNetwork && switchNetworkBypass) {
         }
 
         logToTerminal(`[Network] 本地代理服务连接测试成功，握手耗时正常。`, 'success');
-
+        
         const saveRes = await window.agyHubAPI.saveNetworkConfig({ mode: 'bypass', active: true, port: port });
         if (saveRes.success) {
           logToTerminal(`[Network] 免 TUN 局部加速代理已成功保存并激活！配置存入: ${saveRes.path}`, 'success');
@@ -399,7 +427,7 @@ if (btnToggleTerminal && terminalBar) {
   btnToggleTerminal.addEventListener('click', () => {
     const isExpanded = terminalBar.classList.toggle('expanded');
     btnToggleTerminal.textContent = isExpanded ? '隐藏日志' : '显示日志';
-
+    
     // 同步给父容器 main-wrapper 切换高度避让 class
     const mainWrapper = document.querySelector('.main-wrapper');
     if (mainWrapper) {
@@ -414,7 +442,7 @@ if (btnToggleTerminal && terminalBar) {
     let prefix = '[LOG]';
     if (type === 'error') prefix = '❌ [ERROR]';
     if (type === 'success') prefix = '✅ [SUCCESS]';
-
+    
     logTerminal.innerHTML += `\n[${time}] ${prefix} ${msg}`;
     logTerminal.scrollTop = logTerminal.scrollHeight;
   };
@@ -428,7 +456,33 @@ let uploadedImageUrl = ''; // 全局保存发帖已上传图片的 R2 CDN 链接
 let uploadedAnnImageUrl = ''; // 全局保存发布公告已上传图片的 R2 CDN 链接
 let uploadTarget = 'feedback'; // 'feedback' 或 'announcement'
 let feedbackVisibleLimit = 20;
+let feedbackCurrentPage = 1;
+const FEEDBACK_PAGE_SIZE = 4;
+let announcementCurrentPage = 1;
+const ANNOUNCEMENT_PAGE_SIZE = 4;
+let cachedAnnouncementsPayload = null;
 const replyImageDrafts = new Map();
+
+function renderPaginationButtons(containerEl, currentPage, totalPages, onPageSelect) {
+  if (!containerEl) return;
+  containerEl.replaceChildren();
+  const maxButtons = 5;
+  let start = Math.max(1, currentPage - 2);
+  let end = Math.min(totalPages, start + maxButtons - 1);
+  if (end - start + 1 < maxButtons) {
+    start = Math.max(1, end - maxButtons + 1);
+  }
+  for (let p = start; p <= end; p++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `page-num-btn${p === currentPage ? ' active' : ''}`;
+    btn.textContent = String(p);
+    btn.addEventListener('click', () => {
+      if (p !== currentPage) onPageSelect(p);
+    });
+    containerEl.appendChild(btn);
+  }
+}
 
 async function uploadCommunityImageFile(file, context) {
   if (!currentUser || !currentUser.token) return { success: false, error: '请先登录后再上传图片' };
@@ -486,8 +540,91 @@ function initFeedbackBoard() {
     authModal.setAttribute('aria-hidden', 'true');
   };
 
+  const feedbackComposeModal = document.getElementById('feedback-compose-modal');
+  const btnOpenFeedbackModal = document.getElementById('btn-open-feedback-modal');
+  const btnCloseFeedbackCompose = document.getElementById('btn-close-feedback-compose');
+
+  const showFeedbackComposeModal = () => {
+    if (!feedbackComposeModal) return;
+    feedbackComposeModal.style.display = 'flex';
+    setTimeout(() => {
+      const ta = document.getElementById('input-feedback-content');
+      if (ta && !ta.disabled) ta.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  const hideFeedbackComposeModal = () => {
+    if (!feedbackComposeModal) return;
+    feedbackComposeModal.style.display = 'none';
+  };
+
+  if (btnOpenFeedbackModal) {
+    btnOpenFeedbackModal.addEventListener('click', () => {
+      if (!currentUser) {
+        showAuthModal();
+        return;
+      }
+      showFeedbackComposeModal();
+    });
+  }
+  if (btnCloseFeedbackCompose) {
+    btnCloseFeedbackCompose.addEventListener('click', hideFeedbackComposeModal);
+  }
+  if (feedbackComposeModal) {
+    feedbackComposeModal.addEventListener('click', (e) => {
+      if (e.target === feedbackComposeModal) hideFeedbackComposeModal();
+    });
+  }
+
+  const announcementComposeModal = document.getElementById('announcement-compose-modal');
+  const btnOpenAnnouncementModal = document.getElementById('btn-open-announcement-modal');
+  const btnCloseAnnouncementCompose = document.getElementById('btn-close-announcement-compose');
+
+  const showAnnouncementComposeModal = () => {
+    if (!announcementComposeModal) return;
+    announcementComposeModal.style.display = 'flex';
+    setTimeout(() => {
+      const ta = document.getElementById('input-announce-content');
+      if (ta) ta.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  const hideAnnouncementComposeModal = () => {
+    if (!announcementComposeModal) return;
+    announcementComposeModal.style.display = 'none';
+  };
+
+  if (btnOpenAnnouncementModal) {
+    btnOpenAnnouncementModal.addEventListener('click', () => {
+      const editIdEl = document.getElementById('input-announce-edit-id');
+      const contentEl = document.getElementById('input-announce-content');
+      const titleEl = document.getElementById('text-ann-form-title');
+      const pubBtn = document.getElementById('btn-publish-announcement');
+      const cancelBtn = document.getElementById('btn-cancel-ann-edit');
+      const rmImgBtn = document.getElementById('btn-remove-ann-uploaded-img');
+      if (editIdEl) editIdEl.value = '';
+      if (contentEl) contentEl.value = '';
+      if (rmImgBtn) rmImgBtn.click();
+      if (titleEl) titleEl.textContent = '发布系统新公告';
+      if (pubBtn) pubBtn.textContent = '发布公告';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      showAnnouncementComposeModal();
+    });
+  }
+  if (btnCloseAnnouncementCompose) {
+    btnCloseAnnouncementCompose.addEventListener('click', hideAnnouncementComposeModal);
+  }
+  if (announcementComposeModal) {
+    announcementComposeModal.addEventListener('click', (e) => {
+      if (e.target === announcementComposeModal) hideAnnouncementComposeModal();
+    });
+  }
+
   if (btnTitlebarLogin) btnTitlebarLogin.addEventListener('click', showAuthModal);
-  if (btnLockTriggerLogin) btnLockTriggerLogin.addEventListener('click', showAuthModal);
+  if (btnLockTriggerLogin) btnLockTriggerLogin.addEventListener('click', () => {
+    hideFeedbackComposeModal();
+    showAuthModal();
+  });
   if (btnCloseAuthModal) btnCloseAuthModal.addEventListener('click', hideAuthModal);
 
   if (authModal) {
@@ -679,18 +816,18 @@ function initFeedbackBoard() {
           logToTerminal(`[Auth] 新账号 @${username} 注册成功。`, 'success');
           inputRegUser.value = '';
           inputRegPass.value = '';
-
+          
           // 自动平滑切换到登录面板
           btnTabLogin.click();
           inputLoginUser.value = username;
           inputLoginPass.value = '';
-
+          
           showAuthBanner(`🎉 账号 @${username} 注册成功！请输入密码完成登录。`, 'success');
-
+          
           try {
             await window.agyHubAPI.focusMainWindow();
           } catch (_) {}
-
+          
           setTimeout(() => {
             if (inputLoginPass) {
               inputLoginPass.focus({ preventScroll: true });
@@ -767,7 +904,7 @@ function initFeedbackBoard() {
   const btnTriggerUpload = document.getElementById('btn-trigger-upload');
   const btnTriggerAnnUpload = document.getElementById('btn-trigger-ann-upload');
   const inputFileImage = document.getElementById('input-file-image');
-
+  
   // 反馈预览
   const uploadPreviewWrapper = document.getElementById('upload-preview-wrapper');
   const imgUploadPreview = document.getElementById('img-upload-preview');
@@ -894,16 +1031,18 @@ function initFeedbackBoard() {
       };
       communityState?.upsert?.(pending);
       syncCommunityStateToWindow();
+      feedbackCurrentPage = 1;
       await loadFeedbacks(true, { silent: true });
       inputFeedbackContent.value = '';
       if (textCharCounter) textCharCounter.textContent = '0 / 500';
       btnSendFeedback.disabled = true;
       btnSendFeedback.textContent = '发送中…';
+      hideFeedbackComposeModal();
 
       const imageAtSubmit = uploadedImageUrl;
       const res = await window.agyHubAPI.submitFeedback(content, imageAtSubmit);
       btnSendFeedback.disabled = false;
-      btnSendFeedback.textContent = '发送';
+      btnSendFeedback.textContent = '发送反馈';
       if (res.success) {
         if (btnRemoveUploadedImg) btnRemoveUploadedImg.click();
         logToTerminal('[Feedback] 反馈已提交，正在后台同步真实数据。', 'success');
@@ -914,6 +1053,7 @@ function initFeedbackBoard() {
         syncCommunityStateToWindow();
         await loadFeedbacks(true, { silent: true });
         inputFeedbackContent.value = content;
+        showFeedbackComposeModal();
         const handled = await handleSessionExpiry(res.error);
         if (!handled) uiFeedback.notify(res.error || '发送失败', 'error', { title: '反馈发送失败' });
         logToTerminal(`[Feedback] 提交失败: ${res.error}`, 'error');
@@ -976,12 +1116,14 @@ function initFeedbackBoard() {
         if (annRes.ok && annResult.success) {
           logToTerminal(editId ? `[Admin] 成功更新公告 ID: ${editId}` : '[Admin] 云端新公告发布成功！', 'success');
           uiFeedback.notify(editId ? '公告修改成功' : '公告发布成功', 'success');
-
+          
           inputAnnounceContent.value = '';
           inputAnnounceEditId.value = '';
           if (btnRemoveAnnUploadedImg) btnRemoveAnnUploadedImg.click();
           if (btnCancelAnnEdit) btnCancelAnnEdit.click();
-
+          hideAnnouncementComposeModal();
+          if (!editId) announcementCurrentPage = 1;
+          
           loadAnnouncementHistory();
           loadAnnouncementSystemDesktop();
         } else {
@@ -1002,9 +1144,10 @@ function initFeedbackBoard() {
       inputAnnounceEditId.value = '';
       inputAnnounceContent.value = '';
       if (btnRemoveAnnUploadedImg) btnRemoveAnnUploadedImg.click();
-      if (textAnnFormTitle) textAnnFormTitle.textContent = '📢 发布系统新公告';
+      if (textAnnFormTitle) textAnnFormTitle.textContent = '发布系统新公告';
       btnPublishAnnouncement.textContent = '发布公告';
       btnCancelAnnEdit.style.display = 'none';
+      hideAnnouncementComposeModal();
     });
   }
 
@@ -1045,8 +1188,8 @@ async function loadAdminUserData() { return window.AgyAdminCommunity.loadUsers()
 async function handleSessionExpiry(errorMsg) {
   logToTerminal(`[DEBUG] 进入会话失效校验，错误消息为: "${errorMsg}"`, 'info');
   const isExpired = errorMsg && (
-    errorMsg.includes('请先登录') ||
-    errorMsg.includes('会话已') ||
+    errorMsg.includes('请先登录') || 
+    errorMsg.includes('会话已') || 
     errorMsg.includes('Token') ||
     errorMsg.includes('未登录') ||
     errorMsg.includes('已过期')
@@ -1064,7 +1207,7 @@ function updateAuthUI() {
   const btnTitlebarLogin = document.getElementById('btn-titlebar-login');
   const dropdownUser = document.getElementById('titlebar-user-dropdown');
   const textTitlebarUsername = document.getElementById('text-titlebar-username');
-
+  
   const writeLockOverlay = document.getElementById('write-lock-overlay');
   const inputFeedbackContent = document.getElementById('input-feedback-content');
   const btnTriggerUpload = document.getElementById('btn-trigger-upload');
@@ -1157,19 +1300,59 @@ async function loadFeedbacks(useCache = false, options = {}) {
   else if (communityState && !communityState.all().length) communityState.setAll(nextItems);
   syncCommunityStateToWindow();
   if (!communityState) window.currentFeedbacksDesktop = nextItems;
-  if (res.stale && !options.silent) uiFeedback.notify(res.warning || '网络不可用，正在显示最近一次成功同步的数据', 'info', { title: '离线只读' });
   const list = window.AgyCommunityData.feedbacks(window.currentFeedbacksDesktop, document.getElementById('feedback-sort').value, document.getElementById('feedback-search').value);
   document.getElementById('feedback-result-count').textContent = list.length + ' 条反馈';
-  if (!list.length) { container.innerHTML = '<div class="no-data-tip">没有匹配的反馈，试试其他显示顺序或搜索条件。</div>'; return; }
-  const visibleItems = list.slice(0, feedbackVisibleLimit);
+  const paginationBar = document.getElementById('feedback-pagination');
+  const pageInfo = document.getElementById('feedback-page-info');
+  const prevBtn = document.getElementById('feedback-page-prev');
+  const nextBtn = document.getElementById('feedback-page-next');
+  const pageNumbersEl = document.getElementById('feedback-page-numbers');
+
+  if (!list.length) {
+    container.innerHTML = '<div class="no-data-tip">没有匹配的反馈，试试其他显示顺序或搜索条件。</div>';
+    if (paginationBar) paginationBar.style.display = 'none';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(list.length / FEEDBACK_PAGE_SIZE));
+  feedbackCurrentPage = Math.min(Math.max(1, feedbackCurrentPage), totalPages);
+  const startIndex = (feedbackCurrentPage - 1) * FEEDBACK_PAGE_SIZE;
+  const visibleItems = list.slice(startIndex, startIndex + FEEDBACK_PAGE_SIZE);
+
+  if (paginationBar) {
+    paginationBar.style.display = 'flex';
+    if (pageInfo) pageInfo.textContent = `第 ${feedbackCurrentPage} / ${totalPages} 页 · 共 ${list.length} 条反馈`;
+    if (prevBtn) {
+      prevBtn.disabled = feedbackCurrentPage <= 1;
+      prevBtn.onclick = () => {
+        if (feedbackCurrentPage > 1) {
+          feedbackCurrentPage--;
+          loadFeedbacks(true, { silent: true });
+        }
+      };
+    }
+    if (nextBtn) {
+      nextBtn.disabled = feedbackCurrentPage >= totalPages;
+      nextBtn.onclick = () => {
+        if (feedbackCurrentPage < totalPages) {
+          feedbackCurrentPage++;
+          loadFeedbacks(true, { silent: true });
+        }
+      };
+    }
+    renderPaginationButtons(pageNumbersEl, feedbackCurrentPage, totalPages, (p) => {
+      feedbackCurrentPage = p;
+      loadFeedbacks(true, { silent: true });
+    });
+  }
 
   let html = '';
   visibleItems.forEach(fb => {
     const isOwnerOrAdmin = currentUser && (currentUser.role === 'admin' || currentUser.username === fb.username);
-    const deleteButton = isOwnerOrAdmin
-      ? `<button class="btn-delete-fb" data-id="${fb.id}" title="删除该反馈">🗑️ 删除</button>`
+    const deleteButton = isOwnerOrAdmin 
+      ? `<button class="btn-delete-fb" data-id="${fb.id}" title="删除该反馈">删除</button>`
       : '';
-
+      
     const isAdminAuthor = fb.role === 'admin';
     const authorClass = isAdminAuthor ? 'feedback-author admin-author' : 'feedback-author';
     const dateText = fb.pending ? '发送中…' : new Date(fb.created_at).toLocaleString();
@@ -1183,8 +1366,8 @@ async function loadFeedbacks(useCache = false, options = {}) {
     // B. 内容大于 120 字截断
     const isLong = fb.content.length > 120;
     const displayContent = isLong ? escapeHTML(fb.content.slice(0, 120)) + '...' : escapeHTML(fb.content);
-    const showMoreBtn = isLong
-      ? `<button class="show-detail-btn" style="background: rgba(0, 245, 255, 0.05); border: 1px dashed rgba(0, 245, 255, 0.2); color: var(--neon-cyan); padding: 4px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;">📖 展开全文</button>`
+    const showMoreBtn = isLong 
+      ? `<button class="show-detail-btn">展开全文</button>` 
       : '';
 
     const heartSvg = `
@@ -1197,9 +1380,10 @@ async function loadFeedbacks(useCache = false, options = {}) {
 
     // C. 点赞和回复操作栏 (小红书心形点赞 + 评论数)
     const postActionBar = `
-      <div class="post-action-bar" style="display: flex; gap: 16px; align-items: center; margin-top: 12px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.02); padding-top: 8px;">
-        <button type="button" class="action-text-btn" style="color: var(--text-muted); font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; background: transparent; border: none; cursor: pointer;">
-          💬 <span id="main-comment-count-${fb.id}">${repliesCount}</span> 条评论
+      <div class="post-action-bar">
+        <button type="button" class="action-text-btn">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span id="main-comment-count-${fb.id}">${repliesCount}</span> 条评论
         </button>
         <button type="button" class="heart-like-btn ${fb.has_liked ? 'liked' : ''}" data-id="${fb.id}" id="like-btn-${fb.id}">
           ${heartSvg}
@@ -1209,7 +1393,7 @@ async function loadFeedbacks(useCache = false, options = {}) {
     `;
 
     html += `
-      <div class="feedback-item${fb.pending ? ' is-pending' : ''}" data-id="${fb.id}" style="cursor: pointer; margin-bottom: 12px;">
+      <div class="feedback-item${fb.pending ? ' is-pending' : ''}" data-id="${fb.id}" style="cursor: pointer;">
         <div class="feedback-meta">
           <span class="${authorClass}">${safeDom.text(fb.username)}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -1225,14 +1409,7 @@ async function loadFeedbacks(useCache = false, options = {}) {
     `;
   });
 
-  if (visibleItems.length < list.length) {
-    html += `<div class="community-load-more"><button type="button" class="btn btn-secondary" id="btn-load-more-feedbacks">加载更多</button><span>已显示 ${visibleItems.length} / ${list.length}</span></div>`;
-  }
   container.innerHTML = html;
-  container.querySelector('#btn-load-more-feedbacks')?.addEventListener('click', () => {
-    feedbackVisibleLimit += 20;
-    loadFeedbacks(true, { silent: true });
-  });
   if (res.fromCache) void reconcileFeedbacksInBackground();
 
   // 1. 物理级级联删除绑定（乐观移除 + 失败回滚）
@@ -1307,6 +1484,7 @@ async function openFeedbackDetailDesktop(id) {
   const fb = window.currentFeedbacksDesktop ? window.currentFeedbacksDesktop.find(f => String(f.id) === String(id)) : null;
   if (!fb) return;
 
+  modal.dataset.feedbackId = String(id);
   renderDetailModalContentDesktop(fb);
   clearTimeout(modal._agyHideTimer);
   modal.classList.add('active');
@@ -1321,7 +1499,7 @@ function renderDetailModalContentDesktop(fb) {
 
   const dateStr = new Date(fb.created_at).toLocaleString();
   const detailImageUrl = safeDom.imageUrl(fb.image_url);
-  const imgTag = detailImageUrl
+  const imgTag = detailImageUrl 
     ? `<img src="${detailImageUrl}" class="feedback-image-preview detail-image img-trigger-lightbox" alt="反馈截图，点击查看原图">`
     : '';
 
@@ -1335,22 +1513,23 @@ function renderDetailModalContentDesktop(fb) {
   let repliesListHtml = '';
   if (fb.replies && fb.replies.length > 0) {
     repliesListHtml = fb.replies.map(r => {
-      const replyDate = r.pending ? '发送中…' : new Date(r.created_at).toLocaleString();
-      const deleteReplyBtn = (!r.pending && currentUser && (currentUser.role === 'admin' || currentUser.username === r.username))
-        ? `<button type="button" class="action-text-btn delete-btn" data-feedback-detail-action="delete-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" style="font-size:9px; margin-left:6px; color: #ef4444; border:none; background:transparent;">✕ 删除</button>`
+      const isTransientReply = Boolean(r.pending || r.syncing);
+      const replyDate = r.pending ? '发送中…' : r.syncing ? '已发送' : new Date(r.created_at).toLocaleString();
+      const deleteReplyBtn = (!isTransientReply && currentUser && (currentUser.role === 'admin' || currentUser.username === r.username))
+        ? `<button type="button" class="reply-delete-btn" data-feedback-detail-action="delete-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" title="删除此回复">✕ 删除</button>`
         : '';
       const isAdminReply = r.role === 'admin' ? 'admin' : '';
       const replyImageUrl = safeDom.imageUrl(r.image_url);
       const replyImage = replyImageUrl ? `<img src="${replyImageUrl}" class="reply-image-preview img-trigger-lightbox" alt="评论图片，点击查看原图" loading="lazy">` : '';
 
       return `
-        <article class="reply-item${r.pending ? ' is-pending' : ''}">
+        <article class="reply-item${r.pending ? ' is-pending' : r.syncing ? ' is-syncing' : ''}" data-reply-row="${r.id}">
           <div class="community-avatar small">${window.AgyCommunityMedia.avatarInitial(r.username)}</div>
           <div class="reply-content">
           <div class="reply-header">
             <span class="reply-author ${isAdminReply}">${escapeHTML(r.username)} ${isAdminReply ? '<span class="community-role-badge">管理员</span>' : ''}</span>
             <span class="community-time">
-              ${replyDate}
+              ${replyDate} 
               ${deleteReplyBtn}
             </span>
           </div>
@@ -1358,10 +1537,10 @@ function renderDetailModalContentDesktop(fb) {
           ${replyImage}
           <div class="reply-actions">
             <button type="button" class="action-text-btn" data-feedback-detail-action="focus-reply" data-reply-username="${escapeHTML(r.username)}">回复</button>
-            <button type="button" class="reply-like-btn ${r.has_liked ? 'liked' : ''}" data-feedback-detail-action="like-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" id="reply-like-btn-${r.id}">
+            ${isTransientReply ? '' : `<button type="button" class="reply-like-btn ${r.has_liked ? 'liked' : ''}" data-feedback-detail-action="like-reply" data-reply-id="${r.id}" data-feedback-id="${fb.id}" id="reply-like-btn-${r.id}">
               ${heartSvg}
               <span id="reply-like-count-${r.id}">${r.likes_count || 0}</span>
-            </button>
+            </button>`}
           </div>
           </div>
         </article>
@@ -1372,16 +1551,15 @@ function renderDetailModalContentDesktop(fb) {
   }
 
   const replyDraft = replyImageDrafts.get(String(fb.id));
-  const inputAreaHtml = currentUser
+  const inputAreaHtml = currentUser 
     ? `
       <div class="reply-composer">
-        <textarea id="modal-reply-text-${fb.id}" placeholder="写下回复，或直接 Ctrl+V 粘贴截图" class="reply-textarea" maxlength="500"></textarea>
-        ${replyDraft ? `<div class="reply-image-draft ${replyDraft.status || ''}"><img src="${safeDom.imageUrl(replyDraft.previewUrl || replyDraft.url)}" alt="待发送评论图片"><span>${replyDraft.status === 'loading' ? '正在上传…' : replyDraft.status === 'error' ? escapeHTML(replyDraft.error || '上传失败') : '图片已就绪'}</span><button type="button" data-feedback-detail-action="remove-reply-image" data-feedback-id="${fb.id}">移除</button></div>` : ''}
-        <div class="reply-composer-actions">
-          <button type="button" class="btn btn-secondary" data-feedback-detail-action="attach-reply-image" data-feedback-id="${fb.id}">添加图片</button>
-          <span>支持 PNG、JPG、GIF、WebP，最大 8MB</span>
-          <button type="button" class="btn btn-primary" data-feedback-detail-action="submit-reply" data-feedback-id="${fb.id}">发布回复</button>
+        <div class="reply-composer-row">
+          <button type="button" class="reply-attach-btn" data-feedback-detail-action="attach-reply-image" data-feedback-id="${fb.id}" title="添加图片，也可 Ctrl+V 粘贴截图" aria-label="添加图片">＋</button>
+          <input type="text" id="modal-reply-text-${fb.id}" placeholder="回复讨论…（支持 Ctrl+V 粘贴图片）" class="reply-textarea" maxlength="500" aria-label="回复内容">
+          <button type="button" class="btn btn-primary reply-submit-btn" data-feedback-detail-action="submit-reply" data-feedback-id="${fb.id}">发送</button>
         </div>
+        ${replyDraft ? `<div class="reply-image-draft ${replyDraft.status || ''}"><img src="${safeDom.imageUrl(replyDraft.previewUrl || replyDraft.url)}" alt="待发送评论图片"><span>${replyDraft.status === 'loading' ? '正在上传…' : replyDraft.status === 'error' ? escapeHTML(replyDraft.error || '上传失败') : '图片已就绪'}</span><button type="button" data-feedback-detail-action="remove-reply-image" data-feedback-id="${fb.id}">移除</button></div>` : ''}
       </div>
     `
     : `<div class="community-login-prompt">登录后即可参与讨论和上传图片。</div>`;
@@ -1411,15 +1589,16 @@ function renderDetailModalContentDesktop(fb) {
       </div>
     </section>
 
-    <!-- 评论发布提交区 -->
-    ${inputAreaHtml}
   `;
+  const modalComposer = document.getElementById('detail-modal-composer');
+  if (modalComposer) modalComposer.innerHTML = inputAreaHtml;
 
   // 严格 CSP (script-src 'self') 会拦截内联 onclick。
   // 详情弹窗统一使用事件委托，避免按钮看起来可点但实际没有任何响应。
-  modalBody.onclick = async (event) => {
+  const detailDialog = modalBody.closest('.feedback-detail-dialog');
+  if (detailDialog) detailDialog.onclick = async (event) => {
     const button = event.target.closest('[data-feedback-detail-action]');
-    if (!button || !modalBody.contains(button)) return;
+    if (!button || !detailDialog.contains(button)) return;
     const action = button.dataset.feedbackDetailAction;
     if (action === 'submit-reply') {
       await submitModalReplyDesktop(Number(button.dataset.feedbackId), button);
@@ -1442,6 +1621,12 @@ function renderDetailModalContentDesktop(fb) {
   };
 
   const replyTextarea = document.getElementById(`modal-reply-text-${fb.id}`);
+  replyTextarea?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.isComposing || event.repeat) return;
+    event.preventDefault();
+    const send = detailDialog?.querySelector('[data-feedback-detail-action="submit-reply"]');
+    if (send && !send.disabled) send.click();
+  });
   replyTextarea?.addEventListener('paste', event => {
     const file = window.AgyCommunityMedia.imageFromClipboardEvent(event);
     if (!file) return;
@@ -1515,11 +1700,13 @@ function selectReplyImageDesktop(feedbackId) {
 }
 
 // 提交回复评论
+const pendingReplySubmits = new Set();
 async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
   if (!currentUser) {
     uiFeedback.notify('请先登录后再发表评论', 'error', { title: '需要登录' });
     return;
   }
+  if (pendingReplySubmits.has(String(feedbackId))) return;
   const textarea = document.getElementById(`modal-reply-text-${feedbackId}`);
   if (!textarea) return;
   const content = textarea.value.trim();
@@ -1532,6 +1719,7 @@ async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
     uiFeedback.notify('回复文字和图片至少需要填写一项', 'error');
     return;
   }
+  pendingReplySubmits.add(String(feedbackId));
 
   const tempId = communityState?.pendingId?.('reply') || `reply-${Date.now()}`;
   const pendingReply = {
@@ -1573,9 +1761,11 @@ async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
       if (!handled) uiFeedback.notify(errorMessage, 'error', { title: '回复失败' });
       return;
     }
-    logToTerminal(`[Feedback] 成功发表评论 ID: ${feedbackId}`, 'success');
     replyImageDrafts.delete(String(feedbackId));
-    uiFeedback.notify('回复已发送', 'success');
+    communityState?.updateReply?.(feedbackId, tempId, { pending: false, syncing: true });
+    syncCommunityStateToWindow();
+    renderFeedbackDetailFromState(feedbackId);
+    logToTerminal(`[Feedback] 成功发表评论 ID: ${feedbackId}`, 'success');
     void reconcileFeedbacksInBackground();
   } catch (err) {
     communityState?.removeReply?.(feedbackId, tempId);
@@ -1585,6 +1775,7 @@ async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
     if (restored) restored.value = content;
     uiFeedback.notify(err.message || '网络异常', 'error', { title: '回复失败' });
   } finally {
+    pendingReplySubmits.delete(String(feedbackId));
     const currentButton = document.querySelector(`#feedback-detail-modal [data-feedback-detail-action="submit-reply"][data-feedback-id="${feedbackId}"]`);
     if (currentButton) {
       currentButton.disabled = false;
@@ -1595,9 +1786,14 @@ async function submitModalReplyDesktop(feedbackId, triggerButton = null) {
 window.submitModalReplyDesktop = submitModalReplyDesktop;
 
 // 删除回复的评论
+const pendingReplyDeletes = new Set();
 async function deleteReplyDesktop(replyId, feedbackId) {
-  const confirmed = await uiFeedback.confirm('确定删除这条回复吗？此操作不可撤销。', { title: '删除回复', okText: '确认删除', danger: true });
-  if (!confirmed) return;
+  if (!currentUser || !Number.isSafeInteger(replyId) || replyId <= 0) return;
+  const key = `${feedbackId}:${replyId}`;
+  if (pendingReplyDeletes.has(key)) return;
+  const reply = feedbackFromState(feedbackId)?.replies?.find(item => Number(item.id) === replyId);
+  if (!reply || !(currentUser.role === 'admin' || currentUser.username === reply.username)) return;
+  pendingReplyDeletes.add(key);
   const snapshot = communityState?.snapshot?.() || [];
   communityState?.removeReply?.(feedbackId, replyId);
   syncCommunityStateToWindow();
@@ -1622,6 +1818,8 @@ async function deleteReplyDesktop(replyId, feedbackId) {
     syncCommunityStateToWindow();
     renderFeedbackDetailFromState(feedbackId);
     uiFeedback.notify(err.message || '网络异常', 'error', { title: '删除回复失败' });
+  } finally {
+    pendingReplyDeletes.delete(key);
   }
 }
 window.deleteReplyDesktop = deleteReplyDesktop;
@@ -1719,7 +1917,7 @@ async function loadAnnouncementSystemDesktop() {
       </div>
     </div>
   `;
-
+  
   if (!document.getElementById('announcement-modal')) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
   }
@@ -1866,39 +2064,85 @@ function escapeHTML(str) {
     .replace(/'/g, '&#039;');
 }
 
-// J.6 载入公告历史列表
-async function loadAnnouncementHistory() {
+// J.6 载入公告历史列表 (带页码分页器与弹窗编辑)
+async function loadAnnouncementHistory(useCache = false) {
   const container = document.getElementById('admin-ann-history-list');
   if (!container) return;
 
-  container.innerHTML = '<div class="no-data-tip">⏳ 正在读取云端公告历史...</div>';
+  const paginationBar = document.getElementById('admin-ann-pagination');
+  const pageInfo = document.getElementById('admin-ann-page-info');
+  const prevBtn = document.getElementById('admin-ann-page-prev');
+  const nextBtn = document.getElementById('admin-ann-page-next');
+  const pageNumbersEl = document.getElementById('admin-ann-page-numbers');
+  const countEl = document.getElementById('admin-ann-result-count');
+
+  if (!useCache || !cachedAnnouncementsPayload) {
+    container.innerHTML = '<div class="no-data-tip">正在读取云端公告历史...</div>';
+  }
 
   try {
-    const res = await window.AgyCommunityController.request('/api/announcement?all=true');
-    if (!res.ok) throw new Error('拉取失败');
+    if (!useCache || !cachedAnnouncementsPayload) {
+      const res = await window.AgyCommunityController.request('/api/announcement?all=true');
+      if (!res.ok) throw new Error('拉取失败');
+      cachedAnnouncementsPayload = await res.json();
+    }
 
-    const list = window.AgyCommunityData.announcements(await res.json(), document.getElementById('admin-ann-sort').value, document.getElementById('admin-ann-search').value);
+    const list = window.AgyCommunityData.announcements(cachedAnnouncementsPayload, document.getElementById('admin-ann-sort').value, document.getElementById('admin-ann-search').value);
+    if (countEl) countEl.textContent = `${list.length} 条公告`;
     if (!list || list.length === 0) {
-      container.innerHTML = '<div class="no-data-tip">🏜️ 暂无历史发布公告。</div>';
+      container.innerHTML = '<div class="no-data-tip">暂无匹配的历史发布公告。</div>';
+      if (paginationBar) paginationBar.style.display = 'none';
       return;
     }
 
+    const totalPages = Math.max(1, Math.ceil(list.length / ANNOUNCEMENT_PAGE_SIZE));
+    announcementCurrentPage = Math.min(Math.max(1, announcementCurrentPage), totalPages);
+    const startIndex = (announcementCurrentPage - 1) * ANNOUNCEMENT_PAGE_SIZE;
+    const visibleList = list.slice(startIndex, startIndex + ANNOUNCEMENT_PAGE_SIZE);
+
+    if (paginationBar) {
+      paginationBar.style.display = 'flex';
+      if (pageInfo) pageInfo.textContent = `第 ${announcementCurrentPage} / ${totalPages} 页 · 共 ${list.length} 条公告`;
+      if (prevBtn) {
+        prevBtn.disabled = announcementCurrentPage <= 1;
+        prevBtn.onclick = () => {
+          if (announcementCurrentPage > 1) {
+            announcementCurrentPage--;
+            loadAnnouncementHistory(true);
+          }
+        };
+      }
+      if (nextBtn) {
+        nextBtn.disabled = announcementCurrentPage >= totalPages;
+        nextBtn.onclick = () => {
+          if (announcementCurrentPage < totalPages) {
+            announcementCurrentPage++;
+            loadAnnouncementHistory(true);
+          }
+        };
+      }
+      renderPaginationButtons(pageNumbersEl, announcementCurrentPage, totalPages, (p) => {
+        announcementCurrentPage = p;
+        loadAnnouncementHistory(true);
+      });
+    }
+
     let html = '';
-    list.forEach(ann => {
+    visibleList.forEach(ann => {
       const dateText = window.AgyCommunityData.date(ann.created_at);
       let imageTag = '';
       const announcementImageUrl = safeDom.imageUrl(ann.image_url);
       if (announcementImageUrl) {
-        imageTag = `<img src="${announcementImageUrl}" class="announcement-img-preview img-trigger-lightbox" alt="公告配图" style="max-height: 120px; object-fit: contain; cursor: zoom-in; margin-top: 8px;">`;
+        imageTag = `<img src="${announcementImageUrl}" class="announcement-img-preview img-trigger-lightbox" alt="公告配图" style="max-height: 100px; object-fit: contain; cursor: zoom-in; margin-top: 8px;">`;
       }
 
       html += `
-        <article class="card community-ann-record" style="padding:16px">
-          <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${dateText}</span>
+        <article class="card community-ann-record" style="padding: 13px 16px;">
+          <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="community-ann-date" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${dateText}</span>
             <div style="display: flex; gap: 8px;">
-              <button class="btn btn-secondary btn-edit-ann" data-id="${ann.id}" data-content="${safeDom.text(encodeURIComponent(ann.content))}" data-image="${safeDom.text(ann.image_url || '')}" style="padding: 2px 8px; font-size: 10px;">📝 编辑</button>
-              <button class="btn-delete-fb btn-delete-ann" data-id="${ann.id}" style="padding: 2px 8px; font-size: 10px; color: var(--accent-pink); border-color: rgba(255,0,85,0.2);">🗑️ 删除</button>
+              <button class="btn btn-secondary btn-edit-ann" data-id="${ann.id}" data-content="${safeDom.text(encodeURIComponent(ann.content))}" data-image="${safeDom.text(ann.image_url || '')}" style="padding: 3px 10px; min-height: 26px; font-size: 11px;">编辑</button>
+              <button class="btn-delete-fb btn-delete-ann" data-id="${ann.id}" style="padding: 3px 10px; font-size: 11px;">删除</button>
             </div>
           </div>
           <details><summary>${safeDom.text(ann.content.slice(0, 100))}${ann.content.length > 100 ? '…' : ''}</summary><p class="community-ann-content">${escapeHTML(ann.content)}</p></details>
@@ -1919,11 +2163,11 @@ async function loadAnnouncementHistory() {
 
         document.getElementById('input-announce-edit-id').value = id;
         document.getElementById('input-announce-content').value = content;
-
+        
         const previewWrapper = document.getElementById('ann-upload-preview-wrapper');
         const previewImg = document.getElementById('img-ann-upload-preview');
         const statusText = document.getElementById('text-ann-upload-status');
-
+        
         if (image && image.trim()) {
           previewImg.src = image.trim();
           previewWrapper.style.display = 'flex';
@@ -1933,10 +2177,14 @@ async function loadAnnouncementHistory() {
           previewWrapper.style.display = 'none';
         }
 
-        document.getElementById('text-ann-form-title').textContent = '📝 编辑系统公告';
+        document.getElementById('text-ann-form-title').textContent = '编辑系统公告';
+        document.getElementById('btn-publish-announcement').textContent = '保存修改';
         document.getElementById('btn-cancel-ann-edit').style.display = 'inline-flex';
-
-        document.getElementById('tab-admin-announcement').scrollTop = 0;
+        const annComposeModal = document.getElementById('announcement-compose-modal');
+        if (annComposeModal) {
+          annComposeModal.style.display = 'flex';
+          setTimeout(() => document.getElementById('input-announce-content')?.focus({ preventScroll: true }), 50);
+        }
       });
     });
 
@@ -1944,7 +2192,7 @@ async function loadAnnouncementHistory() {
     deleteBtns.forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm('⚠️ 确定要从云端删除这条公告吗？物理抹除操作不可逆。')) {
+        if (confirm('确定要从云端删除这条公告吗？物理抹除操作不可逆。')) {
           btn.disabled = true;
           const delRes = await window.AgyCommunityController.request(`/api/announcement?id=${id}`, {
             method: 'DELETE',
@@ -1955,7 +2203,7 @@ async function loadAnnouncementHistory() {
           const delResult = await delRes.json();
           if (delRes.ok && delResult.success) {
             logToTerminal(`[Admin] 物理删除公告 ID: ${id}`, 'success');
-            loadAnnouncementHistory();
+            loadAnnouncementHistory(false);
             loadAnnouncementSystemDesktop();
           } else {
             alert(`删除失败: ${delResult.error}`);
@@ -1979,7 +2227,7 @@ async function loadAnnouncementHistory() {
     });
 
   } catch (err) {
-    container.innerHTML = `<div class="no-data-tip">❌ 加载历史失败: ${safeDom.errorMessage(err)}</div>`;
+    container.innerHTML = `<div class="no-data-tip">加载历史失败: ${safeDom.errorMessage(err)}</div>`;
   }
 }
 
@@ -1987,14 +2235,14 @@ async function loadAnnouncementHistory() {
 async function showAdminUserDetail(username) { return window.AgyAdminCommunity.showDetail(username); }
 
 window.AgyAdminCommunity.init({ getUser: () => currentUser, refreshFeedbacks: () => loadFeedbacks() });
-document.getElementById('feedback-sort').addEventListener('change', () => { feedbackVisibleLimit = 20; loadFeedbacks(Boolean(communityState?.all?.().length)); });
+document.getElementById('feedback-sort').addEventListener('change', () => { feedbackCurrentPage = 1; loadFeedbacks(Boolean(communityState?.all?.().length)); });
 document.getElementById('feedback-search').addEventListener('input', () => {
   clearTimeout(feedbackSearchTimer);
-  feedbackSearchTimer = setTimeout(() => { feedbackVisibleLimit = 20; loadFeedbacks(true, { silent: true }); }, 120);
+  feedbackSearchTimer = setTimeout(() => { feedbackCurrentPage = 1; loadFeedbacks(true, { silent: true }); }, 120);
 });
-document.getElementById('admin-ann-sort').addEventListener('change', () => loadAnnouncementHistory());
+document.getElementById('admin-ann-sort').addEventListener('change', () => { announcementCurrentPage = 1; loadAnnouncementHistory(true); });
 let announcementSearchTimer;
-document.getElementById('admin-ann-search').addEventListener('input', () => { clearTimeout(announcementSearchTimer); announcementSearchTimer = setTimeout(loadAnnouncementHistory, 150); });
+document.getElementById('admin-ann-search').addEventListener('input', () => { clearTimeout(announcementSearchTimer); announcementSearchTimer = setTimeout(() => { announcementCurrentPage = 1; loadAnnouncementHistory(true); }, 150); });
 // 自动加载初始化极客看板
 initFeedbackBoard();
 // Session lookup is local and cheap; load it after first paint so admin navigation and

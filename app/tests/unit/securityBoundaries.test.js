@@ -26,6 +26,6 @@ test('feedback detail actions remain compatible with the strict CSP', () => {
   for (const action of ['submit-reply', 'attach-reply-image', 'remove-reply-image', 'delete-reply', 'focus-reply', 'like-reply', 'like-post']) {
     assert.match(renderer, new RegExp(`data-feedback-detail-action=["']${action}["']`));
   }
-  assert.match(renderer, /modalBody\.onclick = async/);
+  assert.match(renderer, /detailDialog\.onclick = async/);
   assert.match(renderer, /(发布中…|发送中…)/);
 });

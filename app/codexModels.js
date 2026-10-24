@@ -124,8 +124,20 @@ function codexVisibleModelAliasesForModels(slugs) {
   const available = new Set(live.filter(model => model !== 'agy-auto'));
   const aliases = {};
   const assignedModels = new Set();
+  // Codex currently accepts a restricted set of display IDs. Assign those
+  // slots to newer models only when the upstream model catalog actually
+  // confirms them; do not force Gemini 4 / Claude 5.5 on older accounts.
+  const preferred = {
+    ...CODEX_VISIBLE_MODEL_ALIASES,
+    'gpt-5.6-sol': available.has('gemini-4-argon-medium')
+      ? 'gemini-4-argon-medium' : CODEX_VISIBLE_MODEL_ALIASES['gpt-5.6-sol'],
+    'gpt-5.3-codex': available.has('claude-opus-5-5-medium')
+      ? 'claude-opus-5-5-medium' : CODEX_VISIBLE_MODEL_ALIASES['gpt-5.3-codex'],
+    'gpt-5.4-mini': available.has('claude-sonnet-5-5-medium')
+      ? 'claude-sonnet-5-5-medium' : CODEX_VISIBLE_MODEL_ALIASES['gpt-5.4-mini']
+  };
 
-  for (const [alias, preferredModel] of Object.entries(CODEX_VISIBLE_MODEL_ALIASES)) {
+  for (const [alias, preferredModel] of Object.entries(preferred)) {
     if (!available.has(preferredModel)) continue;
     aliases[alias] = preferredModel;
     assignedModels.add(preferredModel);
@@ -154,15 +166,15 @@ function buildAntigravityCodexModelsResponse(options = {}) {
   };
 }
 
-function resolveCodexModelAlias(model) {
+function resolveCodexModelAlias(model, availableModels) {
   const value = String(model || '');
-  const aliases = codexVisibleModelAliasesForModels();
+  const aliases = codexVisibleModelAliasesForModels(availableModels);
   return aliases[value] || CODEX_VISIBLE_MODEL_ALIASES[value] || value;
 }
 
-function codexAliasForModel(model) {
+function codexAliasForModel(model, availableModels) {
   const value = String(model || '');
-  const aliases = codexVisibleModelAliasesForModels();
+  const aliases = codexVisibleModelAliasesForModels(availableModels);
   const liveAlias = Object.entries(aliases).find(([, realModel]) => realModel === value)?.[0];
   return liveAlias || REAL_MODEL_TO_CODEX_ALIAS[value] || value;
 }

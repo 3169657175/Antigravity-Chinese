@@ -3,20 +3,20 @@
   "officialAsar": "C:\\Users\\niu\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar.original",
   "officialVersion": "2.26.0",
   "officialSha256": "8ce27ff7c2defa10ed1ed2817288a61c546690f4cae1b1a8c91d4e69e0851e4d",
-  "outputAsar": "C:\\Users\\niu\\.gemini\\antigravity\\scratch\\agy-hub\\assets\\app.asar",
-  "outputSize": 5309745,
-  "outputSha256": "68719401baca9e64abba9a2480b8f6e841c65215e2a5c041e4859041346e8b9e",
+  "outputAsar": "D:\\AGY-Hub-Dev\\assets\\app.asar",
+  "outputSize": 5330944,
+  "outputSha256": "ec9c39a27b4c029dd826d3fdaa681c2e084ffcf98ef7709e47d925c0cd65a062",
   "compatibility": {
     "files": [
       {
         "file": "dist/preload.js",
         "officialBytes": 5561,
-        "rebuiltBytes": 571577
+        "rebuiltBytes": 579232
       },
       {
         "file": "dist/main.js",
         "officialBytes": 20518,
-        "rebuiltBytes": 272888
+        "rebuiltBytes": 272948
       },
       {
         "file": "dist/tray.js",
@@ -31,7 +31,7 @@
       {
         "file": "dist/ipcHandlers.js",
         "officialBytes": 18302,
-        "rebuiltBytes": 99962
+        "rebuiltBytes": 102150
       },
       {
         "file": "dist/languageServer.js",
@@ -46,12 +46,17 @@
       {
         "file": "dist/accountQuota.js",
         "addedByPatch": true,
-        "rebuiltBytes": 8460
+        "rebuiltBytes": 13648
+      },
+      {
+        "file": "dist/argonEvidence.js",
+        "addedByPatch": true,
+        "rebuiltBytes": 3358
       },
       {
         "file": "dist/antigravityQuotaBridge.js",
         "addedByPatch": true,
-        "rebuiltBytes": 4922
+        "rebuiltBytes": 7416
       }
     ],
     "appliedRuntimeRules": [

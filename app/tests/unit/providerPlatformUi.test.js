@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..', '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+const gatewayCss = fs.readFileSync(path.join(root, 'gatewayUi.css'), 'utf8');
 const controller = fs.readFileSync(path.join(root, 'gatewayController.js'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'preload.js'), 'utf8');
 
@@ -23,6 +24,8 @@ test('snapshot and timeline reuse existing overview header without embedding onb
   assert.doesNotMatch(html, /data-target="tab-tool-center"/);
   assert.match(html, /class="gateway-header-tools"/);
   assert.match(css, /\.codex-workspace-header\s*\{[^}]*flex-direction:\s*column/s);
+  assert.match(gatewayCss, /\.gateway-header-tools\s*\{[^}]*flex-direction:\s*row[^}]*justify-content:\s*flex-end/s);
+  assert.doesNotMatch(gatewayCss, /\.gateway-header-tools\s*\{[^}]*flex-direction:\s*column/s);
   assert.match(css, /\.gateway-insight-panel\s*\{[^}]*position:\s*absolute/s);
   assert.match(css, /\.gateway-snapshot-row\s*\{/);
   assert.match(controller, /row\.className = 'gateway-snapshot-row'/);

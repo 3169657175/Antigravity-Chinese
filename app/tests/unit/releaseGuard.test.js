@@ -4,7 +4,7 @@ const { verify, parseLatestYaml } = require('../../releaseGuard.js');
 
 test('release guard keeps package version and publish repository unified', () => {
   const result = verify({ expectedVersion: require('../../package.json').version });
-  assert.equal(result.version, '1.4.1');
+  assert.equal(result.version, '1.4.3');
   assert.equal(result.repository, '3169657175/Antigravity-Chinese');
 });
 

@@ -3,6 +3,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AgyUiFeedback = api;
 })(typeof window !== 'undefined' ? window : globalThis, function createUiFeedback(root) {
+  let activeConfirmation = null;
   function toast(message, type = 'info', options = {}) {
     if (typeof document === 'undefined') return null;
     const host = document.getElementById('operation-toast-host');
@@ -22,7 +23,8 @@
   function fail(id, message) { root?.AgyOperationFeedback?.fail?.(id, message); }
   function confirm(message, options = {}) {
     if (typeof document === 'undefined' || !document.body) return Promise.resolve(root?.confirm ? root.confirm(message) : false);
-    return new Promise(resolve => {
+    if (activeConfirmation) return activeConfirmation;
+    activeConfirmation = new Promise(resolve => {
       const overlay = document.createElement('div');
       overlay.className = 'agy-confirm-overlay';
       overlay.innerHTML = '<section class="agy-confirm-dialog" role="dialog" aria-modal="true"><strong class="agy-confirm-title"></strong><p class="agy-confirm-message"></p><div class="agy-confirm-actions"><button type="button" class="btn btn-secondary" data-confirm="cancel">取消</button><button type="button" class="btn btn-primary" data-confirm="ok"></button></div></section>';
@@ -31,7 +33,19 @@
       const ok = overlay.querySelector('[data-confirm="ok"]');
       ok.textContent = options.okText || '确认';
       if (options.danger) ok.classList.add('danger');
-      const finish = value => { overlay.remove(); resolve(value); };
+      let finished = false;
+      const finish = value => {
+        if (finished) return;
+        finished = true;
+        document.removeEventListener('keydown', onKeyDown);
+        overlay.remove();
+        activeConfirmation = null;
+        resolve(value);
+      };
+      const onKeyDown = event => {
+        if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+      };
+      document.addEventListener('keydown', onKeyDown);
       overlay.addEventListener('click', event => {
         if (event.target === overlay || event.target.closest('[data-confirm="cancel"]')) finish(false);
         if (event.target.closest('[data-confirm="ok"]')) finish(true);
@@ -39,6 +53,7 @@
       document.body.appendChild(overlay);
       ok.focus();
     });
+    return activeConfirmation;
   }
   return { toast, notify: toast, begin, succeed, fail, confirm };
 });

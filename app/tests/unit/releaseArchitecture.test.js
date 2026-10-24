@@ -7,8 +7,8 @@ const flags = require('../../featureFlags.js');
 const communityState = require('../../communityState.js');
 const lifecycle = require('../../pageLifecycle.js');
 
-test('1.4.1 release identity and updater repository cannot drift', () => {
-  assert.equal(packageJson.version, '1.4.1');
+test('1.4.3 release identity and updater repository cannot drift', () => {
+  assert.equal(packageJson.version, '1.4.3');
   assert.deepEqual(packageJson.build.publish[0], { provider: 'github', owner: release.RELEASE_REPOSITORY.owner, repo: release.RELEASE_REPOSITORY.repo });
   assert.equal(release.RELEASE_REPOSITORY.repo, 'Antigravity-Chinese');
   assert.deepEqual(release.releaseTagCandidates('v1.3.8'), ['1.3.8', 'v1.3.8']);

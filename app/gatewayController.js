@@ -78,7 +78,7 @@
     
       function refreshCodexPage(page) {
         if (page === 'overview') return refresh({ maxAgeMs: 5000 });
-        if (page === 'api') return refresh({ force: true });
+        if (page === 'api') return refresh({ force: true, includeQuota: true });
         if (page === 'claude') return refreshClaudeDesktopStatus({ maxAgeMs: 5000 });
         if (page === 'usage') return refreshCodexUsage({ maxAgeMs: 3000 });
         return Promise.resolve();
@@ -462,6 +462,34 @@
           const response = await window.agyHubAPI.fetchAccountQuota(selectedId);
           if (requestId !== quotaRequestId) return null;
           if (!response || response.success === false) throw new Error(response?.error || '额度查询失败');
+          const entries = response.availableModelEntries;
+          if (Array.isArray(entries) && entries.length && model) {
+            const previous = model.value;
+            const grouped = new Map([
+              ['自动路由', [{ id: 'agy-auto', label: 'AGY 自动路由（按额度）' }]]
+            ]);
+            model.replaceChildren();
+            for (const entry of entries) {
+              const groupName = entry.group || '其他模型';
+              if (!grouped.has(groupName)) grouped.set(groupName, []);
+              grouped.get(groupName).push(entry);
+            }
+            const options = [];
+            for (const [groupName, models] of grouped) {
+              const group = document.createElement('optgroup');
+              group.label = groupName;
+              for (const entry of models) {
+                const option = document.createElement('option');
+                option.value = entry.id;
+                option.textContent = entry.label || entry.id;
+                group.appendChild(option);
+                options.push(option);
+              }
+              group.dataset.modelCount = String(models.length);
+              model.appendChild(group);
+            }
+            model.value = options.some(option => option.value === previous) ? previous : 'agy-auto';
+          }
           const quota = response.quota || {};
           renderQuotaItem('gemini5h', quota.gemini5h, quota.gemini5hReset);
           renderQuotaItem('geminiWeekly', quota.geminiWeekly, quota.geminiWeeklyReset);
@@ -587,6 +615,9 @@
               await refreshSelectedQuota();
               const refreshedStatus = await window.agyHubAPI.getCodexGatewayStatus();
               renderStatus(refreshedStatus);
+              // The account-scoped cloud model list is refreshed by the quota
+              // lookup above. Re-render the API page after that cache update.
+              renderApiAccess(refreshedStatus);
             }
             if (options.includeClaude) await refreshClaudeDesktopStatus({ force: true });
             return status;

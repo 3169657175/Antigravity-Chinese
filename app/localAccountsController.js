@@ -7,6 +7,16 @@ const QUOTA_SECTIONS = Object.freeze([
   { title: 'Claude / GPT', fields: [['claude5h', '5h 限制'], ['claudeWeekly', '每周上限']] },
   { title: 'Gemini', fields: [['gemini5h', '5h 限制'], ['geminiWeekly', '每周上限']] }
 ]);
+function argonLastSeenCopy(result) {
+  if (result?.argonCapabilityStatus !== 'previously-available') return null;
+  const checkedAt = Number(result.argonLastKnown?.checkedAt);
+  const ageMs = Date.now() - checkedAt;
+  if (!Number.isFinite(ageMs) || ageMs < 0) return '历史已验证，实时额度待确认';
+  const age = ageMs < 3600000 ? Math.max(1, Math.round(ageMs / 60000)) + ' 分钟前' :
+    ageMs < 86400000 ? Math.round(ageMs / 3600000) + ' 小时前' :
+    Math.round(ageMs / 86400000) + ' 天前';
+  return `上次确认：${result.argonLastKnown?.lastPercent || '额度未知'} · ${age}（非实时）`;
+}
 let localAccountsLoadGeneration = 0;
 
 function quotaFieldState(result, field) {
@@ -34,7 +44,7 @@ function calculateQuotaScore(weekly, shortWindow) {
 
 function quotaSectionsForResult(result) {
   const sections = [...QUOTA_SECTIONS];
-  if (result?.capabilities?.argon && quotaFieldState(result, 'argonWeekly') === 'available') {
+  if (result?.capabilities?.argon === true) {
     sections.push({ title: 'Gemini 4 Argon', fields: [['argonWeekly', '每周上限']] });
   }
   return sections.map(section => ({
@@ -114,7 +124,14 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
       try {
         const sRes = await window.agyHubAPI.switchLocalAccount(account.id);
         if (sRes && sRes.success) {
-          logToTerminal(`[Account] 已切换当前活动账户：${account.email}${sRes.restarted ? '，Antigravity 已完整重启' : '，请重启 Antigravity 后生效'}`, 'success');
+          const lifecycleText = sRes.restarted
+            ? '，Antigravity 已正常重启并保留原启动参数'
+            : sRes.willApplyOnNextLaunch
+              ? '，将在下次启动 Antigravity 时生效'
+              : sRes.restartRequired
+                ? '，需要手动重新打开 Antigravity'
+                : '，账号状态已更新';
+          logToTerminal(`[Account] 已切换当前活动账户：${account.email}${lifecycleText}`, 'success');
           if (sRes.restartRequired && sRes.error) alert(sRes.error);
           await loadLocalAccounts();
         } else {
@@ -168,12 +185,10 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
   // 添加配额显示区
   const quotaPanel = document.createElement('div');
   quotaPanel.className = 'local-account-quota';
-
+  
   if (account.storageState === 'missing') {
     quotaPanel.innerHTML = `<div class="quota-error">凭据不可用，请先在官方客户端登录该账号</div>`;
   } else {
-    quotaPanel.innerHTML = `<div class="quota-spinner">正在查询实时额度...</div>`;
-
     // 格式化重置倒计时
     function formatResetTime(isoStr) {
       if (!isoStr) return '';
@@ -193,6 +208,49 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
       } catch(e) { return ''; }
     }
 
+    function getBarColor(percent) {
+      const val = Number(percent) || 0;
+      if (val >= 50) return 'var(--accent-green, #10b981)';
+      if (val >= 25) return '#f59e0b';
+      return 'var(--accent-pink, #ef4444)';
+    }
+
+    function renderQuotaResultIntoPanel(res) {
+      const quotaColumns = quotaSectionsForResult(res).map(section => {
+        const isArgonSection = section.title.toLowerCase().includes('argon');
+        const items = section.fields.map(({ field, label, state }) => {
+          if (state === 'unconfirmed') {
+            const lastSeen = isArgonSection ? argonLastSeenCopy(res) : null;
+            return `<div class="quota-item pending"><div class="quota-label"><span>${label}</span><span class="quota-val">待确认</span></div>${lastSeen ? `<div class="quota-last-seen">${lastSeen}</div>` : ''}</div>`;
+          }
+          const percent = quotaPercent(res, field);
+          const reset = formatResetTime(res.quota[`${field}Reset`]);
+          const barColor = isArgonSection && percent >= 50 ? '#8b5cf6' : getBarColor(percent);
+          return `<div class="quota-item"><div class="quota-label"><span>${label} ${reset}</span><span class="quota-val">${percent}%</span></div><div class="quota-bar"><div class="quota-fill" style="width: ${percent}%; background-color: ${barColor};"></div></div></div>`;
+        }).filter(Boolean).join('');
+        return items ? `<div class="quota-col${isArgonSection ? ' quota-col-argon' : ''}"><div class="quota-platform">${section.title}</div>${items}</div>` : '';
+      }).filter(Boolean);
+      quotaPanel.className = 'local-account-quota';
+      quotaPanel.innerHTML = `<div class="quota-grid${quotaColumns.length === 1 ? ' single' : ''}">${quotaColumns.join('')}</div>`;
+    }
+
+    const swrCacheKey = `agy_hub_quota_swr_v2_${account.id}`;
+    let swrRendered = false;
+    try {
+      const rawCache = typeof localStorage !== 'undefined' ? localStorage.getItem(swrCacheKey) : null;
+      if (rawCache) {
+        const parsed = JSON.parse(rawCache);
+        if (parsed && parsed.savedAt && (Date.now() - parsed.savedAt < 300000) && parsed.res?.success && parsed.res?.quota) {
+          renderQuotaResultIntoPanel(parsed.res);
+          swrRendered = true;
+        }
+      }
+    } catch (_) {}
+
+    if (!swrRendered) {
+      quotaPanel.innerHTML = `<div class="quota-spinner">正在同步实时额度...</div>`;
+    }
+
     // 异步拉取该账号的配额信息
     const qPromise = (async () => {
       try {
@@ -202,18 +260,12 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
           if (res.quotaSourceHost) {
             logToTerminal(`[Quota] ${account.email} source: ${res.quotaSourceHost}, ${res.quotaResponseTimeMs || 0}ms`);
           }
-          const quotaColumns = quotaSectionsForResult(res).map(section => {
-            const items = section.fields.map(({ field, label, state }) => {
-              if (state === 'unconfirmed') {
-                return `<div class="quota-item pending"><div class="quota-label"><span>${label}</span><span class="quota-val">待确认</span></div></div>`;
-              }
-              const percent = quotaPercent(res, field);
-              const reset = formatResetTime(res.quota[`${field}Reset`]);
-              return `<div class="quota-item"><div class="quota-label"><span>${label} ${reset}</span><span class="quota-val">${percent}%</span></div><div class="quota-bar"><div class="quota-fill" style="width: ${percent}%"></div></div></div>`;
-            }).filter(Boolean).join('');
-            return items ? `<div class="quota-col"><div class="quota-platform">${section.title}</div>${items}</div>` : '';
-          }).filter(Boolean);
-          quotaPanel.innerHTML = `<div class="quota-grid${quotaColumns.length === 1 ? ' single' : ''}">${quotaColumns.join('')}</div>`;
+          renderQuotaResultIntoPanel(res);
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(swrCacheKey, JSON.stringify({ savedAt: Date.now(), res }));
+            }
+          } catch (_) {}
 
           if (res.quotaDetails && Object.keys(res.quotaDetails).length > 0) {
             logToTerminal(`[Quota] 账号 ${account.email} 详细配额明细 (Project: ${res.projectId || '未知'}): ${JSON.stringify(res.quotaDetails)}`);
@@ -221,16 +273,6 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
           if (res.quotaDataDebug && Object.keys(res.quotaDataDebug).length > 0) {
             logToTerminal(`[Quota] 账号 ${account.email} 响应体最外层全局非 models 属性: ${JSON.stringify(res.quotaDataDebug)}`);
           }
-
-          // 渲染完成后稍微延迟给进度条上色及填充，以展示顺滑过渡动画
-          setTimeout(() => {
-            quotaPanel.querySelectorAll('.quota-fill').forEach(fill => {
-              const val = parseInt(fill.style.width) || 0;
-              if (val >= 50) fill.style.backgroundColor = 'var(--text-accent, #3ba5fc)';
-              else if (val >= 25) fill.style.backgroundColor = '#fca240';
-              else fill.style.backgroundColor = '#f06c8b';
-            });
-          }, 50);
 
           return {
             accountId: account.id,
@@ -289,12 +331,12 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
       }
       return { accountId: account.id, success: false };
     })();
-
+    
     if (activeQuotaPromises) {
       activeQuotaPromises.push(qPromise);
     }
   }
-
+  
   row.appendChild(quotaPanel);
   return row;
 }
@@ -375,7 +417,7 @@ async function loadLocalAccounts(options = {}) {
             if (geminiRow) {
               const nameLine = geminiRow.querySelector('.local-account-title-line');
               if (nameLine && !nameLine.querySelector('.recommend-gemini')) {
-                nameLine.appendChild(createLocalAccountBadge('💡 Gemini 推荐', 'recommend-gemini'));
+                nameLine.appendChild(createLocalAccountBadge('Gemini 优选', 'recommend-gemini'));
                 geminiRow.classList.add('recommended-card-gemini');
               }
             }
@@ -385,7 +427,7 @@ async function loadLocalAccounts(options = {}) {
             if (claudeRow) {
               const nameLine = claudeRow.querySelector('.local-account-title-line');
               if (nameLine && !nameLine.querySelector('.recommend-claude')) {
-                nameLine.appendChild(createLocalAccountBadge('💡 Claude 推荐', 'recommend-claude'));
+                nameLine.appendChild(createLocalAccountBadge('Claude 优选', 'recommend-claude'));
                 claudeRow.classList.add('recommended-card-claude');
               }
             }

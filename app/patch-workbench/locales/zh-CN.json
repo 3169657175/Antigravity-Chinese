@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "messages": {
+    "Gemini 4 Argon Weekly Limit": "Gemini 4 Argon 每周额度",
     "Global Permissions": "全局权限",
     "Security Preset": "安全预设策略",
     "Fast Mode": "极速模式",

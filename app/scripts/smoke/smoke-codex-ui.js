@@ -12,6 +12,8 @@ app.whenReady().then(async () => {
     nav.click();
     const panel = document.getElementById('panel-la-codex');
     const mount = document.getElementById('codex-overview-mount');
+    const gatewayToolButtons = [...document.querySelectorAll('.gateway-header-tools .gateway-diagnostic-button')];
+    const gatewayToolRects = gatewayToolButtons.map(button => button.getBoundingClientRect());
     document.querySelector('[data-codex-page="usage"]').click();
     document.querySelector('[data-usage-source="claude-code-gateway"]').click();
     const claudeUsage = {
@@ -22,6 +24,11 @@ app.whenReady().then(async () => {
     };
     return {
       navActive: nav.classList.contains('active'),
+      gatewayTools: {
+        count: gatewayToolRects.length,
+        sameRow: gatewayToolRects.length === 3 && Math.max(...gatewayToolRects.map(rect => rect.top)) - Math.min(...gatewayToolRects.map(rect => rect.top)) < 2,
+        widths: gatewayToolRects.map(rect => Math.round(rect.width))
+      },
       panelMounted: panel.parentElement === mount,
       panelVisible: getComputedStyle(panel).display !== 'none',
       quotaItems: document.querySelectorAll('.codex-gateway-quota-item').length,
@@ -44,6 +51,7 @@ app.whenReady().then(async () => {
       duplicateIds: [...document.querySelectorAll('[id]')].map(n => n.id).filter((id, i, all) => all.indexOf(id) !== i)
     };
   })()`);
+  if (!result.gatewayTools.sameRow) throw new Error(`Gateway utility buttons are not aligned horizontally: ${JSON.stringify(result.gatewayTools)}`);
   const feedback = await win.webContents.executeJavaScript(`(async () => {
     window.__smokeAlerts = [];
     window.alert = message => window.__smokeAlerts.push(String(message));

@@ -14,6 +14,10 @@ const KNOWN_MODEL_ORDER = Object.freeze([
 
 const MODEL_DISPLAY_NAMES = Object.freeze({
   'agy-auto': 'AGY 自动路由（按额度）',
+  'gemini-4-argon-medium': 'Gemini 4 Argon (Medium)',
+  'gemini-4-argon-high': 'Gemini 4 Argon (High)',
+  'claude-opus-5-5-thinking': 'Claude Opus 5.5 (Thinking)',
+  'claude-sonnet-5-5': 'Claude Sonnet 5.5',
   'gemini-3.8-flash-high': 'Gemini 3.8 Flash (High)',
   'gemini-3.8-flash-medium': 'Gemini 3.8 Flash (Medium)',
   'gemini-3.8-flash-low': 'Gemini 3.8 Flash (Low)',
@@ -126,10 +130,11 @@ function modelDisplayName(model) {
     return `Gemini ${gemini[1]} ${family}${variant ? ` (${variant})` : ''}`;
   }
 
-  const claude = /^claude-(opus|sonnet)-(\d+(?:-\d+)+)(?:-(thinking))?$/i.exec(value);
+  const claude = /^claude-(opus|sonnet)-(\d+(?:-\d+)+)(?:-(thinking|high|medium|low))?$/i.exec(value);
   if (claude) {
     const family = claude[1][0].toUpperCase() + claude[1].slice(1).toLowerCase();
-    return `Claude ${family} ${claude[2].replace(/-/g, '.')}${claude[3] ? ' (Thinking)' : ''}`;
+    const suffix = claude[3] ? ` (${claude[3][0].toUpperCase() + claude[3].slice(1)})` : '';
+    return `Claude ${family} ${claude[2].replace(/-/g, '.')}${suffix}`;
   }
 
   const gptOss = /^gpt-oss-([^-]+)(?:-(.+))?$/i.exec(value);
@@ -203,6 +208,9 @@ function selectCurrentModels(models) {
     .map(value => String(value || '').trim())
     .filter(isAgentModel))];
   const selected = [];
+  // Argon is independent of Flash/Pro. Previously this filter discarded the
+  // new model even if the live upstream returned it.
+  selected.push(...candidates.filter(model => /^gemini-4-argon(?:-(?:high|medium|low))?$/i.test(model)));
 
   const flashModels = candidates
     .filter(model => /^gemini-\d+(?:\.\d+)?-flash-(?:high|medium|low)$/i.test(model))

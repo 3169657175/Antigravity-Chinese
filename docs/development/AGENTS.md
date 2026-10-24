@@ -1,3 +1,5 @@
+# DEV_WORKSPACE_MOVED_20261024: Main development workspace is D:\AGY-Hub-Dev; D:\ang\agy-hub is only the installed app.
+
 # Antigravity 主题资源安全边界
 
 ## 接手项目之前
