@@ -747,7 +747,9 @@ function buildLanguageServerStartOverlay(officialStart) {
   requireSingleAnchor(output, apiEndpoint, 'languageServer API endpoint');
   requireSingleAnchor(output, cloudEndpoint, 'languageServer Cloud Code endpoint');
 
-  output = output.replace('function startLanguageServer(', 'async function startLanguageServer(');
+  if (!output.includes('async function startLanguageServer(')) {
+    output = output.replace('function startLanguageServer(', 'async function startLanguageServer(');
+  }
   const signatureEnd = output.indexOf('\n');
   if (signatureEnd < 0) throw new Error('Official languageServer start function signature is incomplete');
   const signature = output.slice(0, signatureEnd);
@@ -761,7 +763,9 @@ function buildLanguageServerStartOverlay(officialStart) {
     "    console.log('[Network] Language Server keeps official API endpoints; token monitoring is out-of-band.');"
   ].join('\n'), 'languageServer routing overlay');
 
-  const envAnchor = '        const env = { ...process.env, ...(0, shell_env_1.shellEnvSync)() };';
+  const loginShellEnvAnchor = '        const env = { ...process.env, ...loginShellEnv };';
+  const legacyShellEnvAnchor = '        const env = { ...process.env, ...(0, shell_env_1.shellEnvSync)() };';
+  const envAnchor = output.includes(loginShellEnvAnchor) ? loginShellEnvAnchor : legacyShellEnvAnchor;
   output = insertAfter(output, envAnchor, [
     "        if (proxyString && typeof proxyString === 'string') {",
     "            const proxyPart = proxyString.split(';').map(part => part.trim()).find(part => /^(?:PROXY|HTTPS?)\\s+/i.test(part));",
@@ -786,9 +790,12 @@ function buildLanguageServer(official, legacy) {
   output = insertAfter(output, 'let _lsPort = 0;', "let _lsCsrf = '';", 'languageServer csrf state');
   const getter = extractBetween(legacy, 'function getLsCsrf() {', '/** Clears the language server process reference', 'languageServer csrf getter');
   output = insertBefore(output, '/** Clears the language server process reference', getter, 'languageServer csrf getter target');
-  const officialStart = extractBetween(output, 'function startLanguageServer(', '/** Sets whether the termination was intentional', 'official startLanguageServer');
+  const startAnchor = output.includes('async function startLanguageServer(')
+    ? 'async function startLanguageServer('
+    : 'function startLanguageServer(';
+  const officialStart = extractBetween(output, startAnchor, '/** Sets whether the termination was intentional', 'official startLanguageServer');
   const overlaidStart = buildLanguageServerStartOverlay(officialStart);
-  output = replaceBetween(output, 'function startLanguageServer(', '/** Sets whether the termination was intentional', overlaidStart, 'official startLanguageServer');
+  output = replaceBetween(output, startAnchor, '/** Sets whether the termination was intentional', overlaidStart, 'official startLanguageServer');
   output = insertAfter(output, '    setIntentionalTermination(false); // Reset', '    _lsCsrf = csrf;', 'languageServer csrf assignment');
   return output;
 }
