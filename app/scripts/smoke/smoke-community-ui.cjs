@@ -56,7 +56,7 @@ const { chromium } = require('C:/Users/niu/.cache/codex-runtimes/codex-primary-r
       return { separate: version.top >= guide.bottom, version: document.querySelector('#app-version-badge').textContent.trim() };
     });
     assert.equal(footer.separate, true, 'version must occupy a distinct row below guide');
-    assert.equal(footer.version, 'v1.4.3');
+    assert.equal(footer.version, 'v1.4.7');
     await page.screenshot({path:path.join(__dirname, '..', '..', 'assets', 'screenshots', 'community-users-preview.png')});
     await page.locator('#admin-user-next').click(); assert.match(await page.locator('#admin-user-pagination').textContent(),/第 2/);
     await page.locator('#admin-user-search').fill('member02'); assert.equal(await page.locator('.community-table tbody tr').count(),1);

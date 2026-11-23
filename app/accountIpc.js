@@ -3,8 +3,9 @@ const path = require('path');
 const os = require('os');
 const { classifyAccountError } = require('./accountErrorClassifier.js');
 const { readJsonSafe, writeJsonAtomic } = require('./fsUtils.js');
-const { fetchAccountQuota, parseQuotaSummary } = require('./accountQuota.js');
+const { fetchAccountQuota, parseQuotaSummary, buildLanguageServerQuotaResult } = require('./accountQuota.js');
 const { fetchLiveQuotaSummary, fetchLiveAvailableModels, clearQuotaBridgeCache } = require('./antigravityQuotaBridge.js');
+const { fetchCurrentAccountLanguageServerQuota } = require('./antigravityLanguageServerQuota.js');
 const { setModelsForAccount } = require('./accountModelAvailability.js');
 const { captureAntigravityModelCatalog, describeAntigravityModels } = require('./antigravityModelCatalog.js');
 const { writeWindowsAntigravityCredential } = require('./windowsAccountCredential.js');
@@ -28,6 +29,18 @@ function getGoogleClientSecret() {
   const s1 = 'R09DU1BYLUs1';
   const s2 = 'OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=';
   return Buffer.from(s1 + s2, 'base64').toString('utf8');
+}
+
+function scopeQuotaResultToAccount(accountId, result, source = '') {
+  if (!result || typeof result !== 'object') return result;
+  const scopedResult = { ...result, accountId: String(accountId || '') };
+  if (!Array.isArray(scopedResult.availableModels) || !scopedResult.availableModels.length) return scopedResult;
+  const modelSource = source || scopedResult.availableModelsSource
+    || (String(scopedResult.quotaSource || '').includes('language-server') ? 'local-language-server' : 'oauth-cloud');
+  const scoped = setModelsForAccount(accountId, scopedResult.availableModels, modelSource);
+  if (scoped?.modelIds?.length) scopedResult.availableModels = scoped.modelIds;
+  scopedResult.availableModelEntries = describeAntigravityModels(scopedResult.availableModels);
+  return scopedResult;
 }
 
 async function restartAntigravityClient(options = {}) {
@@ -135,11 +148,13 @@ async function isAntigravityClientRunning(options = {}) {
 }
 
 function registerAccountIpc(options) {
+  require('./accountTransfer').registerAccountTransferIpc(options);
   const { ipcMain, app, net, safeStorage, getMainWindow } = options;
   const writeCredential = options.writeCredential || writeWindowsAntigravityCredential;
   const restartClient = options.restartClient || restartAntigravityClient;
   const isClientRunning = options.isClientRunning || isAntigravityClientRunning;
   const nativeSwitch = options.nativeSwitch || requestNativeAccountSwitch;
+  const fetchLiveQuota = options.fetchLiveQuota || fetchCurrentAccountLanguageServerQuota;
 
   function accountTokenFromDetail(detail) {
     if (!detail || typeof detail !== 'object') return null;
@@ -177,13 +192,13 @@ function getGoogleClientId() {
     const p2 = 'MmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ==';
     return Buffer.from(p1 + p2, 'base64').toString('utf8');
   }
-  
+
   function getGoogleClientSecret() {
     const s1 = 'R09DU1BYLUs1';
     const s2 = 'OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=';
     return Buffer.from(s1 + s2, 'base64').toString('utf8');
   }
-  
+
   // 读取 Antigravity 本地账号元数据。Token 永远不会离开主进程。
   ipcMain.handle('list-local-accounts', async () => {
     try {
@@ -389,10 +404,13 @@ function getGoogleClientId() {
   // A. 注入 fetch-account-quota 用以向小助手卡片拉取配额
   ipcMain.handle('fetch-account-quota', async (event, request) => {
     let fallbackCachedQuota = null;
+    let requestedAccountId = '';
     try {
       const quotaRequest = request && typeof request === 'object' ? request : { accountId: request };
       const accountId = String(quotaRequest.accountId || '');
+      requestedAccountId = accountId;
       const force = quotaRequest.force === true;
+      const requestedSource = quotaRequest.source === 'language-server' ? 'language-server' : 'cloud';
       if (typeof accountId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(accountId)) throw new Error('无效账号 ID');
       const userHome = app.getPath('home');
       const accountRoot = path.join(userHome, '.gemini/antigravity/tools');
@@ -427,8 +445,58 @@ function getGoogleClientId() {
       }
 
       fallbackCachedQuota = readCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token });
-      if (!force) {
-        if (fallbackCachedQuota) return fallbackCachedQuota;
+      if (!force && requestedSource !== 'language-server') {
+        if (fallbackCachedQuota) return scopeQuotaResultToAccount(accountId, fallbackCachedQuota, 'oauth-cloud');
+      }
+
+      if (requestedSource === 'language-server') {
+        if (!isCurrentAccount) {
+          return { success: false, code: 'CURRENT_ACCOUNT_REQUIRED', error: 'Language Server 只允许读取当前账号额度' };
+        }
+        const liveStartedAt = Date.now();
+        try {
+          const liveQuota = await fetchLiveQuota({
+            appData: localAppData,
+            cacheKey: accountId,
+            timeoutMs: 2200,
+            maxAttempts: 2,
+            force
+          });
+          const latest = readJsonSafe(path.join(accountRoot, 'accounts.json'), {}, { preserveCorrupted: true });
+          if (String(latest?.current_account_id || '') !== accountId) {
+            return { success: false, code: 'ACCOUNT_CHANGED', error: '当前账号已改变，请刷新额度' };
+          }
+          let liveResult = buildLanguageServerQuotaResult(liveQuota.summary, {
+            clientVersion: liveQuota.appVersion,
+            startedAt: liveStartedAt
+          });
+          try {
+            if (liveResult.capabilities.argon === true) {
+              rememberEvidence(userHome, accountId, tokenObj.refresh_token, liveResult);
+            } else {
+              liveResult = decorateQuotaWithEvidence(
+                liveResult, readEvidence(userHome, accountId, tokenObj.refresh_token)
+              );
+            }
+          } catch (_) { /* evidence cache is optional */ }
+          const cachedAt = Date.now();
+          writeCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token, result: liveResult, now: cachedAt });
+          return scopeQuotaResultToAccount(accountId, {
+            ...liveResult, fromCache: false, cachedAt, quotaCacheVersion: 1
+          }, 'local-language-server');
+        } catch (error) {
+          if (fallbackCachedQuota) {
+            return scopeQuotaResultToAccount(accountId, {
+              ...fallbackCachedQuota,
+              stale: true,
+              refreshFailed: true,
+              refreshError: error.message,
+              refreshErrorCode: 'LANGUAGE_SERVER_UNAVAILABLE',
+              requestedQuotaSource: 'local-language-server'
+            }, 'oauth-cloud');
+          }
+          throw error;
+        }
       }
 
       // Only a cache miss or an explicit refresh performs live I/O. Inactive
@@ -437,7 +505,7 @@ function getGoogleClientId() {
       const liveQuotaPromise = isCurrentAccount
         ? fetchLiveQuotaSummary({ appData: localAppData, cacheKey: accountId, timeoutMs: 2200, maxAttempts: 2 }).catch(() => null)
         : Promise.resolve(null);
-  
+
       const liveQuota = await liveQuotaPromise;
       const localSummaryQuota = isCurrentAccount && liveQuota?.summary ? parseQuotaSummary(liveQuota.summary) : {};
       const hasCompleteLocalQuota = ['gemini5h', 'geminiWeekly', 'claude5h', 'claudeWeekly']
@@ -484,7 +552,7 @@ function getGoogleClientId() {
         // unconfirmed for any cloud-only quota/model capability.
         console.warn('[fetch-quota] Cloud OAuth refresh failed; using local quota fallback:', error.message);
       }
-  
+
       let quotaResult = await fetchAccountQuota({
         fetch: net.fetch.bind(net), accessToken,
         projectId: tokenObj.project_id || detail.project_id,
@@ -543,20 +611,20 @@ function getGoogleClientId() {
         writeCachedQuota({ accountRoot, accountId, refreshToken: tokenObj.refresh_token, result: quotaResult, now: cachedAt });
         quotaResult = { ...quotaResult, fromCache: false, cachedAt, quotaCacheVersion: 1 };
       }
-      return quotaResult;
+      return scopeQuotaResultToAccount(accountId, quotaResult);
     } catch (err) {
       const accountError = classifyAccountError(err);
       console.warn(`[fetch-quota] ${accountError.code}: ${accountError.diagnosticCode}`);
       if (fallbackCachedQuota && accountError.retryable) {
-        return {
+        return scopeQuotaResultToAccount(requestedAccountId, {
           ...fallbackCachedQuota,
           stale: true,
           refreshFailed: true,
           refreshError: accountError.message,
           refreshErrorCode: accountError.code
-        };
+        }, 'oauth-cloud');
       }
-      return { success: false, error: accountError.message, ...accountError };
+      return { success: false, accountId: requestedAccountId, error: accountError.message, ...accountError };
     }
   });
   
@@ -931,4 +999,12 @@ function getGoogleClientId() {
   
 }
 
-module.exports = { normalizeAccountEmail, getGoogleClientId, getGoogleClientSecret, restartAntigravityClient, isAntigravityClientRunning, registerAccountIpc };
+module.exports = {
+  normalizeAccountEmail,
+  getGoogleClientId,
+  getGoogleClientSecret,
+  scopeQuotaResultToAccount,
+  restartAntigravityClient,
+  isAntigravityClientRunning,
+  registerAccountIpc
+};

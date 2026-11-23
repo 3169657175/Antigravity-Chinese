@@ -3,6 +3,68 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AgyAppShellController = api;
 })(typeof window !== 'undefined' ? window : globalThis, function createAppShellController() {
+  function escapeReleaseNoteHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderReleaseNoteInline(value) {
+    return escapeReleaseNoteHtml(value)
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+      .replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+  }
+
+  function renderReleaseNotesMarkdown(value) {
+    const lines = String(value ?? '').replace(/\r/g, '').split('\n');
+    const output = [];
+    let listType = '';
+    const closeList = () => {
+      if (!listType) return;
+      output.push(`</${listType}>`);
+      listType = '';
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+      const heading = line.match(/^\s*(#{1,4})\s+(.+)$/);
+      const quote = line.match(/^\s*>\s?(.*)$/);
+      const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+      const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+
+      if (!line.trim()) {
+        closeList();
+        continue;
+      }
+      if (heading) {
+        closeList();
+        const level = Math.min(4, heading[1].length + 1);
+        output.push(`<h${level}>${renderReleaseNoteInline(heading[2])}</h${level}>`);
+      } else if (quote) {
+        closeList();
+        output.push(`<blockquote>${renderReleaseNoteInline(quote[1])}</blockquote>`);
+      } else if (unordered || ordered) {
+        const nextListType = unordered ? 'ul' : 'ol';
+        if (listType !== nextListType) {
+          closeList();
+          listType = nextListType;
+          output.push(`<${listType}>`);
+        }
+        output.push(`<li>${renderReleaseNoteInline((unordered || ordered)[1])}</li>`);
+      } else {
+        closeList();
+        output.push(`<p>${renderReleaseNoteInline(line.trim())}</p>`);
+      }
+    }
+    closeList();
+    return output.join('');
+  }
+
   function init() {
 
       // ----------------------------------------
@@ -28,6 +90,11 @@
       const ui = window.AgyUiFeedback || { notify: (message, type) => console[type === 'error' ? 'error' : 'log'](message) };
       const diagnostics = window.AgyErrorDiagnostics || { classify: input => ({ title: '操作失败', message: String(input?.message || input?.error || input || '未知错误') }) };
       const notifyError = (input, fallbackTitle = '操作失败') => { const info = diagnostics.classify(input); ui.notify(info.message, 'error', { title: info.title || fallbackTitle }); return info; };
+      const setReleaseNotes = (value, markdown = false) => {
+        if (!updateReleaseNotes) return;
+        if (markdown) updateReleaseNotes.innerHTML = renderReleaseNotesMarkdown(value);
+        else updateReleaseNotes.textContent = String(value || '');
+      };
 
       function formatDownloadSpeed(bytesPerSecond) {
         const value = Math.max(0, Number(bytesPerSecond) || 0);
@@ -70,9 +137,7 @@
         if (updateCurrentVersion) updateCurrentVersion.textContent = versionLabel(data.currentVersion);
         if (updateLatestVersion) updateLatestVersion.textContent = versionLabel(data.version);
         if (updateModalSummary) updateModalSummary.textContent = `检测到有更新，建议升级到 ${versionLabel(data.version)}`;
-        if (updateReleaseNotes) {
-          updateReleaseNotes.textContent = String(data.releaseNotes || '').trim() || '本次更新未提供详细说明。';
-        }
+        setReleaseNotes(String(data.releaseNotes || '').trim() || '本次更新未提供详细说明。', true);
         if (updateModalStatus) updateModalStatus.textContent = '';
         if (updateProgressSection) updateProgressSection.hidden = true;
         if (btnUpdateCancel) btnUpdateCancel.disabled = false;
@@ -86,7 +151,7 @@
         if (updateModalSummary) updateModalSummary.textContent = '正在连接 GitHub Release，请稍候…';
         if (updateCurrentVersion) updateCurrentVersion.textContent = versionLabel(currentAppVersion);
         if (updateLatestVersion) updateLatestVersion.textContent = 'v--';
-        if (updateReleaseNotes) updateReleaseNotes.textContent = '正在读取版本信息与更新说明…';
+        setReleaseNotes('正在读取版本信息与更新说明…');
         if (updateModalStatus) updateModalStatus.textContent = '检查过程在后台进行，无需重复点击。';
         if (updateProgressSection) updateProgressSection.hidden = true;
         if (btnUpdateCancel) btnUpdateCancel.disabled = false;
@@ -103,7 +168,7 @@
         if (updateAction === 'download') {
           setUpdateAction('downloading', '正在下载...', true);
           if (updateProgressSection) updateProgressSection.hidden = false;
-          if (updateModalStatus) updateModalStatus.textContent = '将直接下载完整安装包，已关闭 GitHub blockmap 差分下载以提升速度。';
+          if (updateModalStatus) updateModalStatus.textContent = '优先下载差分更新；若 Release 未提供差分文件，将自动回退到完整安装包。';
           const result = await window.agyHubAPI.startDownloadUpdate();
           if (!result || !result.success) {
             setUpdateAction('download', '重新下载');
@@ -187,23 +252,34 @@
             if (updateModalTitle) updateModalTitle.textContent = '当前已是最新版';
             if (updateModalSummary) updateModalSummary.textContent = '无需更新，可以继续使用当前版本。';
             if (updateLatestVersion) updateLatestVersion.textContent = updateCurrentVersion?.textContent || 'v--';
-            if (updateReleaseNotes) updateReleaseNotes.textContent = '当前版本已经是 GitHub Release 中的最新版本。';
+            setReleaseNotes('当前版本已经是 GitHub Release 中的最新版本。');
             if (updateModalStatus) updateModalStatus.textContent = '';
             setUpdateAction('close', '知道了');
             setTimeout(() => { btn.textContent = '检查更新'; }, 3000);
           } else if (data.status === 'details') {
-            if (data.releaseNotes && updateReleaseNotes) updateReleaseNotes.textContent = data.releaseNotes;
+            if (data.releaseNotes) setReleaseNotes(data.releaseNotes, true);
           } else if (data.status === 'downloading') {
             btn.textContent = `已下载 ${data.percent}%`;
             btn.disabled = true;
             updateAction = 'downloading';
             if (updateProgressSection) updateProgressSection.hidden = false;
             const speed = formatDownloadSpeed(data.bytesPerSecond);
-            if (updateProgressText) updateProgressText.textContent = speed ? `正在高速下载完整安装包 · ${speed}` : '正在下载完整安装包';
+            if (updateProgressText) updateProgressText.textContent = speed ? `正在下载更新 · ${speed}` : '正在下载更新';
             if (updateProgressPercent) updateProgressPercent.textContent = `${data.percent}%`;
             if (updateProgressBar) updateProgressBar.style.width = `${Math.max(0, Math.min(100, Number(data.percent) || 0))}%`;
             if (btnUpdateAction) {
               btnUpdateAction.textContent = `正在下载 ${data.percent}%`;
+              btnUpdateAction.disabled = true;
+            }
+          } else if (data.status === 'retrying') {
+            btn.textContent = `重试下载 ${data.attempt}/${data.maxAttempts}`;
+            btn.disabled = true;
+            updateAction = 'downloading';
+            if (updateProgressSection) updateProgressSection.hidden = false;
+            if (updateProgressText) updateProgressText.textContent = `连接中断，正在自动重试（${data.attempt}/${data.maxAttempts}）`;
+            if (updateModalStatus) updateModalStatus.textContent = '已保留更新流程，无需手动重复点击。';
+            if (btnUpdateAction) {
+              btnUpdateAction.textContent = '正在重新连接…';
               btnUpdateAction.disabled = true;
             }
           } else if (data.status === 'downloaded') {
@@ -221,15 +297,15 @@
             if (updateModalTitle) updateModalTitle.textContent = '检查更新失败';
             if (updateModalSummary) updateModalSummary.textContent = '暂时无法连接更新服务。';
             const info = diagnostics.classify({ code: data.code, message: data.error || data.text });
-            if (updateReleaseNotes) updateReleaseNotes.textContent = `${info.message}\n\n建议：${info.action}`;
+            setReleaseNotes(`${info.message}\n\n建议：${info.action}`);
             if (updateModalStatus) updateModalStatus.textContent = info.message;
             ui.notify(info.message, 'error', { title: info.title });
             const modalOpen = Boolean(updateModal && updateModal.style.display !== 'none');
             if (modalOpen) setUpdateAction('download', '重新下载');
             btn.textContent = '检查更新';
             btn.disabled = false;
-            if (modalOpen) setUpdateAction('close', '关闭');
-            else updateAction = 'check';
+            if (data.phase !== 'download' && modalOpen) setUpdateAction('close', '关闭');
+            else if (!modalOpen) updateAction = 'check';
           }
         });
       }
@@ -282,5 +358,5 @@
       }
   }
 
-  return { init };
+  return { init, renderReleaseNotesMarkdown };
 });

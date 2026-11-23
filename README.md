@@ -2,27 +2,50 @@
 
 ![Electron](https://img.shields.io/badge/Electron-31.x-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Release](https://img.shields.io/badge/AGY%20Hub-1.4.3-0A7D5A.svg)
-![Antigravity](https://img.shields.io/badge/Antigravity-2.26.0-5B5BD6.svg)
+![Release](https://img.shields.io/badge/AGY%20Hub-1.4.7-0A7D5A.svg)
+![Antigravity](https://img.shields.io/badge/Antigravity-2.34.0-5B5BD6.svg)
 
 AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉化补丁、账号与额度、Codex / 自定义 Provider 接入、Token 统计、主题、MCP / Skill、社区与更新能力集中到一个 Electron 应用中。
 
-当前发布版本为 **AGY Hub 1.4.3**；汉化补丁基于 **Antigravity 2.26.0** 构建与验证。客户端更新后按版本、官方文件哈希与结构自动构建并校验；如果官方移除必要能力，会在写入前停止，不能保证未知结构的任意未来版本均兼容。
+当前发布版为 **AGY Hub 1.4.7**，支持 Windows 10 / 11。汉化补丁基于 **Antigravity 2.34.0** 构建并验证。官方客户端更新后，AGY Hub 会检查版本与文件结构。结构超出兼容范围时，注入会在写入前停止。
 
-[下载 1.4.3 安装包](https://github.com/3169657175/Antigravity-Chinese/releases/download/v1.4.3/agy-hub-setup-1.4.3.exe) · [最新版 Release](https://github.com/3169657175/Antigravity-Chinese/releases/latest) · [完整更新说明](docs/RELEASE_NOTES_1.4.3.md)
+[下载 1.4.7 安装包](https://github.com/3169657175/Antigravity-Chinese/releases/download/v1.4.7/agy-hub-setup-1.4.7.exe) · [全部发行版](https://github.com/3169657175/Antigravity-Chinese/releases) · [1.4.7 更新说明](docs/RELEASE_NOTES_1.4.7.md)
 
-安装后打开 AGY Hub，点击“注入中文汉化补丁”应用新版汉化。覆盖安装会按安装目录识别并关闭正在运行的管家。
+下载 EXE 并运行安装器。已有用户可覆盖安装。安装后打开 AGY Hub，点击“注入中文汉化补丁”，更新 Antigravity 的汉化、侧栏和账号弹窗。覆盖安装会按安装目录关闭正在运行的 AGY Hub。
+
+## 1.4.7 重点更新
+
+- 适配 Antigravity 2.34.0，修复新版客户端无法注入汉化的问题。
+- 修复注入后账号列表无法加载、账号切换超时的问题。
+- 侧栏和账号详情从 Language Server 同步刷新当前账号的额度，正确显示 0%，避免账号切换后混用旧数据。
+- 修复账号配置导入导出。导入时加密保存凭据，同一账号保留原有记录。
+
+## 1.4.6 重点更新
+
+- 适配 Antigravity 2.32.1 的新版主进程、IPC 与 Language Server 启动结构，兼容官方 `baseLsArgs` 参数来源。
+- 防止新版客户端被错误重写成重复 `async` 函数；新旧环境合并结构均通过回归测试。
+- 运行时兼容构建改为识别 `process.env` 合并语义；未来相近版本可自动匹配，完全未知结构仍会在写入前安全报错。
+- 使用官方 2.32.1 ASAR 完成隔离兼容构建，保留账号、额度、主题、汉化、代理和安全回滚能力。
+- 重新适配 2.32.1 主内容根节点、inset shell、自动化和自定义功能页面，恢复被实色容器遮挡的壁纸，并收敛新版输入框的双层描边与阴影。
+- 深度审计 2.32.1 嵌入式前端，补齐动态问候、自动化空状态、自定义功能分类/说明和设置页新增文案，同时保护产品名、代码、路径及用户内容不被误翻。
+
+## 1.4.4 重点更新
+
+- 反代账号选择、当前账号提示和额度卡片统一绑定同一份账号草稿状态；后台刷新带账号作用域与请求序号，避免旧请求覆盖新选择或刷新后跳回其他账号。
+- 反代模型目录改为按所选账号的真实能力生成，Gemini 4 Argon 与 Claude 模型使用各自的账号路由和动态模型映射；三级测试沿用当前选择，不再误用全局账号或旧模型列表。
+- 账号缓存回填时同步保存该账号的模型目录，额度、模型可用性与诊断结果保持隔离。
+- 反馈、用户管理和公告页统一搜索框留白、数量徽标和摘要排版，移除反馈页冗余说明，长列表及弹窗在窄窗口下保持稳定滚动。
+- 保留 1.4.3 的本机 Language Server 实时额度、按账号 Argon 判定、公告常驻入口、更新重试与 Markdown 更新说明渲染修复。
 
 ## 1.4.3 重点更新
 
-- **纯云端 Gemini 4 Argon 额度**：使用每个已保存账号的 OAuth 授权直接查询 Cloud Code，Antigravity 关闭、账号未切换时也可刷新；显示真实剩余百分比与重置时间。无授权账号仍需先登录。
-- **双通道额度兼容**：只读额度/模型接口采用新 CLI User-Agent 与 `{}` 请求体；保留原桌面端请求回退。本地 Language Server 仅作辅助，缓存与未知状态不会冒充实时额度。
-- **本地账号管理**：优化账号切换和登录态保护、按账号独立模型目录及额度缓存，防止 A 账号模型或额度混进 B 账号。
-- **Codex / API 接入**：按当前账号的实际能力展示 Gemini 4 Argon、Claude 5.5，其他账号继续使用 Gemini 3.8 Flash / Claude 4.6 等可用模型；更新 Codex 私有别名映射。
-- **界面与社区**：优化反代页三个诊断按钮布局、反馈回复与弹窗、浅色主题及管理页面。
-- **汉化补丁**：保持 Antigravity 2.26.0 已验证适配、按版本校验构建、注入窗口额度显示与安全回退能力。
-
-> 说明：每个账号能否使用 Gemini 4 / Claude 5.5 取决于 Google 返回的实际权限与模型目录；普通额度与独立 Argon 额度不会强行合并。详细内容请看 [v1.4.3 更新日志](docs/RELEASE_NOTES_1.4.3.md)。
+- 账号额度改为当前账号本地语言服务优先，云端接口补充；云端额度缺失不能覆盖已确认的本地数据。
+- Gemini 4 Argon 权限按账号独立识别：只有存在本地额度桶或该账号云端可见模型证据时展示，不支持的账号不显示，无法判断时不伪称不支持。
+- 增加语言服务启动短暂失败的重试、按账号隔离的短缓存、切换失效及异步结果防串号。
+- 注入包同步升级多账号窗口和侧栏数据刷新；Argon 有权限但尚无数值时显示“待确认”，不再继承前一个账号的额度。
+- 补充云端失败本地回退、非当前账号模型证据、缓存切换和缺失额度判定的自动化测试。
+- 修复反代接入页“配置快照 / 请求时间线 / 一键诊断”按钮纵向错位，宽屏保持同一行，窄屏自动换行。
+- 反馈页不再弹出无必要的“离线只读”提示；回复成功后立即结束“发送中”状态并同步刷新详情，避免服务器已经接收但界面仍停留在处理中。
 
 ## 1.4.1 重点更新
 
@@ -85,7 +108,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 | Anthropic Messages | `http://127.0.0.1:8046` | `/v1/messages` | Messages、SSE、tool_use、`count_tokens` |
 | Gemini Native | `http://127.0.0.1:8046/v1beta` | `models/{model}:generateContent` | generate/stream、functionCall / functionResponse |
 
-公共模型发现：`GET /v1/models`；Gemini 模型发现：`GET /v1beta/models`。实时模型目录按账号查询与筛选：获得权限的账号可见 Gemini 4 Argon、Claude 5.5，其他账号保留其实际可用的 Gemini 3.8 Flash、Claude 4.6 和 GPT-OSS；不会将 A 账号的模型权限直接应用到 B 账号。
+公共 OpenAI 客户端通过 `GET /v1/models` 查询模型。Gemini 客户端使用 `GET /v1beta/models`。可用模型随上游和当前账号权限变化，以接口返回或 AGY Hub 的模型列表为准。
 
 > Codex 为了适配自身模型白名单仍使用 `gpt-*` 兼容槽位，但这些别名只写入 Codex 私有模型目录；普通 API 客户端始终看到并使用真实 Gemini / Claude 模型 ID。
 
@@ -94,8 +117,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 - **汉化补丁与安全回退**：基于当前官方 `app.asar` 构建兼容补丁，支持注入、退回上一版汉化和恢复官方英文原版。
 - **本地账号与额度**：读取 Antigravity 本地账号，展示额度、状态与重置时间，并提供账号切换和异常分类。
 - **统一 API 反代**：本地 `127.0.0.1:8046` 同时提供 OpenAI Responses、OpenAI Chat Completions、Anthropic Messages 与 Gemini Native，支持流式输出、工具调用、图片、长上下文与模型映射。
-- **Claude Code 底层兼容（暂时隐藏入口）**：相关实现仍保留在源码中，当前版本默认通过 Feature Flag 关闭 UI，待链路完善后可直接重新开放。
-- **当前模型目录**：按保存账号的云端模型目录动态识别 Gemini 4 Argon、Claude 5.5、Gemini 3.8 Flash、Claude 4.6 与 GPT-OSS；Argon 独立额度可在不启动 Antigravity 时实时查询。
+- **Claude Code 底层兼容**：网关保留 Anthropic Messages 协议支持，界面里的 Claude Code 一键接入入口当前默认隐藏。
 - **自定义 Provider**：支持 OpenAI Responses 兼容服务，测试不会改变当前已连接线路。
 - **Token 与缓存监控**：区分本地 Antigravity、Codex 和 Claude Code 调用，统计输入、输出、缓存与命中率。
 - **主题皮肤**：内置主题并支持本地自定义壁纸。
@@ -110,7 +132,7 @@ AGY Hub 是面向 Windows 版 Google Antigravity 的本地桌面管家，把汉�
 | `<AGY Hub 安装目录>` | 应用安装与运行目录，不建议直接作为长期开发目录 |
 | `app\dist\` | Windows 安装包、blockmap 和 `latest.yml` 发布产物 |
 
-开发时请先阅读 [源码布局说明](docs/REPOSITORY_LAYOUT.md)、`docs/development/AGENTS.md`、`docs/development/AI_PROJECT_GUIDE.md` 和 `docs/MAINTENANCE_GUIDE.md`。
+开发时请先阅读 [源码布局说明](docs/REPOSITORY_LAYOUT.md)和 [维护指南](docs/MAINTENANCE_GUIDE.md)。源码布局说明列出了本机与 GitHub 上的开发指引位置。
 
 ## 项目结构
 
@@ -186,12 +208,14 @@ npm run dist:sync
 正式 Release 使用以下三个核心文件：
 
 ```text
-agy-hub-setup-1.4.3.exe
-agy-hub-setup-1.4.3.exe.blockmap
+agy-hub-setup-1.4.7.exe
+agy-hub-setup-1.4.7.exe.blockmap
 latest.yml
 ```
 
-`latest.yml` 与安装包必须来自同一次构建。发布前应确认补丁校验通过、全量测试通过，并记录安装包 SHA-256。
+`latest.yml`、EXE 和 blockmap 必须来自同一次构建。发布前核对补丁验证、测试结果和附件哈希，并确认 Release 标签指向包含该版本的源码提交。
+
+安装器提供覆盖升级流程。项目本机 1.4.7 构建的 SHA-256 记录位于 `dist/SHA256SUMS-1.4.7.txt`。
 
 ## 安全边界
 

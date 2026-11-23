@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { fetchAccountQuota, parseQuotaSummary } = require('../../accountQuota');
-const { registerAccountIpc } = require('../../accountIpc');
+const { fetchAccountQuota, parseQuotaSummary, buildLanguageServerQuotaResult } = require('../../accountQuota');
+const { registerAccountIpc, scopeQuotaResultToAccount } = require('../../accountIpc');
+const { modelsForAccount, clearModelsForAccount } = require('../../accountModelAvailability');
 const asar = require('@electron/asar');
 
 const fields = ['gemini5h', 'geminiWeekly', 'claude5h', 'claudeWeekly'];
@@ -136,6 +137,56 @@ test('absent or invalid remainingFraction is never fabricated as 100 percent', (
   ] }] }), {});
 });
 
+test('current-account Language Server result preserves live Argon quota without cloud merging', () => {
+  const result = buildLanguageServerQuotaResult({ groups: [{ buckets: [
+    { bucketId: 'gemini-5h', remainingFraction: 0.88 },
+    { bucketId: 'gemini-weekly', remainingFraction: 0.77 },
+    { bucketId: '3p-5h', remainingFraction: 0.66 },
+    { bucketId: '3p-weekly', remainingFraction: 0.55 },
+    { bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.17, resetTime: '2026-11-01T00:00:00Z' }
+  ] }] }, { clientVersion: '2.26.0' });
+  assert.equal(result.success, true);
+  assert.equal(result.quotaSource, 'local-language-server');
+  assert.equal(result.quota.argonWeekly, '17%');
+  assert.equal(result.argonQuotaSource, 'local-language-server');
+  assert.deepEqual(result.capabilities, { argon: true });
+  assert.equal(result.partial, false);
+});
+
+test('current-account quota IPC source bypasses cache and cloud for a direct Language Server read', async t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-current-live-quota-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const root = path.join(home, '.gemini/antigravity/tools');
+  fs.mkdirSync(path.join(root, 'accounts'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'accounts.json'), JSON.stringify({ current_account_id: 'active', accounts: [{ id: 'active' }] }));
+  fs.writeFileSync(path.join(root, 'accounts', 'active.json'), JSON.stringify({ token: { refresh_token: 'active-refresh' } }));
+  const handlers = new Map();
+  let liveReads = 0;
+  registerAccountIpc({
+    app: { getPath: () => home }, safeStorage: {}, getMainWindow: () => null,
+    ipcMain: { handle: (name, fn) => handlers.set(name, fn) },
+    fetchLiveQuota: async options => {
+      liveReads += 1;
+      assert.equal(options.force, true);
+      return { appVersion: '2.26.0', summary: { groups: [{ buckets: [
+        { bucketId: 'gemini-5h', remainingFraction: 0.9 },
+        { bucketId: 'gemini-weekly', remainingFraction: 0.8 },
+        { bucketId: '3p-5h', remainingFraction: 0.7 },
+        { bucketId: '3p-weekly', remainingFraction: 0.6 },
+        { bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.16 }
+      ] }] } };
+    },
+    net: { fetch: async () => { throw new Error('cloud must not be called for active Language Server quota'); } }
+  });
+  const result = await handlers.get('fetch-account-quota')(null, {
+    accountId: 'active', force: true, source: 'language-server'
+  });
+  assert.equal(liveReads, 1);
+  assert.equal(result.quota.argonWeekly, '16%');
+  assert.equal(result.quotaSource, 'local-language-server');
+  assert.equal(result.fromCache, false);
+});
+
 test('local Argon snapshot is not presented as a live cloud quota when Cloud Code cannot confirm it', async () => {
   const seenAgents = [];
   const result = await fetchAccountQuota({
@@ -149,7 +200,7 @@ test('local Argon snapshot is not presented as a live cloud quota when Cloud Cod
     }
   });
   assert.ok(seenAgents.includes('antigravity/2.26.0'));
-  assert.ok(seenAgents.some(value => value.startsWith('antigravity/cli/1.4.5 ')));
+  assert.ok(seenAgents.some(value => value.startsWith('antigravity/cli/1.4.7 ')));
   assert.equal(result.quota.argonWeekly, undefined);
   assert.deepEqual(result.capabilities, { argon: false });
   assert.equal(result.argonCapabilityStatus, 'unconfirmed');
@@ -243,15 +294,27 @@ test('hub quota IPC queries non-current accounts without writing the registry or
   assert.deepEqual(files.map(file => fs.readFileSync(file, 'utf8')), before);
 });
 
-test('shipped Antigravity preload isolates quota cache without periodic cloud polling', () => {
+test('shipped Antigravity sidebar and detail dialog share one pushed Language Server snapshot', () => {
   const preload = asar.extractFile(path.join(__dirname, '../../assets/app.asar'), 'dist/preload.js').toString('utf8');
+  const ipc = asar.extractFile(path.join(__dirname, '../../assets/app.asar'), 'dist/ipcHandlers.js').toString('utf8');
+  assert.match(preload, /function createQuotaSnapshotState\(storage\)/);
   assert.match(preload, /function setAgyCurrentQuotaAccount\(accountId\)/);
-  assert.match(preload, /function refreshAgyActiveQuota\(\)/);
-  assert.match(preload, /window\.antigravityCurrentAccount !== id/);
+  assert.match(preload, /function refreshAgyActiveQuota\(force\)/);
+  assert.match(preload, /ipcRenderer\.on\('agy:quota:updated'/);
+  assert.match(preload, /ipcRenderer\.invoke\('agy:quota:get-current'\)/);
+  assert.match(preload, /isCurrent \? Promise\.resolve\(getAgyCurrentQuotaResult\(\)\)/);
   assert.match(preload, /_checked_at/);
   assert.doesNotMatch(preload, /setInterval\(refreshAgyActiveQuota/);
+  assert.doesNotMatch(preload, /isArgon && argonWeekly === '待查询'[\s\S]*refreshAgyActiveQuota/);
+  assert.doesNotMatch(preload, /isCurrent \? electron_1\.ipcRenderer\.invoke\('agy:quota:refresh-current'\)/);
   assert.match(preload, /fetch-account-quota', \{ accountId: acc\.id, force: Boolean\(forceQuota\) \}/);
   assert.match(preload, /Gemini 4 Argon 每周额度/);
+  assert.match(preload, /localStorage\.setItem\('agy_current_account_id', id\)/);
+  assert.match(preload, /agy_quota_snapshot_v3_/);
+  assert.match(ipc, /ipcMain\.handle\('agy:quota:get-current'/);
+  assert.match(ipc, /contents\.send\('agy:quota:updated', result\)/);
+  assert.doesNotMatch(ipc, /window\.dispatchEvent\(new CustomEvent\('agy-language-server-quota'/);
+  assert.doesNotMatch(ipc, /localStorage\.getItem\('agy_current_account_id'\)/);
 });
 
 test('hub quota IPC reuses shared account cache unless refresh is explicitly forced', async t => {
@@ -283,4 +346,19 @@ test('hub quota IPC reuses shared account cache unless refresh is explicitly for
   const forced = await handler(null, { accountId: 'cached', force: true });
   assert.equal(forced.fromCache, false);
   assert.ok(networkCalls > callsAfterFirst);
+});
+
+test('cached quota hydrates the same accounts gateway model catalog', () => {
+  const accountId = 'cached-new-model-account';
+  clearModelsForAccount(accountId);
+  const result = scopeQuotaResultToAccount(accountId, {
+    success: true,
+    fromCache: true,
+    availableModels: ['gemini-4-argon-high', 'claude-opus-5-5-high']
+  }, 'oauth-cloud');
+  assert.equal(result.accountId, accountId);
+  assert.deepEqual(result.availableModels, ['gemini-4-argon-high', 'claude-opus-5-5-high']);
+  assert.deepEqual(modelsForAccount(accountId).modelIds, ['gemini-4-argon-high', 'claude-opus-5-5-high']);
+  assert.deepEqual(result.availableModelEntries.map(entry => entry.id), result.availableModels);
+  clearModelsForAccount(accountId);
 });

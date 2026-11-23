@@ -7,20 +7,18 @@ const { registerAccountIpc } = require('../../accountIpc');
 const { readEvidence, rememberEvidence, decorateQuotaWithEvidence, evidencePath } = require('../../argonEvidence');
 const { credentialDocument } = require('../../windowsAccountCredential');
 
-test('Argon verified evidence survives without live server; it cannot leak across accounts or refresh token changes', t => {
+test('historical Argon evidence is disabled and cannot resurrect a missing live bucket', t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-argon-evidence-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
-  assert.equal(rememberEvidence(home, 'first', 'refresh-first', { capabilities: { argon: true }, quota: { argonWeekly: '57%' } }), true);
-  assert.equal(fs.readFileSync(evidencePath(home), 'utf8').includes('refresh-first'), false);
-  const evidence = readEvidence(home, 'first', 'refresh-first');
-  assert.equal(evidence.lastPercent, '57%');
-  assert.equal(readEvidence(home, 'first', 'refresh-new'), null);
-  assert.equal(readEvidence(home, 'second', 'refresh-first'), null);
-  const result = decorateQuotaWithEvidence({ success: true, quota: { geminiWeekly: '100%' }, capabilities: { argon: false } }, evidence);
-  assert.equal(result.capabilities.argon, true);
-  assert.equal(result.argonCapabilityStatus, 'previously-available');
+  assert.equal(rememberEvidence(home, 'first', 'refresh-first', { capabilities: { argon: true }, quota: { argonWeekly: '57%' } }), false);
+  assert.equal(fs.existsSync(evidencePath(home)), false);
+  assert.equal(readEvidence(home, 'first', 'refresh-first'), null);
+  const live = { success: true, quota: { geminiWeekly: '100%' }, capabilities: { argon: false } };
+  const result = decorateQuotaWithEvidence(live, { lastPercent: '57%' });
+  assert.equal(result, live);
+  assert.equal(result.capabilities.argon, false);
+  assert.equal(result.argonCapabilityStatus, undefined);
   assert.equal(result.quota.argonWeekly, undefined);
-  assert.equal(result.argonLastKnown.lastPercent, '57%');
 });
 
 test('offline desktop switching rolls back on credential failure and stages the account for next launch', async t => {

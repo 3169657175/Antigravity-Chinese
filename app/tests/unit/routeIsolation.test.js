@@ -5,6 +5,8 @@ const os = require('os');
 const path = require('path');
 const { CodexGateway } = require('../../codexGateway');
 const { PROFILE_IDS } = require('../../gatewayProfiles');
+const { setModelsForAccount, clearModelsForAccount } = require('../../accountModelAvailability');
+const { isQuotaResponseCurrent } = require('../../gatewayController');
 
 test('probeUpstream restores the exact active custom route if probe code mutates it', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-route-isolation-'));
@@ -115,4 +117,39 @@ test('Claude account and model draft selectors stay read-only until an explicit 
     assert.ok(block, `missing Claude draft handler ${pattern}`);
     assert.doesNotMatch(block, /startCodexGateway|connectClaudeDesktop/);
   }
+});
+
+test('quota responses are accepted only for the account that is still selected', () => {
+  const base = { requestId: 4, activeRequestId: 4, selectedId: 'account-a', currentSelectedId: 'account-a' };
+  assert.equal(isQuotaResponseCurrent({ ...base, responseAccountId: 'account-a' }), true);
+  assert.equal(isQuotaResponseCurrent({ ...base, activeRequestId: 5, responseAccountId: 'account-a' }), false);
+  assert.equal(isQuotaResponseCurrent({ ...base, currentSelectedId: 'account-b', responseAccountId: 'account-a' }), false);
+  assert.equal(isQuotaResponseCurrent({ ...base, responseAccountId: 'account-b' }), false);
+});
+
+test('configure validates each draft model against its selected account catalog', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-account-model-routing-'));
+  const accountId = 'new-model-account';
+  setModelsForAccount(accountId, ['gemini-4-argon-high', 'claude-opus-5-5-high']);
+  const gateway = new CodexGateway({
+    fetch: async () => new Response('{}', { status: 200 }),
+    accountRoot: root,
+    stateDir: root,
+    decryptToken: value => value,
+    clientId: 'test',
+    clientSecret: 'test'
+  });
+  gateway.configure({
+    profileId: PROFILE_IDS.CODEX_ANTIGRAVITY,
+    accountId,
+    model: 'gemini-4-argon-high'
+  });
+  gateway.configure({
+    profileId: PROFILE_IDS.CLAUDE_ANTIGRAVITY,
+    claudeAccountId: accountId,
+    claudeModel: 'claude-opus-5-5-high'
+  });
+  assert.equal(gateway.status().profiles.codexAntigravity.model, 'gemini-4-argon-high');
+  assert.equal(gateway.status().profiles.claudeAntigravity.model, 'claude-opus-5-5-high');
+  clearModelsForAccount(accountId);
 });

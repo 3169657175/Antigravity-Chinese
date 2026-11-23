@@ -151,6 +151,7 @@
   }
   function fragmentContext(element) {
     for (let cur = element, depth = 0; cur && depth < 4; cur = cur.parentElement, depth++) {
+      if (cur.matches?.('[data-testid="sidecar-list-empty"]')) return true;
       const value = cur.textContent || '';
       if (value.length < 700 && /(?:to have the agent generate a plan|让智能体生成计划|Modified in|已在\s*\d*\s*(?:projects?|个项目)|个项目中修改|浏览器子智能体|browser subagent)/i.test(value)) return true;
       if (value.length < 100 && /^(?:See|Show|再显示)\s+\d+\s*(?:more|项)(?:\.\.\.)?$/i.test(normalize(value))) return true;

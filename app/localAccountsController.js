@@ -7,18 +7,9 @@ const QUOTA_SECTIONS = Object.freeze([
   { title: 'Claude / GPT', fields: [['claude5h', '5h 限制'], ['claudeWeekly', '每周上限']] },
   { title: 'Gemini', fields: [['gemini5h', '5h 限制'], ['geminiWeekly', '每周上限']] }
 ]);
-function argonLastSeenCopy(result) {
-  if (result?.argonCapabilityStatus !== 'previously-available') return null;
-  const checkedAt = Number(result.argonLastKnown?.checkedAt);
-  const ageMs = Date.now() - checkedAt;
-  if (!Number.isFinite(ageMs) || ageMs < 0) return '历史已验证，实时额度待确认';
-  const age = ageMs < 3600000 ? Math.max(1, Math.round(ageMs / 60000)) + ' 分钟前' :
-    ageMs < 86400000 ? Math.round(ageMs / 3600000) + ' 小时前' :
-    Math.round(ageMs / 86400000) + ' 天前';
-  return `上次确认：${result.argonLastKnown?.lastPercent || '额度未知'} · ${age}（非实时）`;
-}
 let localAccountsLoadGeneration = 0;
 const LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS = 9000;
+const CURRENT_ACCOUNT_QUOTA_POLL_INTERVAL_MS = 15000;
 
 function withQuotaUiDeadline(promise, timeoutMs = LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS, timers = {}) {
   const schedule = timers.setTimeout || setTimeout;
@@ -61,7 +52,10 @@ function calculateQuotaScore(weekly, shortWindow) {
 
 function quotaSectionsForResult(result) {
   const sections = [...QUOTA_SECTIONS];
-  if (result?.capabilities?.argon === true) {
+  // Never let the removed historical-evidence state resurrect an Argon card
+  // from an old localStorage/account cache.  A live response must identify the
+  // capability for this exact account.
+  if (result?.capabilities?.argon === true && result?.argonCapabilityStatus !== 'previously-available') {
     sections.push({ title: 'Gemini 4 Argon', fields: [['argonWeekly', '每周上限']] });
   }
   return sections.map(section => ({
@@ -77,6 +71,144 @@ function createLocalAccountBadge(text, type) {
   badge.className = `local-account-badge ${type}`;
   badge.textContent = text;
   return badge;
+}
+
+function formatResetTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const target = new Date(isoStr);
+    const diffMs = target - new Date();
+    if (diffMs <= 0) return '';
+    const diffMins = Math.round(diffMs / 60000);
+    if (diffMins < 60) return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffMins}m重置)</span>`;
+    const diffHours = Math.floor(diffMins / 60);
+    const remMins = diffMins % 60;
+    if (diffHours < 24) return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffHours}h${remMins}m重置)</span>`;
+    const diffDays = Math.floor(diffHours / 24);
+    const remHours = diffHours % 24;
+    return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffDays}d${remHours}h重置)</span>`;
+  } catch (_) { return ''; }
+}
+
+function getBarColor(percent) {
+  const value = Number(percent) || 0;
+  if (value >= 50) return 'var(--accent-green, #10b981)';
+  if (value >= 25) return '#f59e0b';
+  return 'var(--accent-pink, #ef4444)';
+}
+
+function renderQuotaResultIntoPanel(quotaPanel, result) {
+  const quotaColumns = quotaSectionsForResult(result).map(section => {
+    const isArgonSection = section.title.toLowerCase().includes('argon');
+    const items = section.fields.map(({ field, label, state }) => {
+      if (state === 'unconfirmed') {
+        return `<div class="quota-item pending"><div class="quota-label"><span>${label}</span><span class="quota-val">待确认</span></div></div>`;
+      }
+      const percent = quotaPercent(result, field);
+      const reset = formatResetTime(result.quota[`${field}Reset`]);
+      const barColor = isArgonSection && percent >= 50 ? '#8b5cf6' : getBarColor(percent);
+      return `<div class="quota-item"><div class="quota-label"><span>${label} ${reset}</span><span class="quota-val">${percent}%</span></div><div class="quota-bar"><div class="quota-fill" style="width: ${percent}%; background-color: ${barColor};"></div></div></div>`;
+    }).filter(Boolean).join('');
+    return items ? `<div class="quota-col${isArgonSection ? ' quota-col-argon' : ''}"><div class="quota-platform">${section.title}</div>${items}</div>` : '';
+  }).filter(Boolean);
+  quotaPanel.className = 'local-account-quota';
+  quotaPanel.innerHTML = `<div class="quota-grid${quotaColumns.length === 1 ? ' single' : ''}">${quotaColumns.join('')}</div>`;
+}
+
+function quotaCacheKey(accountId) {
+  return `agy_hub_quota_swr_v2_${accountId}`;
+}
+
+function persistQuotaResult(accountId, result) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(quotaCacheKey(accountId), JSON.stringify({ savedAt: Date.now(), res: result }));
+    }
+  } catch (_) {}
+}
+
+function quotaRequestOptions(account, force) {
+  return {
+    force: force === true,
+    source: account?.current ? 'language-server' : 'cloud'
+  };
+}
+
+function createCurrentQuotaPoller(options = {}) {
+  const intervalMs = Math.max(1000, Number(options.intervalMs) || CURRENT_ACCOUNT_QUOTA_POLL_INTERVAL_MS);
+  const schedule = options.setTimeout || setTimeout;
+  const cancel = options.clearTimeout || clearTimeout;
+  const isActive = options.isActive || (() => true);
+  const refresh = options.refresh || (() => Promise.resolve());
+  let timer = null;
+  let stopped = true;
+
+  const scheduleNext = () => {
+    if (stopped || timer !== null || !isActive()) return;
+    timer = schedule(async () => {
+      timer = null;
+      if (stopped || !isActive()) return;
+      try { await refresh(); }
+      finally { scheduleNext(); }
+    }, intervalMs);
+  };
+
+  return {
+    start() { stopped = false; scheduleNext(); },
+    stop() { stopped = true; if (timer !== null) cancel(timer); timer = null; },
+    isRunning() { return !stopped; }
+  };
+}
+
+let currentQuotaPollLog = () => {};
+let quotaVisibilityListenerInstalled = false;
+
+function isLocalAccountsPageVisible() {
+  if (typeof document === 'undefined') return false;
+  const pane = document.getElementById('tab-local-accounts');
+  return document.visibilityState !== 'hidden' && Boolean(pane?.classList.contains('active'));
+}
+
+async function refreshCurrentAccountQuota() {
+  const row = document.querySelector('#local-accounts-list .local-account-row.current');
+  const accountId = String(row?.getAttribute('data-account-id') || '');
+  const quotaPanel = row?.querySelector('.local-account-quota');
+  if (!accountId || !quotaPanel || !isLocalAccountsPageVisible()) return false;
+  const result = await withQuotaUiDeadline(
+    window.agyHubAPI.fetchAccountQuota(accountId, { force: true, source: 'language-server' }),
+    5000
+  );
+  const currentRow = document.querySelector('#local-accounts-list .local-account-row.current');
+  if (String(currentRow?.getAttribute('data-account-id') || '') !== accountId) return false;
+  if (!result?.success || !result.quota) {
+    currentQuotaPollLog(`[Quota] 当前账号 Language Server 实时刷新失败：${result?.error || result?.message || '暂不可用'}`, 'error');
+    return false;
+  }
+  renderQuotaResultIntoPanel(currentRow.querySelector('.local-account-quota'), result);
+  persistQuotaResult(accountId, result);
+  return true;
+}
+
+const currentAccountQuotaPoller = createCurrentQuotaPoller({
+  intervalMs: CURRENT_ACCOUNT_QUOTA_POLL_INTERVAL_MS,
+  isActive: isLocalAccountsPageVisible,
+  refresh: refreshCurrentAccountQuota
+});
+
+function startCurrentAccountQuotaPolling(options = {}) {
+  currentQuotaPollLog = options.logToTerminal || currentQuotaPollLog;
+  if (!quotaVisibilityListenerInstalled && typeof document !== 'undefined') {
+    quotaVisibilityListenerInstalled = true;
+    document.addEventListener('visibilitychange', () => {
+      if (isLocalAccountsPageVisible()) currentAccountQuotaPoller.start();
+      else currentAccountQuotaPoller.stop();
+    });
+  }
+  if (isLocalAccountsPageVisible()) currentAccountQuotaPoller.start();
+}
+
+function stopCurrentAccountQuotaPolling() {
+  currentAccountQuotaPoller.stop();
 }
 
 function createLocalAccountRow(account, index, activeQuotaPromises, logToTerminal, isCurrentLoad = () => true, quotaOptions = {}) {
@@ -206,59 +338,14 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
   if (account.storageState === 'missing') {
     quotaPanel.innerHTML = `<div class="quota-error">凭据不可用，请先在官方客户端登录该账号</div>`;
   } else {
-    // 格式化重置倒计时
-    function formatResetTime(isoStr) {
-      if (!isoStr) return '';
-      try {
-        const target = new Date(isoStr);
-        const now = new Date();
-        const diffMs = target - now;
-        if (diffMs <= 0) return '';
-        const diffMins = Math.round(diffMs / 60000);
-        if (diffMins < 60) return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffMins}m重置)</span>`;
-        const diffHours = Math.floor(diffMins / 60);
-        const remMins = diffMins % 60;
-        if (diffHours < 24) return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffHours}h${remMins}m重置)</span>`;
-        const diffDays = Math.floor(diffHours / 24);
-        const remHours = diffHours % 24;
-        return `<span style="font-size:10px;opacity:0.75;margin-left:4px;">(${diffDays}d${remHours}h重置)</span>`;
-      } catch(e) { return ''; }
-    }
-
-    function getBarColor(percent) {
-      const val = Number(percent) || 0;
-      if (val >= 50) return 'var(--accent-green, #10b981)';
-      if (val >= 25) return '#f59e0b';
-      return 'var(--accent-pink, #ef4444)';
-    }
-
-    function renderQuotaResultIntoPanel(res) {
-      const quotaColumns = quotaSectionsForResult(res).map(section => {
-        const isArgonSection = section.title.toLowerCase().includes('argon');
-        const items = section.fields.map(({ field, label, state }) => {
-          if (state === 'unconfirmed') {
-            const lastSeen = isArgonSection ? argonLastSeenCopy(res) : null;
-            return `<div class="quota-item pending"><div class="quota-label"><span>${label}</span><span class="quota-val">待确认</span></div>${lastSeen ? `<div class="quota-last-seen">${lastSeen}</div>` : ''}</div>`;
-          }
-          const percent = quotaPercent(res, field);
-          const reset = formatResetTime(res.quota[`${field}Reset`]);
-          const barColor = isArgonSection && percent >= 50 ? '#8b5cf6' : getBarColor(percent);
-          return `<div class="quota-item"><div class="quota-label"><span>${label} ${reset}</span><span class="quota-val">${percent}%</span></div><div class="quota-bar"><div class="quota-fill" style="width: ${percent}%; background-color: ${barColor};"></div></div></div>`;
-        }).filter(Boolean).join('');
-        return items ? `<div class="quota-col${isArgonSection ? ' quota-col-argon' : ''}"><div class="quota-platform">${section.title}</div>${items}</div>` : '';
-      }).filter(Boolean);
-      quotaPanel.className = 'local-account-quota';
-      quotaPanel.innerHTML = `<div class="quota-grid${quotaColumns.length === 1 ? ' single' : ''}">${quotaColumns.join('')}</div>`;
-    }
-
-    const swrCacheKey = `agy_hub_quota_swr_v2_${account.id}`;
+    const swrCacheKey = quotaCacheKey(account.id);
     let swrRendered = false;
     try {
       const rawCache = typeof localStorage !== 'undefined' ? localStorage.getItem(swrCacheKey) : null;
       if (rawCache) {
         const parsed = JSON.parse(rawCache);
         if (parsed && parsed.savedAt && parsed.res?.success && parsed.res?.quota) {
-          renderQuotaResultIntoPanel(parsed.res);
+          renderQuotaResultIntoPanel(quotaPanel, parsed.res);
           swrRendered = true;
         }
       }
@@ -272,19 +359,15 @@ function createLocalAccountRow(account, index, activeQuotaPromises, logToTermina
     const qPromise = (async () => {
       try {
         const res = await withQuotaUiDeadline(
-          window.agyHubAPI.fetchAccountQuota(account.id, { force: quotaOptions.force === true })
+          window.agyHubAPI.fetchAccountQuota(account.id, quotaRequestOptions(account, quotaOptions.force))
         );
         if (!isCurrentLoad()) return { accountId: account.id, success: false, stale: true };
         if (res && res.success) {
           if (res.quotaSourceHost) {
             logToTerminal(`[Quota] ${account.email} source: ${res.quotaSourceHost}, ${res.quotaResponseTimeMs || 0}ms`);
           }
-          renderQuotaResultIntoPanel(res);
-          try {
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(swrCacheKey, JSON.stringify({ savedAt: Date.now(), res }));
-            }
-          } catch (_) {}
+          renderQuotaResultIntoPanel(quotaPanel, res);
+          persistQuotaResult(account.id, res);
 
           if (res.quotaDetails && Object.keys(res.quotaDetails).length > 0) {
             logToTerminal(`[Quota] 账号 ${account.email} 详细配额明细 (Project: ${res.projectId || '未知'}): ${JSON.stringify(res.quotaDetails)}`);
@@ -477,5 +560,19 @@ async function loadLocalAccounts(options = {}) {
 
 // 输出日志到终端
 
-  return { loadLocalAccounts, quotaFieldState, quotaPercent, calculateQuotaScore, quotaSectionsForResult, withQuotaUiDeadline, LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS };
+  return {
+    loadLocalAccounts,
+    startCurrentAccountQuotaPolling,
+    stopCurrentAccountQuotaPolling,
+    refreshCurrentAccountQuota,
+    createCurrentQuotaPoller,
+    quotaRequestOptions,
+    quotaFieldState,
+    quotaPercent,
+    calculateQuotaScore,
+    quotaSectionsForResult,
+    withQuotaUiDeadline,
+    LOCAL_ACCOUNTS_REFRESH_TIMEOUT_MS,
+    CURRENT_ACCOUNT_QUOTA_POLL_INTERVAL_MS
+  };
 });

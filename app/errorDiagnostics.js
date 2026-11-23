@@ -12,7 +12,7 @@
     if (code === 'RATE_LIMITED' || /429|频繁|rate.?limit/i.test(message)) {
       return { category: 'rate-limit', title: '请求过于频繁', message: message || '请稍后再试', retryable: true, action: '稍后重试' };
     }
-    if (['TIMEOUT', 'NETWORK_ERROR'].includes(code) || /timeout|timed out|网络|无法连接|ENOTFOUND|ECONN/i.test(message)) {
+    if (['TIMEOUT', 'NETWORK_ERROR'].includes(code) || /timeout|timed out|网络|无法连接|ENOTFOUND|ECONN|ERR_(?:CONNECTION|NETWORK|INTERNET)/i.test(message)) {
       return { category: 'network', title: '网络连接异常', message: message || '请检查网络后重试', retryable: true, action: '检查网络并重试' };
     }
     if (code === 'PERMISSION_DENIED' || /403|权限|forbidden/i.test(message)) {

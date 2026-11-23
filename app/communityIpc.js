@@ -95,6 +95,36 @@ function registerCommunityIpc(options) {
     if (!['GET', 'POST', 'DELETE'].includes(method)) return { success: false, ok: false, status: 405, code: 'METHOD_NOT_ALLOWED', message: '不允许的社区请求方法', data: {} };
     return client.request(resource, { method, body: requestOptions.body, cache: requestOptions.cache });
   });
+  ipcMain.handle('fetch-announcements', async (_event, requestOptions = {}) => {
+    const cacheKey = 'announcements:all';
+    if (requestOptions?.preferCache) {
+      const cached = client.readCache(cacheKey);
+      if (cached) {
+        return {
+          success: true,
+          data: cached.data,
+          stale: true,
+          fromCache: true,
+          savedAt: cached.savedAt,
+          warning: '正在后台同步最新公告'
+        };
+      }
+    }
+    const result = await client.request('/api/announcement?all=true', {
+      headers: { 'Cache-Control': 'no-cache' },
+      cacheKey
+    });
+    return result.success
+      ? {
+          success: true,
+          data: result.data,
+          stale: Boolean(result.stale),
+          fromCache: Boolean(result.fromCache),
+          savedAt: result.savedAt,
+          warning: result.warning || ''
+        }
+      : { success: false, code: result.code, error: result.message };
+  });
   if (options.registerExternal !== false) ipcMain.handle('open-external-url', async (_event, value) => {
     try {
       const url = safeExternalUrl(value);

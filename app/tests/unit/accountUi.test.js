@@ -6,7 +6,9 @@ const {
   quotaPercent,
   calculateQuotaScore,
   quotaSectionsForResult,
-  withQuotaUiDeadline
+  withQuotaUiDeadline,
+  quotaRequestOptions,
+  createCurrentQuotaPoller
 } = require('../../localAccountsController');
 
 test('quota UI deadline always releases a refresh that never settles', async () => {
@@ -63,4 +65,48 @@ test('Argon appears as a distinct card only when this account has positive capab
   assert.equal(visible.find(section => section.title === 'Gemini 4 Argon').fields[0].state, 'unconfirmed');
   const verified = quotaSectionsForResult({ ...base, capabilities: { argon: true }, quota: { ...base.quota, argonWeekly: '37%' } });
   assert.equal(verified.find(section => section.title === 'Gemini 4 Argon').fields[0].state, 'available');
+});
+
+test('removed historical Argon evidence cannot resurrect a card from an old account cache', () => {
+  const stale = {
+    quota: { gemini5h: '100%', geminiWeekly: '100%' },
+    capabilities: { argon: true },
+    argonCapabilityStatus: 'previously-available',
+    argonLastKnown: { lastPercent: '9%', checkedAt: Date.now() - 3600000 }
+  };
+  assert.equal(quotaSectionsForResult(stale).some(section => section.title === 'Gemini 4 Argon'), false);
+});
+
+test('only the current account selects Language Server quota', () => {
+  assert.deepEqual(quotaRequestOptions({ current: true }, true), { force: true, source: 'language-server' });
+  assert.deepEqual(quotaRequestOptions({ current: false }, true), { force: true, source: 'cloud' });
+});
+
+test('current-account poller schedules serial refreshes and stops off-page', async () => {
+  const callbacks = [];
+  const cleared = [];
+  let timerId = 0;
+  let active = true;
+  let refreshes = 0;
+  const poller = createCurrentQuotaPoller({
+    intervalMs: 15000,
+    isActive: () => active,
+    refresh: async () => { refreshes += 1; },
+    setTimeout: callback => { callbacks.push(callback); timerId += 1; return timerId; },
+    clearTimeout: id => cleared.push(id)
+  });
+  poller.start();
+  assert.equal(callbacks.length, 1);
+  await callbacks.shift()();
+  assert.equal(refreshes, 1);
+  assert.equal(callbacks.length, 1, 'successful tick schedules exactly one next refresh');
+  active = false;
+  await callbacks.shift()();
+  assert.equal(refreshes, 1, 'hidden page performs no quota read');
+  assert.equal(callbacks.length, 0, 'hidden page does not keep a polling timer alive');
+  active = true;
+  poller.start();
+  assert.equal(callbacks.length, 1);
+  poller.stop();
+  assert.deepEqual(cleared, [3]);
 });

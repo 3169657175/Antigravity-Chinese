@@ -3594,9 +3594,23 @@ body.light-theme .titlebar-theme-toggle-btn {
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.75;
-  white-space: pre-wrap;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
+.update-release-notes > :first-child { margin-top: 0; }
+.update-release-notes > :last-child { margin-bottom: 0; }
+.update-release-notes h2,
+.update-release-notes h3,
+.update-release-notes h4,
+.update-release-notes h5 { margin: 15px 0 7px; color: var(--text-main); font-size: 13px; line-height: 1.45; }
+.update-release-notes h2 { font-size: 15px; }
+.update-release-notes p { margin: 7px 0; }
+.update-release-notes ul,
+.update-release-notes ol { margin: 7px 0; padding-left: 22px; }
+.update-release-notes li { margin: 4px 0; }
+.update-release-notes blockquote { margin: 0 0 12px; padding: 8px 11px; color: var(--text-main); background: color-mix(in srgb, var(--accent-cyan) 8%, transparent); border-left: 3px solid var(--accent-cyan); border-radius: 3px; }
+.update-release-notes code { padding: 1px 5px; color: var(--accent-cyan); background: color-mix(in srgb, var(--accent-cyan) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent-cyan) 18%, transparent); border-radius: 4px; font-family: var(--font-mono); }
+.update-release-notes strong { color: var(--text-main); }
 .update-progress-section { margin-top: 18px; }
 .update-progress-section[hidden] { display: none; }
 .update-progress-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--text-dim); font-size: 10px; }

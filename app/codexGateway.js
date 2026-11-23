@@ -20,7 +20,6 @@ const {
   streamAnthropicResponse,
   anthropicError
 } = require('./anthropicGateway');
-const { modelForClaudeRoute } = require('./claudeModelRoutes');
 const {
   PROFILE_IDS,
   normalizeGatewayConfig,
@@ -29,6 +28,7 @@ const {
   profile,
   publicProfiles
 } = require('./gatewayProfiles');
+const { accountIdForSettings, diagnosticRouteFromHeaders, claudeRouteFromRequest } = require('./gatewayAccountRouting.js');
 const { RequestBodyError, jsonError, decodeRequestBody, readJson, codexRequestMetadata } = require('./gatewayHttp.js');
 const { canRetryGeneration, retryDiagnostic } = require('./retryPolicy.js');
 const { readJsonSafe } = require('./fsUtils.js');
@@ -881,9 +881,9 @@ class CodexGateway {
   antigravityModelCatalog() {
     return getAntigravityModelCatalog({ stateDir: this.stateDir });
   }
-
-  antigravityModels() {
-    const selectedId = this.config ? profile(this.config, PROFILE_IDS.CODEX_ANTIGRAVITY)?.accountId : '';
+  antigravityModels(accountIdOverride = '') {
+    const selectedId = String(accountIdOverride || (this.config
+      ? profile(this.config, PROFILE_IDS.CODEX_ANTIGRAVITY)?.accountId : '') || '');
     return gatewayModelsForAccount(selectedId, this.antigravityModelCatalog().models, MODELS);
   }
 
@@ -998,7 +998,7 @@ class CodexGateway {
       if (this.server && this.server.listening && port !== this.config.port) throw new Error('修改端口前请先停止服务');
     }
     configureGatewayConfig(this.config, settings, {
-      models: this.antigravityModels(),
+      models: this.antigravityModels(accountIdForSettings(this.config, settings)),
       defaultModel: DEFAULT_MODEL,
       defaultClaudeModel: DEFAULT_CLAUDE_MODEL
     });
@@ -1104,7 +1104,7 @@ class CodexGateway {
     const selectionConfig = options.modelOverride
       ? { ...routeProfile, model: options.modelOverride, modelControl: 'gateway' }
       : routeProfile;
-    const requestedModel = selectRequestedModel(body.model, selectionConfig, this.antigravityModels());
+    const requestedModel = selectRequestedModel(body.model, selectionConfig, this.antigravityModels(account.id));
     const resolvedModel = requestedModel === 'agy-auto' ? routeProfile.autoResolvedModel : requestedModel;
     const model = mapModel(resolvedModel);
     const request = convertResponsesRequest({ ...body, model }, {
@@ -1285,9 +1285,10 @@ class CodexGateway {
         anthropicError(res, 400, 'messages 必须是数组', 'invalid_request_error');
         return;
       }
-      const accountIdOverride = String(req.headers['x-agy-account-id'] || '').trim();
       const claudeProfile = profile(this.config, PROFILE_IDS.CLAUDE_ANTIGRAVITY);
-      const selectedClaudeModel = modelForClaudeRoute(body.model, claudeProfile.model);
+      const claudeRoute = claudeRouteFromRequest(req.headers, body.model, claudeProfile, id => this.antigravityModels(id));
+      const accountIdOverride = claudeRoute.accountId;
+      const selectedClaudeModel = claudeRoute.model;
       const responsesBody = normalizeResponsesToolHistory(
         anthropicToResponsesRequest({ ...body, model: selectedClaudeModel }, { defaultModel: selectedClaudeModel })
       );
@@ -1452,7 +1453,8 @@ class CodexGateway {
       // Only the active Custom API route receives bounded extra ingress headroom. This lets
       // us safely inspect an image-heavy request and reduce old history before forwarding;
       // Antigravity and Claude continue to use the original 32MB entry guard.
-      const customActive = this.config.activeCodexProfile === 'custom';
+      const diagnosticRoute = diagnosticRouteFromHeaders(req.headers, id => this.antigravityModels(id));
+      const customActive = this.config.activeCodexProfile === 'custom' && !diagnosticRoute.active;
       incomingBody = await readJson(req, responsesRequestReadLimit(customActive));
       const normalizedInbound = compatibility.normalizeBody(inboundRoute, incomingBody);
       responseProtocol = normalizedInbound.protocol;
@@ -1527,7 +1529,7 @@ class CodexGateway {
       res.once('finish', () => clearTimeout(timeout));
       const { kinds } = toolDeclarations(body.tools);
       const outputOptions = {
-        codexAccountId: profile(this.config, PROFILE_IDS.CODEX_ANTIGRAVITY).accountId,
+        codexAccountId: diagnosticRoute.accountId || profile(this.config, PROFILE_IDS.CODEX_ANTIGRAVITY).accountId,
         toolKinds: kinds,
         idleTimeoutMs: compaction ? COMPACTION_IDLE_TIMEOUT_MS : undefined,
         compactionFallback: fallbackSummary,
@@ -1559,7 +1561,7 @@ class CodexGateway {
       if (body.stream !== false) {
         const upstream = customActive
           ? await this.openCustomUpstream(body, controller.signal)
-          : await this.openUpstream(body, controller.signal, { compaction });
+          : await this.openUpstream(body, controller.signal, diagnosticRoute.upstreamOptions(compaction));
         outputOptions.resolvedModel = upstream.resolvedModel;
         if (customActive) {
           await relayResponsesUpstream(res, upstream.response, {
@@ -1585,7 +1587,7 @@ class CodexGateway {
           finishRequest('completed');
           return;
         }
-        const upstream = await this.openUpstream(body, controller.signal, { compaction });
+        const upstream = await this.openUpstream(body, controller.signal, diagnosticRoute.upstreamOptions(compaction));
         const upstreamText = await upstream.response.text();
         const payloads = parseUpstreamEvents(upstreamText);
         const parts = collectParts(payloads);

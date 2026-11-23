@@ -3,6 +3,12 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AgyGatewayController = api;
 })(typeof window !== 'undefined' ? window : globalThis, function createGatewayController() {
+  function isQuotaResponseCurrent({ requestId, activeRequestId, selectedId, currentSelectedId, responseAccountId = '' }) {
+    if (requestId !== activeRequestId) return false;
+    if (!selectedId || String(currentSelectedId || '') !== String(selectedId)) return false;
+    return !responseAccountId || String(responseAccountId) === String(selectedId);
+  }
+
   async function init(dependencies = {}) {
     const { scheduleAfterPaint, setCompactCount, formatCompactCount, escapeHTML } = dependencies;
   const gatewayUi = window.AgyGatewayUI || {};
@@ -61,6 +67,9 @@
       let activeCodexPage = 'overview';
       let gatewayRefreshAt = 0;
       let gatewayRefreshPromise = null;
+      let gatewayDraftAccountId = '';
+      let gatewayDraftModelId = '';
+      let claudeDraftAccountId = '';
       let claudeStatusCache = null;
       let claudeStatusRefreshAt = 0;
       let usageRefreshAt = 0;
@@ -362,6 +371,11 @@
         if (claudeDesktopModel && [...claudeDesktopModel.options].some(option => option.value === status.claudeModel)) {
           claudeDesktopModel.value = status.claudeModel;
         }
+        const configuredAccountId = codexProfile.accountId || status.codexAntigravityAccountId || status.accountId || '';
+        if (gatewayDraftAccountId && gatewayDraftAccountId !== configuredAccountId) {
+          renderSelectedAccount('已选择（未改变当前路由）');
+          return;
+        }
         const fallbackGroup = id => id === 'agy-auto'
           ? '自动路由'
           : id.startsWith('gemini-') ? 'Gemini'
@@ -375,7 +389,8 @@
           : fallbackModels.map(id => ({ id, label: id, group: fallbackGroup(id) }));
         const agyModels = agyModelEntries.map(entry => entry.id);
         const selectedModel = codexProfile.model || status.codexAntigravityModel || status.model;
-        const selected = agyModels.includes(selectedModel) ? selectedModel
+        const selected = agyModels.includes(gatewayDraftModelId) ? gatewayDraftModelId
+          : agyModels.includes(selectedModel) ? selectedModel
           : agyModels.includes(model.value) ? model.value : agyModels[0] || '';
         const groupedModels = new Map();
         for (const entry of agyModelEntries) {
@@ -454,13 +469,22 @@
           renderQuotaError('没有可用账号');
           return null;
         }
+        const selectedLabel = selectedAccountLabel();
         const requestId = ++quotaRequestId;
+        renderSelectedAccount('正在读取所选账号额度');
+        renderQuotaError('正在读取...');
         quotaGrid?.classList.add('loading');
         refreshQuotaButton.disabled = true;
         if (options.showResult) showResult('正在查询所选账号实时额度...');
         try {
           const response = await window.agyHubAPI.fetchAccountQuota(selectedId, { force: options.force === true });
-          if (requestId !== quotaRequestId) return null;
+          if (!isQuotaResponseCurrent({
+            requestId,
+            activeRequestId: quotaRequestId,
+            selectedId,
+            currentSelectedId: account.value,
+            responseAccountId: response?.accountId
+          })) return null;
           if (!response || response.success === false) throw new Error(response?.error || '额度查询失败');
           const entries = response.availableModelEntries;
           if (Array.isArray(entries) && entries.length && model) {
@@ -489,6 +513,7 @@
               model.appendChild(group);
             }
             model.value = options.some(option => option.value === previous) ? previous : 'agy-auto';
+            gatewayDraftModelId = model.value;
           }
           const quota = response.quota || {};
           renderQuotaItem('gemini5h', quota.gemini5h, quota.gemini5hReset);
@@ -506,18 +531,22 @@
             || 'claude-sonnet-4-6';
           const resolvedModel = claudeScore > geminiScore ? preferredClaude : preferredGemini;
           model.dataset.autoResolvedModel = resolvedModel;
-          if (model.value === 'agy-auto') {
-            renderSelectedAccount(`自动路由：${resolvedModel}`);
-          }
-          if (options.showResult) showResult(`已刷新 ${selectedAccountLabel()} 的实时额度`, 'success');
+          renderSelectedAccount(model.value === 'agy-auto' ? `自动路由：${resolvedModel}` : '已选择（未改变当前路由）');
+          if (options.showResult) showResult(`已刷新 ${selectedLabel} 的实时额度`, 'success');
           return response;
         } catch (error) {
-          if (requestId !== quotaRequestId) return null;
+          if (!isQuotaResponseCurrent({
+            requestId,
+            activeRequestId: quotaRequestId,
+            selectedId,
+            currentSelectedId: account.value
+          })) return null;
           renderQuotaError('读取失败');
+          renderSelectedAccount('额度读取失败');
           if (options.showResult) showResult(`额度查询失败：${error.message}`, 'error');
           return null;
         } finally {
-          if (requestId === quotaRequestId) {
+          if (requestId === quotaRequestId && account.value === selectedId) {
             quotaGrid?.classList.remove('loading');
             refreshQuotaButton.disabled = false;
           }
@@ -539,12 +568,19 @@
         const requestId = ++claudeQuotaRequestId;
         const selectedLabel = claudeDesktopAccount.options[claudeDesktopAccount.selectedIndex]?.textContent || selectedId;
         if (claudeGatewayAccountName) claudeGatewayAccountName.textContent = selectedLabel;
+        renderQuotaErrorIn(claudeGatewayQuotaGrid, '正在读取...');
         claudeGatewayQuotaGrid?.classList.add('loading');
         if (claudeGatewayRefreshQuotaButton) claudeGatewayRefreshQuotaButton.disabled = true;
         if (options.showResult) showClaudeDesktopResult('正在查询所选账号实时额度...');
         try {
           const response = await window.agyHubAPI.fetchAccountQuota(selectedId, { force: options.force === true });
-          if (requestId !== claudeQuotaRequestId) return null;
+          if (!isQuotaResponseCurrent({
+            requestId,
+            activeRequestId: claudeQuotaRequestId,
+            selectedId,
+            currentSelectedId: claudeDesktopAccount?.value,
+            responseAccountId: response?.accountId
+          })) return null;
           if (!response || response.success === false) throw new Error(response?.error || '额度查询失败');
           const quota = response.quota || {};
           renderQuotaItemIn(claudeGatewayQuotaGrid, 'gemini5h', quota.gemini5h, quota.gemini5hReset);
@@ -555,12 +591,17 @@
           if (options.showResult) showClaudeDesktopResult(`已刷新 ${selectedLabel} 的实时额度`, 'success');
           return response;
         } catch (error) {
-          if (requestId !== claudeQuotaRequestId) return null;
+          if (!isQuotaResponseCurrent({
+            requestId,
+            activeRequestId: claudeQuotaRequestId,
+            selectedId,
+            currentSelectedId: claudeDesktopAccount?.value
+          })) return null;
           renderQuotaErrorIn(claudeGatewayQuotaGrid, '读取失败');
           if (options.showResult) showClaudeDesktopResult(`额度查询失败：${error.message}`, 'error');
           return null;
         } finally {
-          if (requestId === claudeQuotaRequestId) {
+          if (requestId === claudeQuotaRequestId && claudeDesktopAccount?.value === selectedId) {
             claudeGatewayQuotaGrid?.classList.remove('loading');
             if (claudeGatewayRefreshQuotaButton) claudeGatewayRefreshQuotaButton.disabled = false;
           }
@@ -604,9 +645,11 @@
             const status = await window.agyHubAPI.getCodexGatewayStatus();
             renderStatus(status);
             const codexAccountId = status.profiles?.codexAntigravity?.accountId || status.codexAntigravityAccountId || status.accountId;
-            await loadAccounts(codexAccountId);
-            if (codexAccountId && [...account.options].some(option => option.value === codexAccountId)) {
-              account.value = codexAccountId;
+            const selectedAccountId = gatewayDraftAccountId || account.value || codexAccountId;
+            await loadAccounts(selectedAccountId);
+            const latestSelectedAccountId = gatewayDraftAccountId || selectedAccountId;
+            if (latestSelectedAccountId && [...account.options].some(option => option.value === latestSelectedAccountId)) {
+              account.value = latestSelectedAccountId;
             }
             renderSelectedAccount();
             renderApiAccess(status);
@@ -885,9 +928,11 @@
           claudeStatusRefreshAt = Date.now();
           const gateway = response.gateway || {};
           const claudeAccountId = gateway.profiles?.claudeAntigravity?.accountId || gateway.claudeAccountId || '';
-          await loadAccountsInto(claudeDesktopAccount, claudeAccountId);
-          if (claudeAccountId && [...(claudeDesktopAccount?.options || [])].some(option => option.value === claudeAccountId)) {
-            claudeDesktopAccount.value = claudeAccountId;
+          const selectedAccountId = claudeDraftAccountId || claudeDesktopAccount?.value || claudeAccountId;
+          await loadAccountsInto(claudeDesktopAccount, selectedAccountId);
+          const latestSelectedAccountId = claudeDraftAccountId || selectedAccountId;
+          if (latestSelectedAccountId && [...(claudeDesktopAccount?.options || [])].some(option => option.value === latestSelectedAccountId)) {
+            claudeDesktopAccount.value = latestSelectedAccountId;
           }
           if (claudeGatewayAccountName) {
             claudeGatewayAccountName.textContent = claudeDesktopAccount?.options[claudeDesktopAccount.selectedIndex]?.textContent || '没有可用账号';
@@ -1210,22 +1255,19 @@
       account.addEventListener('change', async () => {
         const selectedId = account.value;
         if (!selectedId) return;
-        account.disabled = true;
+        gatewayDraftAccountId = selectedId;
+        gatewayDraftModelId = '';
         renderSelectedAccount('已选择（未改变当前路由）');
-        try {
-          await refreshSelectedQuota();
+        const response = await refreshSelectedQuota();
+        if (response && account.value === selectedId) {
           showResult(`已选择测试/接入账号\n${selectedAccountLabel()}\n只有点击“连接到 Codex”才会改变当前网关路由。`, 'success');
-        } catch (error) {
-          renderSelectedAccount('额度读取失败');
-          showResult(`账号额度读取失败：${error.message}`, 'error');
-        } finally {
-          account.disabled = false;
         }
       });
     
       refreshQuotaButton.addEventListener('click', () => refreshSelectedQuota({ force: true, showResult: true }));
     
       model.addEventListener('change', async () => {
+        gatewayDraftModelId = model.value;
         if (modelControl) modelControl.value = 'gateway';
         showResult(`已选择测试/接入模型：${model.value}\n当前网关路由没有改变。`, 'success');
       });
@@ -1275,15 +1317,13 @@
       claudeDesktopAccount?.addEventListener('change', async () => {
         const selectedId = claudeDesktopAccount.value;
         if (!selectedId) return;
-        claudeDesktopAccount.disabled = true;
+        claudeDraftAccountId = selectedId;
         if (claudeGatewayAccountName) {
           claudeGatewayAccountName.textContent = `${claudeDesktopAccount.options[claudeDesktopAccount.selectedIndex]?.textContent || selectedId}，已选择（未改变当前路由）`;
         }
-        try {
-          await refreshClaudeSelectedQuota();
+        const response = await refreshClaudeSelectedQuota();
+        if (response && claudeDesktopAccount.value === selectedId) {
           showClaudeDesktopResult(`已选择 Claude Code 测试/接入账号\n${claudeDesktopAccount.options[claudeDesktopAccount.selectedIndex]?.textContent || selectedId}\n只有点击“连接到 Claude Code”才会改变当前网关账号。`, 'success');
-        } finally {
-          claudeDesktopAccount.disabled = false;
         }
       });
     
@@ -1424,5 +1464,5 @@
       }, 60 * 1000);
   }
 
-  return { init };
+  return { init, isQuotaResponseCurrent };
 });

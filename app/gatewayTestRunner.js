@@ -116,9 +116,11 @@ async function runCodexThreeLevelTest({ gateway, fetch, settings = {} }) {
   const requested = String(settings.model || profile.model || 'gemini-3.1-pro-high');
   const autoResolved = String(settings.autoResolvedModel || profile.autoResolvedModel || 'gemini-3.1-pro-high');
   const model = requested === 'agy-auto' ? autoResolved : requested;
-  const supportedModels = Array.isArray(status.antigravityModels) && status.antigravityModels.length
-    ? status.antigravityModels
-    : MODELS;
+  const targetAccountId = String(settings.accountId || profile.accountId || '');
+  const accountModels = typeof gateway.antigravityModels === 'function'
+    ? gateway.antigravityModels(targetAccountId)
+    : status.antigravityModels;
+  const supportedModels = Array.isArray(accountModels) && accountModels.length ? accountModels : MODELS;
   if (!supportedModels.includes(model) || model === 'agy-auto') throw new Error(`不支持的 Antigravity 模型：${model}`);
 
   await executeStep(report, LEVELS.NETWORK, '第 1 级：端口与鉴权', async () => {
@@ -164,10 +166,11 @@ async function runCodexThreeLevelTest({ gateway, fetch, settings = {} }) {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${status.apiKey}`,
-        'x-agy-account-id': String(settings.accountId || '')
+        'x-agy-account-id': targetAccountId,
+        'x-agy-diagnostic-model': model
       },
       body: JSON.stringify({
-        model: codexAliasForModel(model),
+        model: codexAliasForModel(model, supportedModels),
         input: [{ role: 'user', content: [{ type: 'input_text', text: '不要调用工具，只回复：CLIENT_OK' }] }],
         tools: [{
           type: 'function',
@@ -223,9 +226,11 @@ async function runClaudeThreeLevelTest({ gateway, fetch, settings = {} }) {
   const model = requested === 'agy-auto'
     ? String(settings.autoResolvedModel || profile.autoResolvedModel || 'gemini-3.1-pro-high')
     : requested;
-  const supportedModels = Array.isArray(status.antigravityModels) && status.antigravityModels.length
-    ? status.antigravityModels
-    : MODELS;
+  const targetAccountId = String(settings.accountId || profile.accountId || '');
+  const accountModels = typeof gateway.antigravityModels === 'function'
+    ? gateway.antigravityModels(targetAccountId)
+    : status.antigravityModels;
+  const supportedModels = Array.isArray(accountModels) && accountModels.length ? accountModels : MODELS;
   if (!supportedModels.includes(model) || model === 'agy-auto') throw new Error(`不支持的 Claude Code 上游模型：${model}`);
 
   const networkResult = await executeStep(report, LEVELS.NETWORK, '第 1 级：端口与 Anthropic 鉴权', async () => {
@@ -236,9 +241,9 @@ async function runClaudeThreeLevelTest({ gateway, fetch, settings = {} }) {
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01',
         'x-api-key': status.apiKey,
-        'x-agy-account-id': String(settings.accountId || '')
+        'x-agy-account-id': targetAccountId
       },
-      body: JSON.stringify({ model: routeForClaudeModel(model), messages: [{ role: 'user', content: '连接检查' }] })
+      body: JSON.stringify({ model: routeForClaudeModel(model, supportedModels), messages: [{ role: 'user', content: '连接检查' }] })
     });
     const body = await response.text();
     requireOk(response, 'Anthropic count_tokens', body);
@@ -273,10 +278,10 @@ async function runClaudeThreeLevelTest({ gateway, fetch, settings = {} }) {
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01',
         'x-api-key': status.apiKey,
-        'x-agy-account-id': String(settings.accountId || '')
+        'x-agy-account-id': targetAccountId
       },
       body: JSON.stringify({
-        model: routeForClaudeModel(model),
+        model: routeForClaudeModel(model, supportedModels),
         max_tokens: 1024,
         stream: false,
         messages: [{ role: 'user', content: '不要调用工具，只回复：CLAUDE_CLIENT_OK' }],

@@ -108,3 +108,14 @@ test('reply API accepts image-only comments and feedback reads the image URL', a
   assert.equal(rows[0].replies[0].image_url, 'https://cdn.example.test/reply.png');
   f.sql.close();
 });
+
+test('community management toolbars keep search spacing and aligned result counters', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'styles/community.css'), 'utf8');
+  assert.doesNotMatch(html, /与官网 nhw1029\.pages\.dev 实时数据共享/);
+  assert.match(html, /id="feedback-result-count" class="community-muted community-result-count"/);
+  assert.match(html, /id="admin-ann-result-count" class="community-muted community-result-count"/);
+  assert.match(html, /id="admin-user-summary" class="community-muted community-summary-line"/);
+  assert.match(css, /community-toolbar input[^}]*padding-inline:\s*13px/s);
+  assert.match(css, /\.community-result-count\s*\{[^}]*font-variant-numeric:\s*tabular-nums/s);
+});

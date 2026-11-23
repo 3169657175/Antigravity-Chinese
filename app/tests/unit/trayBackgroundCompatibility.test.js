@@ -105,7 +105,8 @@ test('compatibility builder restores close-to-background and safe real quit stat
   const legacyUtils = read(legacyArchive, 'dist/utils.js');
   let officialStyleUtils = read(patchArchive, 'dist/utils.js');
   if (officialStyleUtils.includes("win.on('close'")) {
-    officialStyleUtils = replaceSection(officialStyleUtils, "win.on('close'", '    void win.loadURL(url);');
+    const loadAnchor = officialStyleUtils.includes('    void loadHubWindowUrl(win, url,') ? '    void loadHubWindowUrl(win, url,' : '    void win.loadURL(url);';
+    officialStyleUtils = replaceSection(officialStyleUtils, "win.on('close'", loadAnchor);
   }
   if (officialStyleUtils.includes('function shouldRunInBackground() {')) {
     officialStyleUtils = replaceSection(

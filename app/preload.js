@@ -47,13 +47,15 @@ contextBridge.exposeInMainWorld('agyHubAPI', {
   uploadImage: (filePath, context) => ipcRenderer.invoke('upload-image', filePath, context),
   uploadImageData: (bytes, filename, context) => ipcRenderer.invoke('upload-image-data', bytes, filename, context),
   fetchFeedbacks: options => ipcRenderer.invoke('fetch-feedbacks', options),
+  fetchAnnouncements: options => ipcRenderer.invoke('fetch-announcements', options),
   submitFeedback: (content, imageUrl) => ipcRenderer.invoke('submit-feedback', content, imageUrl),
   deleteFeedback: (id) => ipcRenderer.invoke('delete-feedback', id),
   communityRequest: (resource, options) => ipcRenderer.invoke('community-request', resource, options),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
   fetchAccountQuota: (id, options = {}) => ipcRenderer.invoke('fetch-account-quota', {
     accountId: id,
-    force: options.force === true
+    force: options.force === true,
+    source: options.source === 'language-server' ? 'language-server' : 'cloud'
   }),
   switchLocalAccount: (id) => ipcRenderer.invoke('switch-local-account', id),
   addLocalAccount: (email, name, refreshToken) => ipcRenderer.invoke('add-local-account', { email, name, refreshToken }),

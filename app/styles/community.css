@@ -318,7 +318,44 @@ body.light-theme .page-num-btn:hover:not(.active) {
 #tab-admin-announcement .community-toolbar .community-search { flex: 1 1 220px; min-width: 0; }
 #tab-admin-users .community-toolbar input, #tab-admin-users .community-toolbar select,
 #tab-feedback .community-toolbar input, #tab-feedback .community-toolbar select,
-#tab-admin-announcement .community-toolbar input, #tab-admin-announcement .community-toolbar select { width: 100%; }
+#tab-admin-announcement .community-toolbar input, #tab-admin-announcement .community-toolbar select {
+  box-sizing: border-box;
+  width: 100%;
+}
+#tab-admin-users .community-toolbar input,
+#tab-feedback .community-toolbar input,
+#tab-admin-announcement .community-toolbar input { padding-inline: 13px; }
+#tab-admin-users .community-toolbar input::placeholder,
+#tab-feedback .community-toolbar input::placeholder,
+#tab-admin-announcement .community-toolbar input::placeholder { color: var(--text-muted); }
+.community-result-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: end;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-input);
+  font-size: 11.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.community-summary-line {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-input);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+#text-admin-users-count { font-variant-numeric: tabular-nums; }
 .community-pagination { flex-wrap: wrap; }
 .community-pagination button:disabled { opacity: .42; cursor: not-allowed; }
 .community-muted { color: var(--text-muted); }
@@ -331,6 +368,8 @@ body.light-theme .community-table tr { border-color: #e8edf3; }
 body.light-theme .community-table tbody tr:hover { background: #eff6ff; }
 body.light-theme .community-toolbar, body.light-theme .community-pagination,
 body.light-theme .feedback-item, body.light-theme .community-ann-record { background: #ffffff; border-color: #dbe3ee; color: #334155; }
+body.light-theme .community-result-count,
+body.light-theme .community-summary-line { background: #f8fafc; border-color: #dbe3ee; color: #475569; }
 body.light-theme .feedback-item { box-shadow: 0 1px 2px rgba(15,23,42,.045); }
 body.light-theme .feedback-date, body.light-theme .community-time { color: #64748b !important; }
 body.light-theme .feedback-author, body.light-theme .community-author-copy strong { color: #0f172a !important; }

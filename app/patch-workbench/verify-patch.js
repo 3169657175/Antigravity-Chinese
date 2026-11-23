@@ -4,7 +4,7 @@ const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
 const asar = require('@electron/asar');
-const { assertTrayModuleLoads } = require('./compatibility');
+const { assertTrayModuleLoads, assertOfficialLanguageServerRouting } = require('./compatibility');
 
 const root = path.resolve(__dirname, '..');
 const archivePath = path.join(root, 'assets', 'app.asar');
@@ -113,7 +113,28 @@ try {
   requireText(preload, 'Gemini 4 Argon', 'dist/preload.js');
   requireText(ipc, '.agy-native-switch-request.json', 'dist/ipcHandlers.js');
   requireText(ipc, 'agyPerformNativeAccountSwitch(String(request.accountId))', 'dist/ipcHandlers.js');
-  rejectText(preload, 'setInterval(refreshAgyActiveQuota', 'dist/preload.js');
+  requireText(preload, "ipcRenderer.invoke('agy:quota:refresh-current')", 'dist/preload.js');
+  requireText(preload, "ipcRenderer.invoke('agy:quota:get-current')", 'dist/preload.js');
+  requireText(preload, "ipcRenderer.on('agy:quota:updated'", 'dist/preload.js');
+  requireText(preload, 'function createQuotaSnapshotState(storage)', 'dist/preload.js');
+  requireText(preload, "isCurrent ? Promise.resolve(getAgyCurrentQuotaResult())", 'dist/preload.js');
+  rejectText(preload, "ipcRenderer.invoke('fetch-account-quota', { accountId: id", 'dist/preload.js');
+  rejectText(preload, "isCurrent ? electron_1.ipcRenderer.invoke('agy:quota:refresh-current')", 'dist/preload.js');
+  requireText(ipc, "{ key: 'gemini-argon-wtu-weekly', name: 'argon_weekly' }", 'dist/ipcHandlers.js');
+  requireText(ipc, "ipcMain.handle('agy:quota:get-current'", 'dist/ipcHandlers.js');
+  if (!/function registerIpcHandlers\([^)]*\)\s*\{\s*registerAgyIpcHandlers\(storageManager\);/.test(ipc)) {
+    throw new Error('Injected IPC registration must execute before the official registration body returns');
+  }
+  requireText(ipc, "ipcMain.handle('agy:quota:refresh-current'", 'dist/ipcHandlers.js');
+  requireText(ipc, "contents.send('agy:quota:updated', result)", 'dist/ipcHandlers.js');
+  requireText(ipc, 'webContents.getAllWebContents()', 'dist/ipcHandlers.js');
+  requireText(ipc, 'buildLanguageServerQuotaResult(summary)', 'dist/ipcHandlers.js');
+  requireText(ipc, "require('./accountTransfer').registerAccountTransferIpc", 'dist/ipcHandlers.js');
+  requireText(preload, "localStorage.setItem('agy_current_account_id', id)", 'dist/preload.js');
+  requireText(preload, 'agy_quota_snapshot_v3_', 'dist/preload.js');
+  requireText(preload, "storage.setItem('quota_' + snapshot.accountId + '_source', 'language-server')", 'dist/preload.js');
+  rejectText(ipc, "localStorage.getItem('agy_current_account_id')", 'dist/ipcHandlers.js');
+  rejectText(ipc, "window.dispatchEvent(new CustomEvent('agy-language-server-quota'", 'dist/ipcHandlers.js');
   rejectText(ipc, 'if (gemini5hVal === null) gemini5hVal = 100;', 'dist/ipcHandlers.js');
   rejectText(preload, 'antigravity-version-widget', 'dist/preload.js');
   rejectText(preload, "ipcRenderer.invoke('patch:check-update'", 'dist/preload.js');
@@ -128,8 +149,7 @@ try {
   requireText(ipc, '[Account Switch] Relaunching the full Antigravity process', 'dist/ipcHandlers.js');
   requireText(ipc, 'electron_1.app.relaunch();', 'dist/ipcHandlers.js');
   requireText(ipc, 'electron_1.app.exit(0);', 'dist/ipcHandlers.js');
-  requireText(languageServer, 'https://generativelanguage.googleapis.com', 'dist/languageServer.js');
-  requireText(languageServer, 'https://daily-cloudcode-pa.googleapis.com', 'dist/languageServer.js');
+  assertOfficialLanguageServerRouting(languageServer);
   requireText(languageServer, "env['HTTP_PROXY']", 'dist/languageServer.js');
   requireText(languageServer, "env['HTTPS_PROXY']", 'dist/languageServer.js');
   rejectText(languageServer, 'TOKEN_MONITOR_API_PORT = 31000', 'dist/languageServer.js');
@@ -149,7 +169,15 @@ try {
       if (!optionFields.includes(field)) throw new Error(`dist/languageServer.js is missing official option: ${field}`);
     }
     requireText(languageServer, '--host_bridge_url=${hostBridgeUrl}', 'dist/languageServer.js');
-    requireText(languageServer, '--host_bridge_token=${hostBridgeToken}', 'dist/languageServer.js');
+    if (clientVersionParts[0] === 2 && clientVersionParts[1] < 34) {
+      requireText(languageServer, '--host_bridge_token=${hostBridgeToken}', 'dist/languageServer.js');
+    } else {
+      // 2.34 keeps secrets out of argv and sends the bridge token through stdin.
+      requireText(languageServer, '--read_host_bridge_token_from_stdin', 'dist/languageServer.js');
+      requireText(languageServer, "env['ANTIGRAVITY_SERVER_CSRF_TOKEN'] = csrf", 'dist/languageServer.js');
+      requireText(languageServer, '_lsProcess.stdin?.end?.(`${hostBridgeToken}\\n\\n`)', 'dist/languageServer.js');
+      rejectText(languageServer, '--host_bridge_token=${hostBridgeToken}', 'dist/languageServer.js');
+    }
     rejectText(languageServer, 'function startLanguageServer(port, csrf, headless)', 'dist/languageServer.js');
   }
   const unpackedProbe = path.join('node_modules', 'chrome-devtools-mcp', 'package.json');

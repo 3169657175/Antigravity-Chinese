@@ -4,6 +4,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { discoverRuntime, isLoopbackUrl, parseAppConfig, fetchLiveQuotaSummary, clearQuotaBridgeCache } = require('../../antigravityQuotaBridge');
+const { fetchCurrentAccountLanguageServerQuota, parseGrpcQuotaSummary } = require('../../antigravityLanguageServerQuota');
+
+function grpcQuotaFrame(buckets) {
+  const parts = [Buffer.alloc(5)];
+  for (const [bucketId, fraction] of buckets) {
+    parts.push(Buffer.from(bucketId, 'utf8'), Buffer.from([0x25]));
+    const value = Buffer.alloc(4);
+    value.writeFloatLE(fraction, 0);
+    parts.push(value, Buffer.from([0x00]));
+  }
+  return Buffer.concat(parts);
+}
 
 test('quota bridge accepts only loopback Antigravity targets and parses runtime config', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-quota-bridge-'));
@@ -49,4 +61,41 @@ test('language-service quota cache isolates accounts and retries transient start
   clearQuotaBridgeCache();
   await fetchLiveQuotaSummary(options);
   assert.equal(reads, 4, 'switch invalidates cached quota');
+});
+
+test('grpc quota parser preserves all current-account buckets including Argon', () => {
+  const summary = parseGrpcQuotaSummary(grpcQuotaFrame([
+    ['gemini-weekly', 0.91],
+    ['gemini-5h', 0.82],
+    ['3p-weekly', 0.73],
+    ['3p-5h', 0.64],
+    ['gemini-argon-wtu-weekly', 0.17]
+  ]));
+  const byId = Object.fromEntries(summary.groups[0].buckets.map(bucket => [bucket.bucketId, Math.round(bucket.remainingFraction * 100)]));
+  assert.deepEqual(byId, {
+    'gemini-weekly': 91,
+    'gemini-5h': 82,
+    '3p-weekly': 73,
+    '3p-5h': 64,
+    'gemini-argon-wtu-weekly': 17
+  });
+});
+
+test('Hub Language Server reader sends structured force-refresh and preserves zero quota', async () => {
+  let requestedUrl = '';
+  const result = await fetchCurrentAccountLanguageServerQuota({
+    discoverRuntime: async () => ({ origin: 'https://127.0.0.1:33123', csrfToken: 'local', appVersion: '2.26.0' }),
+    requestBuffer: async (url, options) => {
+      requestedUrl = url;
+      assert.equal(options.headers['Content-Type'], 'application/json');
+      assert.deepEqual(JSON.parse(options.body.toString()), { forceRefresh: true });
+      return Buffer.from(JSON.stringify({ groups: [{ buckets: [
+        { bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.17 },
+        { bucketId: 'gemini-5h', remainingFraction: 0 }
+      ] }] }));
+    }
+  });
+  assert.match(requestedUrl, /RetrieveUserQuotaSummary$/);
+  assert.equal(Math.round(result.summary.groups[0].buckets[0].remainingFraction * 100), 17);
+  assert.equal(result.summary.groups[0].buckets[1].remainingFraction, 0);
 });

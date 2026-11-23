@@ -123,7 +123,7 @@
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.1 9a3 3 0 1 1 5.8 1c-.7 1.2-2.9 1.5-2.9 3"></path><path d="M12 17h.01"></path></svg>
           使用引导
         </button>
-        <div class="version-badge" id="app-version-badge">v1.4.3</div>
+        <div class="version-badge" id="app-version-badge">v1.4.7</div>
       </div>
     </aside>
 
@@ -879,14 +879,13 @@
         <div class="pane-header flex-row space-between-align-center">
           <div>
             <h2>反馈与讨论</h2>
-            <p class="subtitle">与官网 nhw1029.pages.dev 实时数据共享，同步呈现您的优化反馈。</p>
           </div>
           <button class="btn-refresh-feedbacks" id="btn-refresh-feedbacks" title="刷新反馈流">刷新反馈流</button>
         </div>
         
         <div class="pane-body flex-column gap-14">
           <!-- 反馈筛选与列表 -->
-          <div class="community-toolbar"><label class="community-search">搜索反馈<input type="search" id="feedback-search" placeholder="搜索作者或反馈内容"></label><label>显示顺序<select id="feedback-sort"><option value="newest">最新发布</option><option value="popular">最多点赞</option><option value="unanswered">待回复</option></select></label><span id="feedback-result-count" class="community-muted" aria-live="polite"></span></div>
+          <div class="community-toolbar"><label class="community-search">搜索反馈<input type="search" id="feedback-search" placeholder="搜索作者或反馈内容"></label><label>显示顺序<select id="feedback-sort"><option value="newest">最新发布</option><option value="popular">最多点赞</option><option value="unanswered">待回复</option></select></label><span id="feedback-result-count" class="community-muted community-result-count" aria-live="polite"></span></div>
           <div class="feedback-stream-card">
             <div class="feedback-flow-container" id="feedback-flow-list">
               <!-- 骨架屏 / 实时云数据 -->
@@ -915,7 +914,7 @@
 
           <div id="admin-users-list-panel" class="card community-workbench">
             <div class="community-row"><h3>注册用户 <span class="community-tag" id="text-admin-users-count">0</span></h3><button class="btn btn-secondary" id="admin-users-refresh" type="button">刷新列表</button></div>
-            <p id="admin-user-summary" class="community-muted"></p>
+            <p id="admin-user-summary" class="community-muted community-summary-line"></p>
             <div class="community-toolbar">
               <label class="community-search">搜索用户<input id="admin-user-search" type="search" placeholder="输入用户名"></label>
               <label>角色<select id="admin-user-role-filter"><option value="">全部角色</option><option value="admin">管理员</option><option value="user">普通用户</option></select></label>
@@ -953,7 +952,7 @@
         <div class="pane-body flex-column gap-14">
           <!-- 历史公告列表面板 -->
           <div class="card">
-            <div class="community-toolbar"><label class="community-search">搜索公告<input type="search" id="admin-ann-search" placeholder="搜索公告内容"></label><label>排序<select id="admin-ann-sort"><option value="newest">最新发布</option><option value="oldest">最早发布</option></select></label><span id="admin-ann-result-count" class="community-muted" aria-live="polite"></span></div>
+            <div class="community-toolbar"><label class="community-search">搜索公告<input type="search" id="admin-ann-search" placeholder="搜索公告内容"></label><label>排序<select id="admin-ann-sort"><option value="newest">最新发布</option><option value="oldest">最早发布</option></select></label><span id="admin-ann-result-count" class="community-muted community-result-count" aria-live="polite"></span></div>
             <div class="announcement-history-flow" id="admin-ann-history-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
               <!-- 动态载入历史公告 -->
             </div>

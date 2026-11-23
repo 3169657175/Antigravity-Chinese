@@ -6,7 +6,7 @@ const path = require('path');
 const { Worker } = require('worker_threads');
 const asar = require('@electron/asar');
 const { resolveUnpackedSource } = require('../../patchRuntimeBuilder');
-const { buildLanguageServerStartOverlay } = require('../../patch-workbench/compatibility');
+const { buildLanguageServer, buildLanguageServerStartOverlay } = require('../../patch-workbench/compatibility');
 
 const installedAsar = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Antigravity', 'resources', 'app.asar');
 const officialAsar = process.env.ANTIGRAVITY_OFFICIAL_ASAR
@@ -48,6 +48,70 @@ test('modern language server overlay preserves official endpoints and proxy sema
   assert.match(overlaid, /env\['HTTPS_PROXY'\]/);
   assert.match(overlaid, /3100\[01\]/);
   assert.doesNotMatch(overlaid, /function startLanguageServer\(port, csrf, headless\)/);
+});
+
+test('language server overlay supports the async shell environment flow used by Antigravity 2.29', () => {
+  const officialStart = [
+    'async function startLanguageServer(port, csrf, options = {}) {',
+    '    const { headless, hostBridgeUrl, hostBridgeToken, wsl } = options;',
+    '    const loginShellEnv = await takeShellEnv();',
+    '    return new Promise((resolve, reject) => {',
+    '        const args = [',
+    "            '--api_server_url',",
+    "            'https://generativelanguage.googleapis.com',",
+    "            '--cloud_code_endpoint',",
+    "            'https://daily-cloudcode-pa.googleapis.com',",
+    '        ];',
+    '        const env = { ...process.env, ...loginShellEnv };',
+    "        env['AGY_BROWSER_ACTIVE_PORT_FILE'] = getActivePortFilePath();",
+    '        _lsProcess = spawn(spawnCmd, spawnArgs, { env });',
+    '        resolve({ args, env, wsl });',
+    '    });',
+    '}'
+  ].join('\n');
+
+  const overlaid = buildLanguageServerStartOverlay(officialStart);
+  assert.equal(overlaid.split('async function startLanguageServer(').length - 1, 1);
+  assert.doesNotMatch(overlaid, /async async function/);
+  assert.match(overlaid, /const loginShellEnv = await takeShellEnv\(\)/);
+  assert.match(overlaid, /env\['HTTP_PROXY'\]/);
+  assert.match(overlaid, /env\['HTTPS_PROXY'\]/);
+  assert.match(overlaid, /_lsProcess = spawn\(spawnCmd, spawnArgs, \{ env \}\)/);
+});
+
+test('language server rebuild preserves an already-async 2.29 start function', () => {
+  const official = [
+    'exports.getLsPort = getLsPort;',
+    'let _lsPort = 0;',
+    '/** Clears the language server process reference */',
+    'async function startLanguageServer(port, csrf, options = {}) {',
+    '    const loginShellEnv = await takeShellEnv();',
+    '    return new Promise((resolve) => {',
+    '        const args = [',
+    "            'https://generativelanguage.googleapis.com',",
+    "            'https://daily-cloudcode-pa.googleapis.com',",
+    '        ];',
+    '        const env = { ...process.env, ...loginShellEnv };',
+    '        resolve({ args, env });',
+    '    });',
+    '}',
+    '/** Sets whether the termination was intentional */',
+    'function resetLanguageServer() {',
+    '    setIntentionalTermination(false); // Reset',
+    '}'
+  ].join('\n');
+  const legacy = [
+    'function getLsCsrf() {',
+    '    return _lsCsrf;',
+    '}',
+    '/** Clears the language server process reference */'
+  ].join('\n');
+
+  const rebuilt = buildLanguageServer(official, legacy);
+  assert.equal(rebuilt.split('async function startLanguageServer(').length - 1, 1);
+  assert.doesNotMatch(rebuilt, /async async function/);
+  assert.match(rebuilt, /const env = \{ \.\.\.process\.env, \.\.\.loginShellEnv \}/);
+  assert.match(rebuilt, /env\['HTTPS_PROXY'\]/);
 });
 
 test('official backup naming resolves its paired unpacked directory', () => {

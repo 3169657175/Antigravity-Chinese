@@ -101,7 +101,7 @@ async function reconcileFeedbacksInBackground() {
 async function ensureCommunityLoaded() {
   await ensureAuthLoaded();
   return pageLifecycle.once('community-page', async () => {
-    await Promise.all([loadFeedbacks(false, { showSkeleton: true, preferCache: true }), loadAnnouncementSystemDesktop()]);
+    await loadFeedbacks(false, { showSkeleton: true, preferCache: true });
   });
 }
 
@@ -158,6 +158,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 绑定选项卡点击切换
   window.AgyNavigationController.bind({ navItems, tabPanes, onNavigate: (targetId, item) => {
+      const localAccountsController = window.AgyLocalAccountsController;
+      if (targetId !== 'tab-local-accounts') {
+        localAccountsController?.stopCurrentAccountQuotaPolling?.();
+      }
       
       // 切换导航项 Active
       // Active state is owned by navigationController.js.
@@ -178,6 +182,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         pageLifecycle.once('local-accounts-page', async () => {
           await loadLocalAccounts();
           await initTokenMonitor();
+        }).then(() => {
+          localAccountsController?.startCurrentAccountQuotaPolling?.({ logToTerminal });
         });
       } else if (targetId === 'tab-codex-gateway') {
         pageLifecycle.once('codex-page', () => initCodexGateway()).then(() => {
@@ -207,6 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     logToTerminal(`组件载入异常: ${err.message}`, 'error');
   });
   scheduleAfterPaint(() => initThemeManager());
+  // The announcement entry is global application chrome. Bootstrap it on
+  // every launch instead of waiting for the feedback page to be opened.
+  void bootstrapAnnouncementSystemDesktop();
 });
 
 async function initMarketplace() {
@@ -1898,7 +1907,7 @@ async function toggleLikeReplyDesktop(replyId, feedbackId) {
 window.toggleLikeReplyDesktop = toggleLikeReplyDesktop;
 
 // 桌面端专属：云端置顶公告系统 (高斯模糊强弹 + 顶栏常驻)
-async function loadAnnouncementSystemDesktop() {
+async function loadAnnouncementSystemDesktop(options = {}) {
   const modalHTML = `
     <div class="modal-overlay" id="announcement-modal" style="display: none; z-index: 10005;">
       <div class="modal-content" style="width: 480px;">
@@ -1923,11 +1932,11 @@ async function loadAnnouncementSystemDesktop() {
   }
 
   const barHTML = `
-    <div class="global-announcement-bar-desktop" id="global-announcement-bar-desktop" style="display: none;">
+    <div class="global-announcement-bar-desktop" id="global-announcement-bar-desktop" style="display: block;">
       <div class="announcement-bar-content-desktop">
         <span class="announcement-bell"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg></span>
         <span class="announcement-text-desktop" id="text-announcement-bar-content-desktop">最新公告加载中...</span>
-        <button class="announcement-view-link-desktop" id="btn-reopen-announcement-desktop">点击查看详情 &rarr;</button>
+        <button class="announcement-view-link-desktop" id="btn-reopen-announcement-desktop" disabled>正在同步…</button>
       </div>
     </div>
   `;
@@ -1949,17 +1958,23 @@ async function loadAnnouncementSystemDesktop() {
   const textAnnBarContent = document.getElementById('text-announcement-bar-content-desktop');
   const btnReopenAnn = document.getElementById('btn-reopen-announcement-desktop');
 
-  if (!annModal || !annModalBody || !annBar || !annModalFooter || !btnExpandAll) return;
+  if (!annModal || !annModalBody || !annBar || !annModalFooter || !btnExpandAll || !textAnnBarContent || !btnReopenAnn) return;
+  annBar.style.display = 'block';
 
   try {
-    const res = await window.AgyCommunityController.request('/api/announcement?all=true', { cache: 'no-store' });
-    if (!res.ok) throw new Error(`请求失败 (${res.status})`);
-
-    const payload = await res.json();
+    const result = await window.agyHubAPI.fetchAnnouncements({ preferCache: options.preferCache === true });
+    if (!result?.success) throw new Error(result?.error || '公告请求失败');
+    const payload = result.data;
     const announcements = (Array.isArray(payload) ? payload : payload ? [payload] : [])
       .filter(item => item && item.content)
       .sort(window.AgyCommunityData.newest);
-    if (!announcements.length) { annBar.style.display = 'none'; annModal.style.display = 'none'; return; }
+    if (!announcements.length) {
+      textAnnBarContent.textContent = '暂时没有系统公告';
+      btnReopenAnn.textContent = '暂无公告';
+      btnReopenAnn.disabled = true;
+      annModal.style.display = 'none';
+      return { success: true, fromCache: Boolean(result.fromCache), empty: true };
+    }
 
     const latestAnnouncement = announcements[0];
     let expanded = false;
@@ -2023,10 +2038,12 @@ async function loadAnnouncementSystemDesktop() {
     // 展现顶栏常驻条
     textAnnBarContent.textContent = latestAnnouncement.content;
     annBar.style.display = 'block';
+    btnReopenAnn.disabled = false;
 
-    // 判定强弹
+    // The bar is permanent. Each newly published announcement proactively
+    // opens once per local profile, then remains available from this entry.
     const lastReadId = localStorage.getItem('read_announcement_id_desktop');
-    // Announcements stay available in the bar; opening them is an explicit action.
+    const lastShownId = localStorage.getItem('shown_announcement_id_desktop');
     btnReopenAnn.textContent = lastReadId === String(latestAnnouncement.id) ? '查看公告 →' : '查看新公告 →';
 
     const closeAnn = () => {
@@ -2049,8 +2066,41 @@ async function loadAnnouncementSystemDesktop() {
       btnReopenAnn.onclick = openLatestAnnouncement;
     }
 
+    if (options.allowAutoOpen !== false && lastShownId !== String(latestAnnouncement.id)) {
+      openLatestAnnouncement();
+      localStorage.setItem('shown_announcement_id_desktop', String(latestAnnouncement.id));
+    }
+
+    return { success: true, fromCache: Boolean(result.fromCache), latestId: String(latestAnnouncement.id) };
+
   } catch (e) {
     console.error('公告系统载入失败:', e.message);
+    // A transient request failure must never remove the global entry or erase
+    // a cached announcement that was already rendered.
+    if (!textAnnBarContent.textContent || textAnnBarContent.textContent === '最新公告加载中...') {
+      textAnnBarContent.textContent = '公告暂时无法加载';
+    }
+    btnReopenAnn.disabled = false;
+    btnReopenAnn.textContent = '重新加载 →';
+    btnReopenAnn.onclick = () => loadAnnouncementSystemDesktop({ allowAutoOpen: true });
+    return { success: false, error: e.message };
+  }
+}
+
+async function bootstrapAnnouncementSystemDesktop() {
+  const initial = await loadAnnouncementSystemDesktop({ preferCache: true, allowAutoOpen: false });
+  if (initial?.fromCache) {
+    // Cache provides the instant first paint; this pass reconciles it with the
+    // server and performs the one-time popup for a newly published item.
+    await loadAnnouncementSystemDesktop({ preferCache: false, allowAutoOpen: true });
+    return;
+  }
+  if (initial?.success && initial.latestId) {
+    const lastShownId = localStorage.getItem('shown_announcement_id_desktop');
+    if (lastShownId !== initial.latestId) {
+      document.getElementById('btn-reopen-announcement-desktop')?.click();
+      localStorage.setItem('shown_announcement_id_desktop', initial.latestId);
+    }
   }
 }
 

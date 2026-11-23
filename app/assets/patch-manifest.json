@@ -1,9 +1,9 @@
 {
   "formatVersion": 2,
-  "clientVersion": "2.26.0",
+  "clientVersion": "2.34.0",
   "supportedClientRange": ">=2.4.3 <3.0.0",
-  "patchVersion": "1.4.3",
-  "pluginVersion": "1.4.3",
+  "patchVersion": "1.4.7",
+  "pluginVersion": "1.4.7",
   "buildStrategy": "official-baseline-with-declarative-overlay",
   "unpackedMode": "preserve-official",
   "requiredCapabilities": [
@@ -15,13 +15,14 @@
     "dist/utils.js",
     "dist/ipcHandlers.js",
     "dist/accountVault.js",
+    "dist/accountTransfer.js",
     "dist/accountQuota.js",
     "dist/accountQuotaCache.js",
     "dist/argonEvidence.js",
     "dist/antigravityQuotaBridge.js"
   ],
   "optionalCapabilities": [],
-  "officialSha256": "8ce27ff7c2defa10ed1ed2817288a61c546690f4cae1b1a8c91d4e69e0851e4d",
-  "patchSha256": "3f0defdc4da30a3584b8eb8288c630c4b221704cfb1ee05abe4a83d65a0333b4",
-  "builtAt": "2026-10-24T13:19:56.857Z"
+  "officialSha256": "8934adef0622c9271c92eea950a71848764a66f7b10023ccbd82e54b959adb0e",
+  "patchSha256": "2854a732bb5465a6835f2902c3b3cc52d8b2366e3ae7fc66694c7440f8c7ae16",
+  "builtAt": "2026-11-22T14:25:40.470Z"
 }

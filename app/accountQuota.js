@@ -12,7 +12,7 @@ const OPTIONAL_FIELDS = Object.freeze(['argonWeekly']);
 const SHORT_WINDOW_FIELDS = Object.freeze(['gemini5h', 'claude5h']);
 const WEEKLY_FIELDS = Object.freeze(['geminiWeekly', 'claudeWeekly']);
 const ARGON_MODEL_ID = /^gemini[-_](?:4[-_])?argon(?:[-_]|$)/i;
-const CLI_QUOTA_USER_AGENT = 'antigravity/cli/1.4.5 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)';
+const CLI_QUOTA_USER_AGENT = 'antigravity/cli/1.4.7 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)';
 
 function fractionPercent(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -32,6 +32,37 @@ function parseQuotaSummary(payload) {
     }
   }
   return quota;
+}
+
+function buildLanguageServerQuotaResult(payload, options = {}) {
+  const startedAt = Number(options.startedAt) || Date.now();
+  const quota = parseQuotaSummary(payload);
+  if (![...FIELDS, ...OPTIONAL_FIELDS].some(field => quota[field] !== undefined)) {
+    throw new Error('Language Server quota response contained no recognized buckets');
+  }
+  const missingQuotaFields = FIELDS.filter(field => quota[field] === undefined);
+  for (const field of missingQuotaFields) {
+    quota[field] = '--';
+    quota[`${field}Reset`] = null;
+  }
+  const hasArgonQuota = quota.argonWeekly !== undefined;
+  return {
+    success: true,
+    quota,
+    projectId: '',
+    quotaSourceHost: 'local-language-server',
+    partial: missingQuotaFields.length > 0,
+    missingQuotaFields,
+    confirmedMissingQuotaFields: [],
+    unconfirmedQuotaFields: [...missingQuotaFields],
+    capabilities: { argon: hasArgonQuota },
+    argonQuotaSource: hasArgonQuota ? 'local-language-server' : null,
+    argonCapabilityStatus: hasArgonQuota ? 'available' : 'unconfirmed',
+    quotaSource: 'local-language-server',
+    optionalQuotaFields: hasArgonQuota ? ['argonWeekly'] : [],
+    clientVersion: String(options.clientVersion || ''),
+    quotaResponseTimeMs: Math.max(0, Date.now() - startedAt)
+  };
 }
 
 function parseModelQuota(payload) {
@@ -272,4 +303,4 @@ async function fetchAccountQuota({ fetch, accessToken, projectId, clientVersion,
   };
 }
 
-module.exports = { fetchAccountQuota, parseQuotaSummary, parseModelQuota, modelEntries };
+module.exports = { fetchAccountQuota, parseQuotaSummary, buildLanguageServerQuotaResult, parseModelQuota, modelEntries };
